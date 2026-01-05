@@ -1,0 +1,23 @@
+The unit test '[[test]]' for function '[[function]]' has finished with failure
+
+The test has been started with the following command line:
+
+[[command]]
+
+And here is the output:
+
+[[output]]
+
+Here is the source code for the unit test:
+[[test_src]]
+
+Review the test output for errors and let me know if you think they can be fixed by only modifying the '[[function]]' source, without changing data types defined outside of the function scope, the function name and signature:
+[[function_ctx]]
+
+Don't provide revisited implementation source in your response. I will ask you for this a bit later.
+
+Please, start your answer with YES: or NO:
+For example
+YES: the following errors could be fixed in the '[[function]]' source ...
+Or
+NO: Explain the reason why the errors can't be fixed in the '[[function]]' source and what can be done to address them. Let me know if the test logic needs to be modified

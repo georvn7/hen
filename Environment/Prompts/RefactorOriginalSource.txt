@@ -1,0 +1,14 @@
+FUNCTION IMPLEMENTATION AFTER REFACTORING
+
+You have to implement the function [[declaration]]
+, by following the description of this function and taking into account previous discussion about the refactoring. Remember, to optimize its size by splitting functionality, now the implementation has to call the new function '[[new_function]]' which will be declared and implemented a bit later based on the usage in the source of '[[function]]' and description of the '[[new_function]]'
+
+Implementing '[[function]]', you can use the language and libraries as specified in the 'Programming Language' and 'Available Libraries' sections
+
+Please, have a look on the application-defined data types and functions above, if any. Try to understand how to leverage already available functions, enums, structs and their members.
+
+However, prefer existing application-defined data types (structs and enums) and their members when implementing the function. Introduce new ones if existing definitions cannot adequately serve the purpose.
+
+For your implementation, consult with available implementation or review checklists if they are listed above
+
+Now please, go ahead and revise '[[function]]'

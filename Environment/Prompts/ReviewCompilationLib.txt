@@ -1,0 +1,44 @@
+I've tried to compile the function '[[declaration]]'
+
+[[function_ctx]]
+
+Here is the output from the Clang compiler:
+
+[[output]]
+
+Here is the list of 'available data types and functions' for the implementation of '[[function]]'
+
+[[api]]
+
+Current Favorite Functions:
+
+[[favorites]]
+
+And here is the list of the available Application Functions:
+
+[[existing_functions]]
+
+[[analysis]]
+
+Review the compiler output to understand the specific errors preventing [[function]] from compiling. 
+
+Consider whether any of the existing application functions can help fix the compilation errors. Focus on functions that might:
+
+- Consider functions that can help with necessary data type conversions
+- Functions to replace erroneous code fragments from the implementation of [[function]]
+- Functions that supply missing functionality required by [[function]].
+- Incorporate functions that handle errors to resolve compilation issues related to inadequate error checking.
+- Employ initialization functions to set up variables or system states that [[function]] depends on, addressing compilation errors caused by uninitialized variables or improper setup.
+- Match function calls with correct signatures by using existing functions that align with the expected parameters and return types
+- Replace intricate code blocks with existing utility functions that perform the same operations more reliably, reducing compilation errors
+- Use functions that enforce explicit typing to overcome compilation errors related to type inference or template instantiation problems
+
+Provide an updated list of favorite functions with brief explanations for each selection:
+
+- Review the current favorite functions, if any.
+- Your goal is to identify functions that could help resolve the errors
+- Update the list of favorite functions, selecting those most relevant for fixing compilation errors in [[function]]'s implementation.
+- Explain what is the motivation to select or update favorite functions and how they can be used in the implementation.
+- You can use available functions for anything else that might help avoid current compilation errors.
+- It is entirely acceptable to select no functions if none are a good fit and can't be used to fix compilation errors in [[function]]'s implementation.
+- You should strive to keep the number of the function listed in the Favorite Functions list less than 10

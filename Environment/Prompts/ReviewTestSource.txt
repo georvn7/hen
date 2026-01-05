@@ -1,0 +1,11 @@
+I've compiled the unit test '[[test]]' with the following command line:
+
+[[command]]
+
+And here is the output:
+
+[[output]]
+
+Review the output for errors and try to fix them in the unit test source.
+
+Provide the code in your response in markdown syntax. Prefix the C++ source code with ```cpp and postfix the code in your response with ```

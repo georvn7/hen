@@ -1,0 +1,20 @@
+When you've defined or updated the C++ data type for '[[struct]]', used by function '[[function]]'
+
+The following data type has been introduced:
+[[new_data]]
+However, data type with the same name already exists in other parts of this code base:
+[[new_context]]
+
+Please review the new and old data definitions for '[[new_struct]]' As a priority, consider to update if necessary and reuse the already existing data definition without introducing destructive chances since it is already used by other parts of this codebase. If reuse is possible, in your response provide full definition (no missing members) only of the updated data structs or enums.
+
+If reuse is not possible, introduce a new datatype but with a different name! In this case follow the guidelines:
+
+If necessary, you can define or update other structures and enums that this data type depends on. Avoid nested definitions for structures and enums, unions can be nested.
+In your response, provide definitions exactly as in the C++ .h and .cpp, including the ; character at the end.
+Use C++ structures but don't use C++ specific features as access specifiers, constructors, destructors, inheritance.
+Don't provide include statements in the source. I will ask you which files I need to include later.
+Consult with the 'AVAILABLE LIBRARIES' section what features and data types you can use when defining structure fields. Avoid reimplementation and redefinition of functionality and data already available in the libraries or other parts of this software.
+Provide inline comments to clearly explain the purpose of each member. We need this to review data type usage and decide how compatible it is as input or output to various functions.
+
+Provide the code in your response in markdown syntax. Prefix the C++ source code with ```cpp and postfix the code in your response with ```
+Now go ahead and define '[[struct]]' 

@@ -1,0 +1,26 @@
+DISTILL SYSTEM ANALYSIS
+
+I'm generating synthetic training data to train an LLM for my AI coding agent for C++ debugging.
+
+I want you to generate the 'analysis' for the provided pair of REQUEST and RESPONSE
+
+REQUEST STARTS
+[[json_request]]
+REQUEST ENDS
+
+RESPONSE STARTS
+[[json_response]]
+RESPONSE ENDS
+
+
+This 'analysis' is the same field in a .jason file that could be used to train a reasoning LLM with 'harmony' chart format. So the analysis should be provided as thinking chain-of-thought 
+
+You can use all of the information available in this discussion but the thinking should sound like intuition based on previous experience. The only information you can directly quote in the thinking is the one available in the REQUEST
+The thinking analysis shows the THINKING IN PROGRESS, not a finished explanation. Think like an expert muttering to themselves while debugging.
+The thinking should feel like watching someone's reasoning unfold in real-time.
+Thinking reads like internal monologue/reasoning, not post-hoc explanation
+Thinking is 5-10 sentences showing the reasoning flow
+Thinking connects observations from the request to reach the final conclusion in the response
+The reasoning flow (analysis → motivation) feels natural and expert-level
+
+Note: I'm not asking here for your internal/native thinking tokens, I rather ask you to produce synthetic chain-of-thought reasoning (analysis) that led to that response.

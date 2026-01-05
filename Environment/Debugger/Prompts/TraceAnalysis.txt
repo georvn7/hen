@@ -1,0 +1,43 @@
+[[app_info]]
+[[trajectory]]
+[[trace_desc]]
+
+TRACE ANALYSIS
+
+//Information for function '[[function]]'
+[[function_info]]
+
+I ran the application “[[application]]” in trace mode to debug the function “[[function]]”. The application is single‑threaded.
+
+Trace configuration
+
+- Trace every function entry.
+- For the functions called directly by “[[function]]” there is a trace point
+- Each trace point records the source location, call stack and live variable values.
+- Custom breakpoints, if any, with all attributes of a regular trace point but can optionally have condition and expression.
+- All trace points and breakpoints are capped at [[hit_count]] hits to limit the log size.
+- Provide trace log here is in full application trace mode but detailed functions trace is also captured
+- Note that most of the trace events are accessible only in detailed function trace as explained in the 'TRACE DESCRIPTION' section
+
+[[test_log]]
+
+//full application trace mode log starts here
+[[trace_log]]
+//trace log ends here
+
+[[analysis_hint]]
+
+Review the debugging progress and the trace log! When you are analyzing the log and information provided in the trace points and breakpoints, try to understand and confirm correct behavior for:
+- The code execution path on the functions call tree level and does it correspond to how the application is tested? You can consult with the application call graph and listed application functions with their brief description.
+- With what arguments the function '[[function]]' is called and are they looking correct?
+- Is the execution flow in the body of '[[function]]' looks correct?
+- Are the custom application functions called by '[[function]]' receive correct arguments and return expected results?
+- Is the result (or mutable output function arguments) returned by '[[function]]' seem to be correct?
+- You can follow the execution path, function input arguments by tracking the entering of each function.
+- In case of timed out execution break, try to analyze where the application hangs. There is a trace point on each function entry so you should be able to identify the last function before the hang unless this function is with hit count greater than maximum hit count of [[hit_count]]
+[[breakpoint]]
+Update your debug notes. Try to provide analysis that can be used to fix the behavior of '[[application]]'. We are going to use this information later to decide what should be the next step debugging the application. Note that what is written in the debug notes will be the only information available to the next steps in the debugging process. The trace log will not be available for the next steps. Ensure all important information is analyzed and presented in the debug notes! 
+
+Update the log summary. In the log summary add quotes from the trace log that we can refer to in the next steps. The trace log will not be available for the next steps. Ensure all important fragments from the trace log are preserved in the log summary!
+
+Based on your analysis of the trace log, if you identify any issues, update the lists with application-defined custom functions, custom data types, and files that are relevant to those issues and might be of an interest for the next steps in the debugging process. Information for the listed functions, data types and files will be provided later.

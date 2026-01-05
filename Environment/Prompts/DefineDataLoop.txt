@@ -1,0 +1,18 @@
+DEFINE DATA TYPE
+[[context]]
+
+Define or if required update only the data type definition for '[[struct]]' as we've discussed. Familiarize with the provided analysis, description and motivation for all data type definitions or modifications and how they relate to '[[struct]]'
+
+Reminders:
+
+In your response, provide definitions exactly as in the C++ .h and .cpp, including the ; character at the end.
+Use C++ structures but don't use C++ specific features as access specifiers, constructors, destructors, inheritance.
+Don't provide include statements in the source.
+Provide inline comments to clearly explain the purpose of each member. We need this to review data type usage and decide how compatible it is as input or output to various functions.
+When reviewing and updating already existing data types avoid destructive changes like removing or renaming existing members. 
+Always provide full definition including when you update existing data types.
+Don't use templates in the data structs and function definitions.
+Application defined data types must not store any kind of function pointers in their members.
+If '[[struct]]' is an existing data type, don't introduce destructive changes by modifying existing members. Existing data types are shared with other places in the codebase.
+
+Provide the code in your response in a single section with markdown syntax. Prefix the C++ source code with ```cpp and postfix the code in your response with ```

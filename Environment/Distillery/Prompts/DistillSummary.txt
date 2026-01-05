@@ -1,0 +1,34 @@
+DISTILL SUMMARY
+
+I'm generating synthetic training data to train an LLM-based AI coding agent for C++ debugging.
+
+We want to generate a summary that it concise, has optimal length but also relevant to the the fix sequence we are going to optimize
+
+OLD SUMMARY
+[[old_summary]]
+
+DEBUGGING STEPS TO SUMMARIZE
+[[summarize_trajecotry]]
+
+
+[[sequence_to_distill]] - this is the sequence that will be distilled in the next step
+[[sequence_to_summarize]] - this is the sequence (DEBUGGING STEPS TO SUMMARIZE) that you need to summarize this step along with the OLD SUMMARY
+
+The task is to summarize both the OLD SUMMARY and the DEBUGGING STEPS in a new concise summary:
+- The new summary needs to be concise
+- One or two concise sentence on the following topics but only if they are relevant to the OLD SUMMARY and the DEBUGGING STEPS. However, this is not a hard limit as we don't want to miss something important.
+- The new summary must contain concise history of the previous fixes, if any.
+
+1. What you've learned about how to debug the application and how to use the available actions.
+2. Highlight resolved blockers: how they were identified and how they could have been caught earlier.
+3. Explain suboptimal fixes: the reasoning behind them and better alternatives.
+4. Highlight unnecessary changes: how they could have been prevented.
+5. Preserve learnings about key aspects of the high-level architecture of this application that are important when debugging it.
+6. Preserve diagnostic evidence: Error messages, log excerpts, specific symptoms
+7. Preserve a list of recent fixes applied to track potential regressions in subsequent steps
+8. Maintain hypothesis evolution: How understanding of the problem changed
+9. Keep decision points: Why certain approaches were chosen/abandoned
+10. Retain technical specifics: Function names, file names, line numbers, configurations
+11. Track verification results: What was confirmed working vs. still broken
+12. Preserve breakthrough moments: Key insights that advanced understanding
+13. Preserve the number/range of the debugging steps for all of the above artifacts as we might refer to those steps in the future

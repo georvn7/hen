@@ -1,0 +1,26 @@
+[[context]]
+ANALYZE DATA TYPES REQUEST
+
+Analyze what new data types need to be introduced or what existing data types need modification based on the description (implementation if provided) and declaration of '[[function]]' and related functions/types. The analysis should consider data types used not only in '[[function]]'s declaration, but also in its description, dependent code paths, and definitions of related data structures and enumerations. This includes types that are members or components of other types in the dependency chain.
+[[quick_analysis]]
+[[parent]]
+Analyze the requirements by reviewing our previous discussions. We need to define or update data type definitions in the context of their usage in the code and function descriptions. Using this information, determine what data structures and their members related to '[[function]]' require new definitions or updates to existing ones. Propose only necessary changes and explain your reasoning.
+
+Focus your response on analysis rather than providing source code.
+
+Format your response following one of these 2 options:
+
+1. If no new data types are needed and existing data type definitions for '[[function]]' and dependent struct/enum types don't require updates, leave the 'items' array empty.
+
+2. For each struct or enum type that requires creation or modification, provide:
+   - 'type_name': The name of the custom data type
+   - 'type': Whether it's a struct or enum
+   - 'description': A concise description (1-2 sentences) of the data type including proposed modifications
+   - 'motivation': Explain why this new type is needed or why the existing one needs updating. Detail which members need to be added or modified, including their names and data types. Base your explanation on the requirements from the provided code or feedback, and explain how it relates to '[[function]]'
+
+Important notes:
+- Include only application-defined struct or enum types that are new or need modification
+- Do not include standard C++ types or unchanged existing types
+- The analysis should provide clear guidance on how to implement the required data structure changes
+
+The primary goal is to provide precise and sufficient information about required C++ data type changes related to '[[function]]'

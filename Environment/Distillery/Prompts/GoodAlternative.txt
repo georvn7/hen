@@ -1,0 +1,7 @@
+ANALYZE DEBUGGIN TRAJECTORY
+
+
+Ooookay, it is that moment! After hard work on my AI coding agent it started super successfully to produce consistent, syntactically correct, but most importantly debugged and working code. By looking at this trajectory (you can also refer to the test and project description but note that the compiler is just a use case) can you clearly highlight 10 fixes (steps with the fix_function action) that contribute the most to the progress by removing blockers, the 10 steps that contribute less to the progress or even prevent the progress. The rest of the steps separate on two groups - based on their contributions
+
+Note that missing steps, between the listed one are step for acquiring Information such as:
+log_info, function_info, data_info, file_info, call_graph, functions_summary, step_info, search_source

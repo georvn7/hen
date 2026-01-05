@@ -1,0 +1,28 @@
+
+DEBUGGING TRAJECTORY DISTILLATION WORKFLOW
+==============================================================================
+Transform raw debugging trajectories into optimized training data for AI coding agents.
+PIPELINE:
+1. MERGE: Consolidate consecutive fixes to the same function into anchor steps. This is done algorithmically by the agent
+2. SCORE: LLM-assisted. Categorize each run_test→fix_function sequence:
+   - BLOCKERS: Critical fixes required for success
+   - REGRESSIONS: Fixes that introduced new bugs
+   - CONTRIBUTORS: Helpful but non-essential changes
+   - UNNECESSARY: No meaningful impact
+3. OPTIMIZE: LLM-assisted. Remove trial-and-error from high-value sequences:
+   - Keep first run_test
+   - Select essential information-gathering actions only
+   - Combine intermediate fixes into one comprehensive fix_function
+   - Ensure each step logically follows from prior visible information
+4. SUMMARIZE: LLM-assisted. Update running summary with key learnings, resolved blockers,
+   diagnostic evidence, and technical specifics. Also distilled to fit size constraints
+5. DISTILL: For each step in the optimal sequence, generate training pair:
+   - Analysis: Chain-of-thought reasoning (internal monologue)
+   - Motivation: Action decision with comprehensive context
+   
+6. EXPORT: Format as harmony chat dataset (request→response pairs)
+KEY CONSTRAINTS:
+- Context resets after run_test (only test results visible)
+- Traces/logs refresh after run_test and after fix_function
+- Each step sees only information from previous steps in its sequence
+==============================================================================

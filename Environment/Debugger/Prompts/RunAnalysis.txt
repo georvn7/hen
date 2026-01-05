@@ -1,0 +1,42 @@
+[[app_info]]
+
+APPLICATION RUN ANALYSIS
+
+I've executed the '[[application]]' application with debug support to perform test as described in the 'TEST DESCRIPTION' section
+
+I will ask you to analyze the debug log. The log contain messages printed by the application. Log messages printed by the application have the following format:
+
+comp_scan_identifier:3 ln 80 - Scanned identifier: 'RED' at line 2, column 5
+
+In this example;
+[function_name]:[hit_count] ln [source_line] - [actual_message]
+Where:
+
+function_name is the name of the function generating the debug output (comp_scan_identifier)
+hit_count (or invocation ID) indicates how many times this function has been called (3)
+source_line shows which line in the source code produced this log (80)
+actual_message contains the specific information being logged (Scanned identifier: 'RED' at line 2, column 5)
+
+Since the log is too long, we are reviewing it section-by-section. Here is the current progress with all the steps analyzing the log section by section so far:
+//Current progress start
+[[progress]]
+//Current progress end
+
+Here is the new section of the log:
+//New log section start
+[[log]]
+//New log section end
+
+
+
+Review the progress and the current log section!
+
+Update your debug notes. We are going to use this information later to decide what would be the next step debugging the application. If the test is successful the 'debug_notes' field must have only one word - "PASS"
+
+Update the log summary. In the log summary add quotes from the new log section that are relevant to the finding collected in the new debug notes. 
+
+While analyzing the current log section, if you identify any issues, update the lists with application-defined custom functions, custom data types, and files that are relevant to those issues and are worth further investigation. For each field ('functions', 'data_types', 'test_files'), you can select up to 5 items, including any previously selected items. Information for the listed functions, data types and files will be provided later. If no issues you can leave the corresponding list empty.
+
+Observe for reward-hacking practices as they are strictly prohibited!
+
+Ideally, 'debug_notes' and 'log_summary' fields have to be 3 paragraphs or fewer, less than 2048 characters each, but this is not a hard limit as we don't want to miss something important.

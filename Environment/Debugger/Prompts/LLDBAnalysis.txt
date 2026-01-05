@@ -1,0 +1,35 @@
+[[app_info]]
+[[trajectory]]
+
+LLDB DEBUGGER BATCH MODE ANALYSIS
+
+//Information for function '[[function]]'
+[[function_info]]
+
+I've executed the '[[application]]' application under LLDB in batch mode to debug the function '[[function]]'
+For that purpose I set the following LLDB commands in batch mode:
+- A breakpoint at entering and existing each application function
+- For the function '[[function]]' its parent and children additional breakpoints at entering and exiting each scope
+- Each breakpoint optionally might have commands for providing information about process status, thread info, thread backtrace, frame select and frame variable
+- Due to limitation in the size of the lldb trace log, all breakpoints have an implicit condition to hit (and log) only the first 3 times  
+
+I will ask you to analyze the lldb debug log. The log contains debug information provided by LLDB
+
+//LLDB log starts here
+[[lldb_log]]
+//LLDB log ends here
+
+Review the progress and the LLDB trace log! When you are analyzing the log and information provided in the breakpoints, try to understand and confirm correct behavior for:
+- The code execution path on the functions call tree level and does it correspond to how the application is tested? You can consult with the application call graph and listed application functions with their brief description.
+- With what arguments the function '[[function]]' is called and are they looking correct?
+- Is the execution flow in the body of '[[function]]' looks correct?
+- Are the custom application functions called by '[[function]]' receive correct arguments and return expected results?
+- Is the result (or mutable output function arguments) returned by '[[function]]' seem to be correct?
+- You can follow the execution path, function input arguments and returned results by tracking the entering and exit frames of each function and values of the frame variables.
+- In case of timed out execution break, try to analyze where the application hangs.
+[[breakpoint]]
+Update your debug notes. Try to provide analysis that can be used to fix the behavior of '[[application]]'. We are going to use this information later to decide what should be the next step debugging the application. Note that what is written in the debug notes will be the only information available to the next steps in the debugging process. LLDB commands and log will not be available for the next steps. Ensure all important information is analyzed and presented in the debug notes! 
+
+Update the log summary. In the log summary add quotes from the lldb log that we can refer to in the next steps. LLDB commands and log will not be available for the next steps. Ensure all important fragments from the lldb log are preserved in the log summary!
+
+Based on your analysis of the LLDB log, if you identify any issues, update the lists with application-defined custom functions, custom data types, and files that are relevant to those issues and might be of an interest for the next steps in the debugging process. Information for the listed functions, data types and files will be provided later.

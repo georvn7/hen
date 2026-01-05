@@ -1,0 +1,43 @@
+NAMING CONVENTION
+
+Local Variables: Use Snake Case for clarity and distinction from other identifiers.
+Example: int item_index;
+
+Global Variables:
+Prefix with 'g_' followed by Snake Case to indicate global scope and prevent naming collisions.
+Example: int g_word_counter;
+
+Functions:
+Function Names: Use Snake Case for readability and brevity due to database size constraints.
+Keep names under 20 characters to function as index tags.
+Ensure global uniqueness to prevent redefinitions.
+Prioritize distinctiveness and utility over readability (e.g., calculate_total() could be clc_total()).
+
+Constants and Macros:
+Use UPPERCASE Snake Case to distinguish from variables and functions.
+Example: #define MAX_BUFFER_SIZE 512
+
+Type Definitions and Structs:
+Use Pascal Case to differentiate types from variables.
+Examples:
+Struct: struct CarSpecification { ... };
+
+Enumerations:
+Must use 'enum class'
+Must specify underlying type to uint32_t
+Name must start with 'E'
+Second letter must be capital
+Remaining letters in PascalCase, Example: EPlayerState, EWeaponType
+Enum values in UPPERCASE Snake Case. Example: IDLE, MOVING_LEFT, GAME_OVER
+Full Example:
+enum class EPlayerState : uint32_t
+{
+ IDLE,
+ MOVING_LEFT,
+ MOVING_RIGHT,
+};
+
+General Recommendations:
+Consistency: Ensure uniformity across the project.
+Readability Over Brevity: Opt for descriptive names that convey meaning without clutter.
+Project-Specific Prefixes: Use concise prefixes for components, library or module identifiers to avoid collisions and clarify ownership.

@@ -1,0 +1,15 @@
+Review your previous analysis of '[[function]]' and its data types against these criteria:
+
+1. Are all proposed struct and enum changes directly related to '[[function]]' and justified by actual usage?
+2. Are changes limited to what can be clearly deduced from provided information?
+3. Is the 'items' array correctly empty when no updates are needed?
+4. Does each type's motivation explain which specific function requirements or code usage necessitate the change?
+5. Does each proposed change list the exact member names, their data types, and how they will be used?
+6. Have you avoided including standard C++ types or unchanged existing types?
+
+Start your response with either:
+YES: followed by a brief confirmation that the analysis meets all criteria
+Or
+NO: followed by specific points where the analysis needs improvement (without providing an updated analysis yet)
+
+Focus on review of the analysis rather than providing code.

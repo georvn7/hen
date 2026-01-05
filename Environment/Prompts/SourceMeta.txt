@@ -1,0 +1,7 @@
+FUNCTION METADATA
+
+Please, provide metadata from the implementation of the function '[[function]]'
+
+Provided all include directives only for libraries described in 'available libraries' and used in the implementation of '[[function]]'. Please have a look on the [[function]] implementation source to check which libraries are required.
+
+Provide call stack for all external functions called by '[[function]]' as specified in 'external' section

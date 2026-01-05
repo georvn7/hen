@@ -1,0 +1,5 @@
+Please revise the implementation of the function [[declaration]] by taking into account solutions we've discussed!
+
+[[api]]
+
+Provide the code in your response in markdown syntax. Prefix the C++ source code with ```cpp and postfix the code in your response with ```

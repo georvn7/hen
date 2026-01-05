@@ -1,0 +1,9 @@
+[[source]]
+
+Review the C data type definitions in the source above. These data types have been defined or updated as a request to define or revise the '[[struct]]' data type definition. I found a few things in these data type definitions that might need attention:
+
+[[review]]
+
+Please review the listed notes and taking into account previous instructions about the definition of '[[struct]]' if makes sense, provide updated definitions. Note that it is not necessary anything to need change, this is just a chance for us not miss something. Whatever you decide, to adjust your response or keep the current one, please do your best effort to provide new full response without asking questions.
+
+Provide the code with data type definitions in your response in a single section with markdown syntax. Prefix the C++ source code with ```cpp and postfix the code in your response with ```

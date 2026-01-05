@@ -1,0 +1,25 @@
+
+Summarize the project description based on the following chat conversation with the user:
+
+//Conversation starts here
+[[conversation]]
+//Conversation ends here
+
+A good project description should state the following details:
+- Command line interface
+- List of supported features
+- List of features that should not be supported
+- High level components and algorithms explanation
+- Conformance to industry standards if applicable
+- Behavior expectations
+- Error handling
+- Format of the generated output or intermediate data
+- Desired program logic for certain conditions
+- Clearly stated trade-offs between simplicity, functionality, optimal implementation, supported features, and other constraints
+
+
+For reference how to summarize project description with the right level of detail and size follow this example:
+
+//Sample project description starts here
+[[sample_description]]
+//Sample project description ends here

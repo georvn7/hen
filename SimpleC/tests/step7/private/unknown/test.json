@@ -1,0 +1,33 @@
+{
+  "name": "S7_cumulative_trimmed",
+  "description": "Standalone runner with 13 tests: arithmetic, relational, logical, bitwise, assignments, loops, goto, conditional, comma, else, struct_union, pointers, enum_switch. Accepts comma-separated int and float params. Returns a bitmap of failing tests; 255 when no args; 254 for an unknown test. (Not included: sizeof, short_char, other.)",
+  "pretest": {
+    "commands": [
+      "clang -E -P ./s7.c -o ./s7_pre.c"
+    ],
+    "input_files": ["s7.c"],
+    "output_files": ["s7_pre.c"]
+  },
+  "test": {
+    "commands": [
+      "[[result=0]]-v -o ./s7.s ./s7_pre.c"
+    ],
+    "input_files": ["s7_pre.c"],
+    "output_files": ["s7.s"]
+  },
+  "posttest": {
+    "commands": [
+      "test -f ./s7.s || (echo '_DEBUG_COMMAND_RESULT=65535' && exit 1)",
+      "clang --target=aarch64-apple-darwin -c ./s7.s -o ./s7.o",
+      "clang --target=aarch64-apple-darwin ./s7.o -o ./s7",
+      "[[debug,result=254]]./s7 unknown:1"
+    ],
+    "input_files": ["s7.s"],
+    "output_files": ["s7.o", "s7"]
+  },
+  "regression_files": ["s7.c"],
+  "io_files" : ["s7_pre.c", "s7.s"],
+  "io_hint": "Require exact registry matches; unknown names must trigger the designated “unknown” status immediately. Parameters after : never influence matching.",
+  "timeout": 5,
+  "expected_result": "0"
+}

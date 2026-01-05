@@ -1,0 +1,31 @@
+I need help fixing compilation errors in my C++ code for the function '[[function]]'. Here's the libclang evaluation results and code:
+
+Errors:
+[[errors]]
+
+Available functions:
+[[api]]
+
+- Some of the functions, if any, listed in 'Available functions' might already have declarations, other functions might have just name. 
+- For those with only name, you might have to figure out some of the data types produced and consumed by the function, you have to decide what are their arguments and return type based on functions descriptions. Based on your decision, we are going to declare and define those functions later.
+
+Code:
+```cpp
+[[code]]
+```
+Constraints:
+1. You may modify the implementation of '[[function]]' (not its signature)
+2. You may modify the following data types/members:
+[[modifiable]]
+3. You might introduce new data types
+
+Requirements:
+- For function implementation changes:
+ [[source_checklist]]
+
+- For data type/member changes:
+ [[data_requirements]]
+
+Return only the fixed implementation and fixed data types in your response, if either has been modified.
+
+Provide the code in your response in only one block with markdown syntax. Prefix the C++ source code with ```cpp and postfix the code in your response with ```

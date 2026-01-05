@@ -1,0 +1,43 @@
+
+[[trajectory]]
+[[test_files]]
+
+DEBUG TRAJECTORY SCORING
+
+The trajectory shows a sequence of test runs and function fixes that ultimately result in a passing test and successful compilation. Between each run_test-fix_function sequence we have information gathering actions that are currently skipped but could be: log_info, function_info, debug_function, data_info, file_info, call_graph, functions_summary, step_info, search_source 
+
+TASK
+
+Analyze the debugging trajectory and categorize each test-fix sequence by its contribution to passing the test.
+Sequence definition: Each sequence starts with a run_test step and includes all actions until the next run_test. Information-gathering actions (log_info, function_info, etc.) are part of sequences but don't need individual scoring and aren't listed in the trajectory.
+
+Merged steps note:
+
+fix_function steps that fix the same function are already procedurally merged and denoted in the trajectory, for example:
+NOTE: Merge step 224 into step 229 as it fixes the same function 'cg_emit_index_simple_rec'
+The last original step in the merged sequence is the anchor step, for example:
+NOTE: Anchor’s own step 229
+When listing steps in your response don't list steps that are already merged under a given anchor
+
+CATEGORIES
+
+Score each sequence into ONE category:
+1. BLOCKERS
+Critical fixes that directly resolved test-blocking issues. Without these, the test could not pass.
+
+2. REGRESSIONS
+Attempted to fix critical blockers but introduced new bugs. Good intent, flawed execution.
+
+3. CONTRIBUTORS
+Helpful changes that supported success but weren't strictly necessary to pass the test (e.g., better error handling, refactoring, edge case fixes).
+
+4. UNNECESSARY
+No meaningful impact on test success, or introduced bugs while fixing non-critical issues. Noise or misdirected effort.
+
+RULES
+
+List ONLY fix_function step numbers (not run_test or info-gathering steps)
+Don't list steps that are merged in, instead list their anchor steps.
+Provide detailed analysis about your decision. In your reasoning, consider groping steps that are related to similar issues.
+Skip sequences you're uncertain about in which category to put—don't force categorization
+Base scoring on evidence from trajectory (error messages, outcomes), not assumptions

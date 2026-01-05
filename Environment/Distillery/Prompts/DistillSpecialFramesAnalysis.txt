@@ -1,0 +1,16 @@
+DISTILL SYSTEM ANALYSIS
+
+I'm generating synthetic training data to train an LLM-based AI coding agent for C++ debugging.
+
+I want you to revise the system analysis response according to the recently optimized track sequence: [[optimized_sequence]]
+
+OLD ANALYSIS REQUEST
+[[json_request]]
+
+OLD ANALYSIS RESPONSE
+[[json_response]]
+
+If in our conversation we've discussed merged fixes you can revise the system analysis and clarity of describing the current blocker based on this information and also provide the thinking process behind of identifying the blocker in the 'thinking_analysis'.
+
+Please, revise the system analysis response according to the recently optimized track sequence: [[optimized_sequence]]
+In the field 'thinking_analysis' you can provide thinking tokens that will be used to train the LLM. By producing thinking tokens, you can consider everything form our discussion and provide thinking insights but this should look as intuitive logical process based only on the information available in the 'OLD ANALYSIS REQUEST' and strong intuition from debugging experience.

@@ -1,0 +1,19 @@
+Based on the project description provide:
+- Name of the project in the field 'func_name'
+- Single concise sentence of the project description in the field 'brief'. Try to mention consumed input and produced output.
+
+//Project description start here
+[[description]]
+//Project description end here
+
+//Sample project description start here
+[[sample_description]]
+//Sample project description end here
+
+The name of the project has to be a valid C++ identifier between 6 and 16 characters. 
+See the sample name based on the sample project description:
+[[sample_name]]
+
+The project summary should capture the essential features of the project and the implementation focus and limitations.
+For the level of detail refer to the sample summary based on the sample project:
+[[sample_brief]]

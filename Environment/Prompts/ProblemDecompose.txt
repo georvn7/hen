@@ -1,0 +1,32 @@
+PROBLEM DECOMPOSE
+
+We are going to implement a C++ console-based software application containing multiple functions and data definitions. This is a complex task but we can try to hierarchically decompose it on a simpler steps and try to solve them one by one, by defining functions from top-to-bottom and their implementation from bottom-to-top.
+
+For that purpose we have to examine this software as a functions call tree, starting from the application entry point function '[[entry_point]]'. We should strive, each function to be less than 100 lines of source code.
+
+Here is what is our workflow
+
+1. We start with hierarchical traversal and defining the functions one by one, starting from the application entry point function '[[entry_point]]', for each function:
+
+2. Get detailed definition for the function, name, declaration, description, arguments and outputs
+
+3. If the current function calls only functions, that are already implemented in the available libraries or other parts of the software and can be implemented with less than 100 lines of source code, then stop further traversal and implement this function.
+
+4. Get list with name and description for all the functions that the current function calls and aren't implemented yet
+
+5. Implement the function by assuming data types and their members that aren't defined yet 
+
+6. Define the C structs that the function use as arguments and outputs.
+
+7. For each of the called functions from step 4 repeat steps from 1 to 6
+
+Do the above steps until we have entire software decomposed. The core idea of this approach is each step to be small enough, so that you will be able to provide solution, minimizing the probability of error.
+
+When I need to explain a C-like function call stack it will be in the following format:
+main>func1>func2>func3
+Where 'main', 'func1', 'func2', 'func3' are functions and 'main>func1' means the function 'main' calls function 'func1'
+
+Sometime, I will need to explain function definition path. It is different from the call stack. You can think about this as a file path where the file with function definition is stored. It will be denote in this way:
+func1/func2/func3 where func1, func2 and func3 are names of functions
+
+I will ask for your assistance on each of the steps above, you have to provide your answer in JSON format.

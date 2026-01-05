@@ -1,0 +1,112 @@
+HOW TO SET BREAKPOINTS
+
+In addition to the automatically configured breakpoints for the 'debug_function' action (see the "DEBUGGING WORKFLOW" section), you can manually configure breakpoints by specifying three key properties:
+
+1. source_line:
+The line number where the breakpoint should be set. If this is set to -1, no breakpoint will be added.
+
+2. (Optional) breakpoint_condition:
+A optional boolean expression that is evaluated each time the breakpoint is hit. The debugger will only break if this condition returns true or if it is not specified (breakpoint_condition is an empty string)
+
+3. (Optional) breakpoint_expression:
+An optional expression that is evaluated in the current thread when the breakpoint is hit. The result is recorded for analysis.
+
+Below is an example of the LLDB command line that will be appended for each manually configured breakpoint in batch mode:
+
+-o breakpoint set --file your/filepath.cpp --line 123 --auto-continue true --condition "($bp_hit_count < 3 && ++$bp_hit_count) && (breakpoint_condition)" --command "expression breakpoint_expression" --command "thread backtrace" --command "frame select" --command "frame variable"
+
+Explanation of the command components:
+
+--file your/filepath.cpp
+Automatically set to the file containing the function subject of debugging for the 'debug_function' action
+
+--line 123
+Maps directly to the source_line property (in this case, line 123). Source code for each function will be listed prefixed by the line number so you can select the line by that number.
+
+--auto-continue true
+Configures the breakpoint to automatically continue execution after running all its associated commands.
+
+--condition "($bp_hit_count < 3 && ++$bp_hit_count) && (breakpoint_condition)"
+Combines a user-specified condition (breakpoint_condition) with a default implicitly set condition that limits the breakpoint to be hit a maximum of three times. The property breakpoint_expression must contain only the user-specified part of the condition!
+An internal counter $bp_hit_count (initialized via -o expression "int $bp_hit_count = 0") increments with each hit. To manage volume of the LLDB debugger logs and unpredictable nature of the application being debugged no breakpoint will hit more than 3 times. This should be considered when configuring breakpoints.
+The breakpoint_condition property must be a valid LLDB Debugger expression! When the breakpoint is hit, the condition (breakpoint_condition) is going to be evaluated right before the source at the location specified by source_line.
+If you don't need condition, set breakpoint_condition to "none"
+
+--command "expression breakpoint_expression"
+'breakpoint_expression' Will be replaced with the provided expression property. When the breakpoint is hit, if the condition is true, the expression (breakpoint_expression) will be evaluated right before the source at the location specified by source_line.
+The breakpoint_expression property must be a valid LLDB Debugger expression!
+If you don't need expression, set breakpoint_expression to "none"
+
+
+Example of how to properly set a breakpoint
+
+Before deciding on which source line (source_line) you want to set the breakpoint, you should see in our conversation the source of the selected function in the similar format:
+
+9     std::string comp_codegen_label(std::uint32_t & label_counter) {
+10        // Check if the label counter is initialized properly
+11        if (label_counter == 0) {
+12            PRINT_TEST("Warning: label_counter is uninitialized or zero. Starting from 0.");
+13        }
+14    
+15        // Generate a unique label using the current label counter
+16        std::string label = "L" + std::to_string(label_counter);
+17        
+18        // Increment the label counter for the next label
+19        ++label_counter;
+20    
+21        // Return the generated label
+22        return label;
+23    }
+
+
+This format contains number prefixes as the exact lines corresponding to the source file. If you can't see similar format for the function you want to debug first request that info with 'function_info' action.
+From this example, let's say you want to set a breakpoint on the line 19:
+
+19        ++label_counter;
+
+And you want a condition to check if the value of the label_counter is 5 before increasing it with 1 (remember, the conditions are evaluated just before the statements on that line). Here is the condition:
+
+label_counter==5
+
+And expression to verify if the printed label is actually 5. The expression would be:
+
+printf("Generated label: %s", label.c_str())
+
+In this case, in your response, for this breakpoint, you have to return:
+
+{
+	"source_line": 19,
+	"condition": "label_counter==5",
+	"expression": "printf(\"Generated label: %s\", label.c_str())"
+}
+
+Then, based on your response, the debugging runtime will automatically add the following breakpoint setup to the LLDB command line arguments in batch mode:
+
+-o breakpoint set --file your/path/to/comp_codegen_label.cpp --line 19 --auto-continue true --condition "($bp_hit_count < 3 && ++$bp_hit_count) && (label_counter==5)" --command "expression printf(\"Generated label: %s\", label.c_str())" --command "thread backtrace" --command "frame select" --command "frame variable"
+
+C++ vs LLDB Compatibility Guidelines:
+
+Both breakpoint_condition and breakpoint_expression must be valid LLDB Debugger valid expressions
+
+1. String comparisons: Never use direct comparison with string literals.
+
+Wrong: “tokens[index]->value == \”=\””
+Correct: “strcmp(tokens[index]->value.c_str(), \"=\") == 0”
+
+2. Complex C++ features to avoid:
+
+- Template expressions
+- Lambda functions
+- Operator overloads
+- Exception handling (try/catch)
+- Complex STL containers/algorithms
+- RTTI features (dynamic_cast, typeid)
+- C++17/20 specific features
+
+3. Safe practices:
+
+- Use simple C-style expressions where possible
+- Prefer explicit function calls over operators
+- Access object fields directly rather than through overloaded operators
+
+

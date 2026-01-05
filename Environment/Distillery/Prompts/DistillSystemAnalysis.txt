@@ -1,0 +1,102 @@
+# DISTILL SYSTEM ANALYSIS FOR OPTIMIZED TRAJECTORY
+
+## Context
+I'm generating synthetic training data to train an LLM-based AI coding agent for C++ debugging. You will revise a system analysis response to reflect a more expert-level debugging approach based on an optimized trajectory that we've discussed.
+
+## Background
+The original system analysis was produced from logs and diagnostics when debugging the application '[[application]]'. That analysis identified issues and suggested next steps, but it may have been overly cautious or listed multiple possibilities. We've since developed an OPTIMIZED SEQUENCE that shows a more decisive, expert-level approach to the same problem.
+
+## Your Task
+Revise the OLD SYSTEM ANALYSIS RESPONSE (for step [[analysis_step]]) to reflect the insights from the OPTIMIZED SEQUENCE. The key is to make the analysis MORE DECISIVE and TARGETED while keeping it grounded in the information available in the request.
+
+## Inputs
+
+### OPTIMIZED SEQUENCE START
+[[optimized_sequence]]
+
+OPTIMIZED SEQUENCE END
+
+This shows the actual debugging path an expert would take. Pay attention to:
+- Which functions are actually examined and fixed
+- Whether multiple symptoms are addressed by one comprehensive fix
+- How the expert identifies architectural vs incremental issues
+- The ROOT CAUSE identified (not just symptoms)
+
+### OLD SYSTEM ANALYSIS REQUEST
+```json
+[[json_request]]
+```
+
+This contains all the raw information: logs, diagnostics, traces, tokens. Everything in your revised analysis must be derivable from this.
+
+### OLD SYSTEM ANALYSIS RESPONSE
+```json
+[[json_response]]
+```
+
+This is what you're revising. It may be overly tentative or list too many possibilities.
+
+CURRENT (DISTILLED) TRAJECTORY STARTS HERE
+
+[[current_trajectory]]
+
+CURRENT TRAJECTORY ENDS HERE
+
+This is how the currently optimized trajectory will look like before the new response - keep that in mind when you deciding what information to reference in the response.
+
+## What to Revise
+
+### 1. **log_summary** field
+- Keep the factual log/diagnostic quotes from the information available in the request
+- You MAY emphasize patterns that reveal the root cause
+- DO NOT add information not in the logs
+- Focus on diagnostics that matter for the actual blocker
+
+### 2. **debug_notes** field  
+This is the most important field to revise. It should have three sections:
+
+**Status** (1-2 sentences): Current state of the system/subsystems
+
+**Root cause** (main paragraph): 
+- BE MORE DECISIVE based on the optimized sequence
+- If the optimized sequence shows it's an architectural issue, state that
+- If multiple fixes are merged, identify the UNDERLYING problem connecting them
+- Use expert pattern recognition to explain WHY this is the blocker
+- Example: Instead of "we need to implement features X, Y, Z", say "The expression parser has a fundamental precedence delegation flaw affecting cast/parenthesis disambiguation, which manifests as..."
+
+**Next steps** (1-2 sentences):
+- Try to suggest from which function the further investigation should focus.
+- Explain why examining THIS function is the right investigation
+- If the optimized sequence shows comprehensive fixing, suggest that approach or the next step that will likely take us to this discovery
+
+### 3. **ADD NEW FIELD: thinking_analysis**
+This is the EXPERT'S HIDDEN REASONING - the chain-of-thought that gets the expert from symptoms to solution efficiently.
+
+Structure it as a flowing narrative (not bullet points) covering:
+
+**Pattern Recognition**: What does this error signature tell an experienced debugger? What similar issues have they seen? What does the cascade of failures reveal?
+
+**Hypothesis Formation**: Based on error location, what's the likely architectural issue? Why is this probably not just missing features but a fundamental design problem in one component?
+
+**Investigation Strategy**: Why is examining function X the right move? What will the source confirm?
+
+**Solution Intuition**: What kind of comprehensive fix would address all the symptoms? Why is this more efficient than incremental fixes?
+
+**CRITICAL RULES for thinking_analysis:**
+- Only reference information in the OLD SYSTEM ANALYSIS REQUEST (logs, diagnostics, traces)
+- Sound like experienced intuition, NOT omniscient knowledge from the optimized sequence
+- Use hedging: "likely", "suggests", "typical pattern", "reminds me of", "probably"
+- Build logically: symptoms → pattern → hypothesis → investigation → solution architecture
+- You can incorporate wisdom derived from steps to fix the problem and going from sub-optimal to the optimized trajectory "similar debugging experiences" but express it as intuition, not explicit references to the trajectory
+- Example: Instead of "the sub-optimal trajectory showed we need to fix X, Y, Z but they're all in one function", say "this pattern of cascading failures across multiple precedence levels suggests a common root cause, likely a precedence delegation issue in the cast-expression parser where fallback paths don't properly handle..."
+- Ideally this is 5-10 concise sentences
+
+## Key Insight: Expanding Analysis to Cover Merged Fixes
+
+If the optimized sequence merges multiple fixes into one comprehensive solution:
+- The original analysis might list those as separate possible issues
+- Your revised analysis should identify the UNIFYING ROOT CAUSE
+- The thinking_analysis should show the reasoning: "while these symptoms appear as separate missing features, the error pattern suggests they share a common cause..."
+- Use pattern matching to "intuit" that fixing the architectural issue will resolve all symptoms
+
+Now please revise the OLD SYSTEM ANALYSIS RESPONSE according to the OPTIMIZED SEQUENCE.

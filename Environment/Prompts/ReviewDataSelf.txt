@@ -1,0 +1,8 @@
+Do you believe the previous response about the definition of the '[[struct]]' data structure meets the requirements?
+
+Focus on the review rather than providing updated data types definitions.
+
+Please, start your answer with YES: or NO:, for example
+YES: your short positive review of the answer
+Or
+NO: your constructive and detailed review of the provided data types definitions

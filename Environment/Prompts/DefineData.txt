@@ -1,0 +1,43 @@
+[[context]]
+DEFINE DATA REQUEST
+
+Define or if required update the C++ data type for '[[struct]]'
+If necessary, you can define or update other structures and enums that this data type depends on. Avoid nested definitions for structures and enums, unions can be nested.
+In your response, provide definitions exactly as in the C++ .h and .cpp, including the ; character at the end.
+
+Use C++ structures but don't use C++ specific features as access specifiers, constructors, destructors, inheritance.
+
+Don't provide include statements in the source. I will ask you which files I need to include later.
+
+Consult with the 'AVAILABLE LIBRARIES' section what features and data types you can use when defining structure fields. Avoid reimplementation and redefinition of functionality and data already available in the libraries or other parts of this software.
+
+Provide inline comments to clearly explain the purpose of each member. We need this to review data type usage and decide how compatible it is as input or output to various functions.
+
+Existing data types are already shared in other locations in the codebase - when reviewing and updating already existing data types avoid destructive changes like removing or renaming existing members. Always provide full definition including when you update existing data types.
+
+Don't use templates in the data structs and function definitions.
+Don't use preprocessor directives in the provided source
+
+Application defined data types must not store any kind of function pointers in their members. The application code has to use only global functions.
+
+[[struct_members]]
+
+Consult with the description (or implementation if available) of '[[function]]' to see how the data is used and what type of fields are required
+
+However, when reviewing existing data types, if you encounter that the '[[function]]' implementation is using data types or member fields with different names but identical purposes to those already defined, prioritize the current data definitions. Revise or add comments beside the existing data types explaining their potential usage in the new context. This approach will allow me to revise the implementation later while maintaining consistency with the current codebase.
+
+[[parent]]
+[[existing]]
+
+Format your response by following one of the 2 options:
+1. If the existing data type definition for '[[struct]]' and other dependent data types don't require update you must start your response with the word "ACTUAL" and that can be the only word in you short response. For example:
+
+ACTUAL
+
+2. If the definition for '[[struct]]' doesn't represent custom struct or enum defined or supposed to be defined by this software (for example the definition is for functions, macros, constants, etc) you must start your response with the word "SKIP" and that can be the only word in you short response. For example:
+
+SKIP
+ 
+3. If you have to define new or update existing data types, provide the code in your response in a single section with markdown syntax. Prefix the C++ source code with ```cpp and postfix the code in your response with ```
+
+Now go ahead and define '[[struct]]' 

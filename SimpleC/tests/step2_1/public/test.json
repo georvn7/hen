@@ -1,0 +1,33 @@
+{
+  "name": "S2_1_registry_bitmap",
+  "description": "Parses each arg as name[:params], matches by first character against a fixed registry, sets the corresponding bit in a bitmap, returns the combined mask; exits 255 if no args, 254 if any arg is unknown.",
+  "pretest": {
+    "commands": [
+      "clang -E -P ./s2_1.c -o ./s2_1_pre.c"
+    ],
+    "input_files": ["s2_1.c"],
+    "output_files": ["s2_1_pre.c"]
+  },
+  "test": {
+    "commands": [
+      "[[result=0]]-v -o ./s2_1.s ./s2_1_pre.c"
+    ],
+    "input_files": ["s2_1_pre.c"],
+    "output_files": ["s2_1.s"]
+  },
+  "posttest": {
+    "commands": [
+      "test -f ./s2_1.s || (echo '_DEBUG_COMMAND_RESULT=65535' && exit 1)",
+      "clang --target=aarch64-apple-darwin -c ./s2_1.s -o ./s2_1.o",
+      "clang --target=aarch64-apple-darwin ./s2_1.o -o ./s2_1",
+      "[[debug,result=4]]./s2_1 p"
+    ],
+    "input_files": ["s2_1.s"],
+    "output_files": ["s2_1.o", "s2_1"]
+  },
+  "regression_files": ["s2_1.c"],
+  "io_files" : ["s2_1_pre.c", "s2_1.s"],
+  "io_hint": "none",
+  "timeout": 5,
+  "expected_result": "0"
+}

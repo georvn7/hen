@@ -1,0 +1,117 @@
+HOW TO SET BREAKPOINTS
+
+In addition to the automatically configured breakpoints for the 'debug_function' action (see the "DEBUGGING WORKFLOW" section), you can manually configure breakpoints by specifying three key properties:
+
+1. source_line:
+The line number where the breakpoint should be set. If this is set to -1, no breakpoint will be added.
+
+2. (Optional) breakpoint_condition:
+A optional boolean expression that is evaluated each time the code on the line 'source_line' is executed. The debugger will only hit the breakpoint if this condition returns true or if it is not specified (breakpoint_condition is an empty string)
+
+3. (Optional) breakpoint_expression:
+An optional expression that is evaluated in the current thread when the breakpoint is hit. The result is recorded for analysis.
+
+To manage volume of debugger logs and unpredictable nature of the application being debugged no breakpoint will hit more than [[hit_count]] times. This is implicitly enforced.
+
+Example of how to properly set a breakpoint
+
+Before deciding on which source line (source_line) you want to set the breakpoint, you should see in our conversation the source of the selected function in the similar format:
+
+9     std::string comp_codegen_label(std::uint32_t & label_counter) {
+10        // Check if the label counter is initialized properly
+11        if (label_counter == 0) {
+12            PRINT_TEST("Warning: label_counter is uninitialized or zero. Starting from 0.");
+13        }
+14    
+15        // Generate a unique label using the current label counter
+16        std::string label = "L" + std::to_string(label_counter);
+17        
+18        // Increment the label counter for the next label
+19        ++label_counter;
+20    
+21        // Return the generated label
+22        return label;
+23    }
+
+
+This format contains number prefixes as the exact lines corresponding to the source file. If you can't see similar format for the function you want to debug first request that info with 'function_info' action.
+From this example, let's say you want to set a breakpoint on the line 19:
+
+19        ++label_counter;
+
+And you want a condition to check if the value of the label_counter is 5 before increasing it with 1 (remember, the conditions are evaluated just before the statements on that line). Here is the condition:
+
+label_counter==5
+
+And expression to verify if the printed label is actually 5. The expression would be:
+
+printf("Generated label: %s", label.c_str())
+
+In this case, in your response, for this breakpoint, you have to return:
+
+{
+	"source_line": 19,
+	"condition": "label_counter==5",
+	"expression": "printf(\"Generated label: %s\", label.c_str())"
+}
+
+Both breakpoint "condition" and "expression" must be valid LLDB Debugger valid expressions (we use this format for evaluating breakpoints)
+
+1. String comparisons: Never use direct comparison with string literals.
+
+Wrong: “tokens[index]->value == \”=\””
+Correct: “strcmp(tokens[index]->value.c_str(), \"=\") == 0”
+
+2. Complex C++ features to avoid:
+
+- Template expressions
+- Lambda functions
+- Operator overloads
+- Exception handling (try/catch)
+- Complex STL containers/algorithms
+- RTTI features (dynamic_cast, typeid)
+- C++17/20 specific features
+
+3. Safe practices:
+
+- Use simple C-style expressions where possible
+- Prefer explicit function calls over operators
+- Access object fields directly rather than through overloaded operators
+
+4. Remark on using standard library functions in breakpoint conditions and expressions:
+
+When specifying breakpoint conditions using strcmp or similar standard library functions, ensure you explicitly cast the return type to avoid evaluation errors. For instance:
+
+Wrong: (strcmp(tokens[index]->value.c_str(), "=") == 0)
+
+Correct: ((int)strcmp(tokens[index]->value.c_str(), "=") == 0)
+Correct: (int)printf(\"Generated label: %s\", label.c_str())
+
+This explicit cast helps the debugger properly evaluate the conditional breakpoint
+
+5. Remark on using shared pointers in breakpoint conditions and expressions:
+
+When working with shared pointers (std::shared_ptr), directly accessing members via operator -> is incorrect. Instead, use the .get() member function to directly access object members.
+
+Examples:
+
+Wrong:
+current_token->value == expected_value
+
+Correct:
+current_token.get()->value == expected_value
+
+6. Important! Breakpoints are activated via code instrumentation. Here is the template
+
+{if(conditoin){expression;}}
+
+Each breakpoint will be inserted at the beginning of the line of source code specified by source_line. Be careful to not insert the breakpoint at the middle of expression that will prevent further compilation of the instrumented source.
+
+7. Only one breakpoint per source line is allowed.
+
+8. Don't set breakpoints at the same line with the return statements
+
+9. Don't set breakpoints inside multiline C++ statements
+
+When breakpoints are hit, traces and logs from the resulting call stacks, for each function and invocation, can be requested using the 'function_info' action. This data remains available until the next test run.
+

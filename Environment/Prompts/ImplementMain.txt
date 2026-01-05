@@ -1,0 +1,25 @@
+FUNCTION IMPLEMENTATION
+
+You have to implement the 'int main(int argc, char* argv[])' function
+
+Implementing the function, you can use the language and libraries as specified in the 'Programming Language' and 'Available Libraries' sections
+
+[[call_api]]
+
+Please check the project description for command line options this application needs to implement
+
+Implementation Checklist:
+
+- Provide full implementation, no placeholders and stubs
+- Don't translate implementation string on a new line by using the backslash ASCII character.
+- Don't provide include statements in the 'definition' section. They need to be provided separately as specified in the 'includes' section.
+- Don't declare external and global variables and data structures! To pass the data, use function parameters instead.
+- Consult with available libraries section how to leverage functionality provided by the libraries when appropriate.
+- Avoid lambda expressions in the implementation. If not possible to implement everything by using available functions and libraries, consider calling a new helper function. Just call the new function, we'll declare and define it later based on the usage.
+- The code you generate will be compiled with Clang compiler
+- Use PRINT_TEST(fmt, args...) to print as much verbose information as required for the purpose of unit tests only. This macro will not be available in the release builds. I will ask you on a separate step to implement the test code. Now you have to implement only the function
+- Use std::cout with the << operator (avoid other methods) for output that should persist in release builds (user-facing messages, final results). Use PRINT_TEST for debug/diagnostic output that will be stripped from release builds.
+- Provide DAG paths for all external functions from other parts of the software called in the implementation of this function
+- If you can't implement the function, and additional information is required, please let me know. In opposite, set need_more_info to "All clear!"
+
+Now please, go ahead and implement 'int main(int argc, char* argv[])'

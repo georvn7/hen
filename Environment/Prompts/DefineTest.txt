@@ -1,0 +1,45 @@
+[[test_framework_manual]]
+
+FULL APPLICATION TEST
+[[full_test]]
+
+[[prev_full_test]]
+
+[[recommendation]]
+
+SYSTEM OVERVIEW
+
+[[system_data]]
+
+DEFINE UNIT TEST
+
+I want you to help me to define unit test for the following function:
+
+[[function_ctx]]
+
+Please have a look on the '[[function]]' its description input and output data. 
+[[parent_ctx]]
+Would you please help me define unit test that covers as much as possible of the functionality required from '[[function]]' to pass the 'FULL APPLICATION TEST'. It is not required to cover more than that.
+
+I want you to help me and provide detailed description of the unit test. This description will be used as implementation guidelines, so it should provide clear and detailed instructions about the testing algorithm and test cases. The test must be stand alone console application with the following entry point:
+
+int main(int argc, char* argv[])
+
+Consult with the test framework manual how to implement the test
+
+Analyze the system level dependencies for '[[function]]' and ensure unit test will cover functionality required '[[function]]' to implement in order to pass the full application test.
+[[prev_full_test_note]]
+[[recommendation_note]]
+I prefer a simple test that guarantees sub-systems contract with a goal of passing the full application test. We can implement a test that covers more later.
+
+The unit test code must assume PRINT_TEST macro is already defined and to not redefine it.
+
+Important characteristic of the unit test is that the test itself resides in single main.cpp file, wrapping the tested function. All test cases and setup need to be in that file (main.cpp). This file will be compiled and the executable will be executed (implicitly) with the arguments provided in the first command from the 'test' step. The purpose of the 'pretest' is usually to generate any intermediate input files needed for the 'test' step - consumed by the test executable. The 'posttest' step is usually to post-process the output files from the test executable and to report errors. The 'pretest' and 'posttest' steps aren't required and should be used only if needed to support the main test executable.
+
+ The unit tested application function '[[function]]' and all data types for its arguments and return type are already implemented and the test doesn't have to implement them. Other application functions won't be visible for the unit test and shouldn't be used. The test script must not generate main.cpp or to compile the executable being tested. The unit test executable must not be executed in the pretest and posttest steps. However, the framework will invoke the executable implicitly with the arguments-only specified in the 'test.commands[0]' step.
+
+Please, note I'm not asking you here to implement the test's main.cpp. I'm not asking to provide the content of the input files. I will ask for the source of the test and content of the input files (if any) later in a separate step. I'm asking you only to provide description, information about the expected command line and input files as discussed above.
+
+The name of the unit test must be: [[test_name]]
+
+Now please go ahead and provide the required information without asking any further questions!

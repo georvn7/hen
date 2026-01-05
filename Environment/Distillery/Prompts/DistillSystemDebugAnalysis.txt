@@ -1,0 +1,89 @@
+
+DEBUG ANALYSIS FOR SYNTHETIC TRAINING DATA
+
+CONTEXT
+You are generating synthetic training data for an AI coding agent that debugs applications written in C++ and STL. You will be provided with a distilled debugging trajectory along with information from the latest debug_function step. You must generate analysis of the data available from the debugging run. 
+
+ORIGINAL DEBUG ANALYSIS PROMPT STARTS HERE
+[[original_prompt]]
+ORIGINAL DEBUG ANALYSIS PROMPT ENDS HERE
+
+CURRENT (DISTILLED) TRAJECTORY STARTS HERE
+
+[[current_trajectory]]
+
+CURRENT TRAJECTORY ENDS HERE
+
+ANALYSIS BASED ON THE ORIGINAL TRAJECTORY STARTS HERE
+```json
+[[original_analysis]]
+```
+ANALYSIS BASED ON THE ORIGINAL TRAJECTORY ENDS HERE
+
+The trajectory contains:
+1. Summary - High-level overview of what has been accomplished
+2. Last Run - The execution results from the debugging session
+   - Test/LLDB logs showing failures or success
+   - Reward-hacking review (if applicable)
+3. Trajectory Steps - All steps taken up to this point
+4. Requested Information - Information gathered so far
+   - Function sources, traces, logs
+   - Call graphs, function summaries
+   - Source searches, debug traces
+
+TASK
+
+Generate the debug analysis that matches step [[step_id]] from the optimized trajectory and correspond to original step [[original_step_id]]. You must produce:
+
+1. **RunAnalysis for debugging** - The actual debug notes and log summary
+2. **Thinking debug analysis** - Expert-level reasoning for training
+
+REQUIREMENTS START HERE
+
+The debug analysis should follow the instructions as specified in the ORIGINAL DEBUG ANALYSIS PROMPT
+
+thinking_analysis Field:
+- The THINKING PROCESS that leads to the analysis (3-8 sentences)
+- Chain-of-thought reasoning showing HOW you arrived at the conclusion
+- Shows intuitive leaps, pattern recognition, connecting observations
+- Must feel like ACTIVE reasoning, not post-hoc explanation
+- Build and express intuition based on all available information, including in the TRAJECTORY OPTIMIZATION and ORIGINAL TRAJECTORY but framed as abstract intuition and inference
+- Uses phrases like: "I notice...", "This suggests...", "Given that...", "The pattern indicates...", "If X then Y..."
+- Must NOT directly reference the original trajectory or say things like "step 34 shows" (unless quoting facts from previous steps already in the CURRENT TRAJECTORY)
+- Should demonstrate expert intuition and domain knowledge in action
+- Focus on the reasoning flow, not on accumulating details (that's motivation's job)
+- But yeah, leveraging all available information and framing it as intuition is encouraging. 
+
+ALIGNMENT WITH CURRENT TRAJECTORY
+
+Step References
+- Use step numbers from CURRENT TRAJECTORY, not original trajectory
+- When referencing prior fixes: "The step N fix introduced..." must use current trajectory's step N
+
+Quotes and Names
+- Function names must match those appearing in current trajectory's trace/log data
+- Log fragments must be quoted verbatim from current trajectory's provided traces
+- AST node types, token lexemes, diagnostic messages—copy exactly from current trajectory
+
+Conclusions
+- Root cause identification must align with current trajectory
+- Adapt reasoning from original step [[original_step_id]] but ground ALL evidence in current trajectory's data
+
+GROUNDING TO PROVIDED DATA
+
+- Every claim must trace back to specific line in provided trace/log/source
+- No invented trace lines or diagnostic messages—use only what appears in current trajectory
+- Breakpoint analysis must match the breakpoints configured in original step [[original_step_id]]
+- If breakpoint was hit: quote its output from current trajectory
+- If breakpoint was not hit: explain why based on execution flow in current trajectory
+
+NATURAL FLOW
+
+- Write as logical deduction from current trace data, not reconstruction from known answer
+- Show reasoning progression: observe anomaly → form hypothesis → locate cause → propose fix
+- Reference prior trajectory steps as context ("Building on step M's fix of...")
+- Analysis should read as coherent continuation of the debugging narrative
+
+REQUIREMENTS END HERE
+
+Now please go ahead and provide the debugging based on the CURRENT TRAJECTORY and matching the breakpoints configuration from the original step [[original_step_id]] !

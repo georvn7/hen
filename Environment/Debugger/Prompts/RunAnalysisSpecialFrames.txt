@@ -1,0 +1,35 @@
+[[app_info]]
+[[trajectory]]
+[[trace_desc]]
+
+APPLICATION RUN ANALYSIS
+
+I've executed the '[[application]]' application in trace mode performing the test as described in the 'TEST DESCRIPTION' section
+
+So far, we’ve only analyzed sections of the log that included application stdout/stderr output. Because the full log is quite large, our previous analysis was based on snippets from the beginning, middle, and end of that combined log. Here is our current progress based on those snippets:
+
+//Current progress start
+[[progress]]
+//Current progress end
+
+Now, please review the full trace-only log from the same run!
+
+I've executed the '[[application]]' application trace mode to collect debug information
+For that purpose I set a trace points at entering and existing each application function. Each trace pint provides information about the source location, call stack and live variables. 
+
+//Here is the analysis based on the full trace:
+[[analysis_full_trace]]
+//Full trace analysis ends here
+
+You must combine and incorporate the findings from the full trace with this analysis!
+[[analysis_hint]]
+Using the new trace log, compare and “map” what we learned from the application log and the analysis based on the full trace to this detailed frames trace. 
+[[lldb_log]]
+Update your debug notes. We are going to use this information later to decide what would be the next step debugging the application. If the unit test is successful the 'debug_notes' field must have only one word - "PASS"
+
+Update the log summary. In the log summary add quotes from the new log section that are relevant to the finding collected in the new debug notes. 
+
+While analyzing the provided information, if you identify any issues, update the fields with an application-defined custom function, custom data type, and file if any are relevant to those issues and are worth further investigation. Information for the specified function, data type, and file will be provided later. If you don't need information for any of the item types, you can set the corresponding fields to "none".
+
+[[dbg_test_log]]
+Ideally, 'debug_notes' and 'log_summary' fields have to be 3 paragraphs or fewer, less than 2048 characters each, but this is not a hard limit as we don't want to miss something important.

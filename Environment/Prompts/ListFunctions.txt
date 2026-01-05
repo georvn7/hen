@@ -1,0 +1,34 @@
+[[abstract]]
+[[graph]]
+
+LIST ALL FUNCTIONS FOR '[[caller]]'
+
+We are going to list all functions that the function '[[caller]]' requires and will call to fully implement its functionality. Stick to the guidelines in the 'NAMING CONVENTION' section when you naming the functions!
+[[library]]
+You must not assume that functions from external libraries, except libraries listed in 'AVAILABLE LIBRARIES' section, will be used to implement any functionality in this software. The listed functions have to be from this software.
+
+When listing the functions to be called by '[[caller]]', remember:
+- Custom structs, defined by the application cannot have member functions or callable members
+- Plan the execution flow using only global functions to operate on those structs
+
+Consult with the 'AVAILABLE LIBRARIES' section what functionality is already in the libraries and we can leverage without the need to reimplement it. You must not list calls to the function from available libraries here, only to functions defined from this application.
+
+Ensure all functions, that need to be called directly and are required to fully implement the behavior of '[[caller]]' without any placeholders, stubs, TODOs and dummy code, are listed!
+
+If you believe '[[caller]]' can be fully implemented (including called directly or indirectly functions) with less than 100 lines of source code, without directly calling any other functions defined in this application, by using only functionality from 'AVAILABLE LIBRARIES' section, then you can leave this list empty.
+
+In its body '[[caller]]' must not call or store any kind of function pointers to members of application defined data types. It has to use only global functions.
+
+Note that expectations is to not have a single function with more than 100 lines of source code. If a given function is more than that it should be split.
+
+For each function, provide brief description of:
+- The operations performed by this function and what subset of the project features this function is responsible for. 
+- Explain what is the expected input to the function. Explain what is the produced output by the function.
+- IMPORTANT: the main idea of the provided description is someone with strong expertise in the software algorithms, design patterns and data structures, but without domain specific knowledge in the project to be able to understand and implement this function.
+- Provide concise explanation of the operations performed in the body in terms of software algorithms, design patterns and data structures.
+- In your description, you have to leverage the concepts and language explained in the 'HOW EXPLAIN ALGORITHMS IN NATURAL LANGUAGE' section. Please don't use concepts for a particular programming language.
+- Depending from the complexity of the performed operations this function might call directly or indirectly other functions but its body should meet the requirement for less that 100 lines of source code. 
+- The size of the provided description ideally is 5-7 sentences, but this is not a hard limit.
+
+The functions shouldn't assume in their implementation access to external and global variables and data structures except from the 'available libraries'!
+To pass the data, required by the function - use arguments. ALL produced or updated data from this function that need to be accessed by other functions not called directly or indirectly by the function must be exposed by the return result or mutable arguments.

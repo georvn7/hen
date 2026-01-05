@@ -1,0 +1,43 @@
+
+TRACE DESCRIPTION
+
+The fundamental idea of the trace is to capture certain events per function invocation during execution of an C++ application
+
+The events are usually:
+
+'entry' - Function call with arguments
+'trace' - Trace point with live variables at a given source location
+'return' - Function return
+'exit' - Function exit
+'breakpoint' - Custom breakpoint with condition and expression
+
+Each instance of the events has individual hit count limit (currently set to [[events_hit_count]] ) and when it is reached no more instances of this event will be captured
+
+Every function invocation is identified by its full call stack, for example:
+
+main:1->comp_compile:1->comp_lex:1->comp_skip_whitespace:2
+
+Here, main directly calls comp_compile which directly calls comp_lex which directly calls comp_skip_whitespace. The integer after the colon (:) is a global hit count (across all possible execution paths) for that function.
+
+Here is an example of the 'entry' event for the function 'print_result'
+
+<[PUSH (entry):main:1->print_result:1]>
+result = 
+Result {
+is_error=false,
+value_type=EValueType::INT32, 
+int_val=5, 
+float_val=0
+}
+<[POP]>
+
+Where:
+
+PUSH/POP - tags that mark the start and end of this event. Events could be nested.
+entry - the type of the event
+result - a live variable captured at the time of the event with current values (subject to limitations for printing struct members depth and array elements)
+
+Detailed function trace
+
+- Available on request via the 'function_info' action
+- Special call stack traces for crash/hang and breakpoints are always captured and might exceed the hit count limit

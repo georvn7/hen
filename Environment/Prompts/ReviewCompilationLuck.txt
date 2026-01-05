@@ -1,0 +1,30 @@
+I've tried to compile the function '[[declaration]]'
+
+[[function_ctx]]
+
+'[[function]]' has been compiled with the following command line:
+
+[[command]]
+
+Here is the output from the Clang compiler:
+
+[[output]]
+
+Here is the list of 'available data types and functions' for the implementation of '[[function]]'
+
+[[api]]
+
+Requirements for functions in the project:
+[[checklist]]
+
+[[analysis]]
+
+Please review the compiler output for errors and explain the best single solution approach. If possible, we are looking for solution that will solve the problem by only editing the function code. Focus on describing how to fix the issues without providing actual code changes.
+From our discussion so far, familiarize yourself with the previous progress on our attempt to solve the problem and try to avoid re-introducing some of the issues that are already solved!
+If you encounter errors similar to those we've seen before, attempt to solve them using different approaches than those we've already tried.
+
+Note, to fix the problem, we can use 'available data types and functions' exactly as they are listed above. We can't assume or introduce changes in data definitions or function signatures!
+In the recommended strategy you have to avoid changes in the signature of '[[function]]'
+
+Please provide a detailed explanation of your analysis and the single best solution approach. Focus on the overall strategy rather than providing updated source code. Explain why your chosen approach is the most suitable for addressing the compilation issues. You have to provide sufficient guidance for the subsequent implementation of this solution!  
+

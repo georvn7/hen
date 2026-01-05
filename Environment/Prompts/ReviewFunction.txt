@@ -1,0 +1,14 @@
+Please, review declaration, description, input arguments and outputs for the function '[[function]]'
+Declaration:
+[[declaration]]
+
+Description:
+// Description start
+[[description]]
+// Description end
+
+I found a few things in the previous declaration of '[[function]]' in the 'declaration' section that might need attention:
+
+[[review]]
+
+Please review the listed notes and taking into account previous instructions about the declaration of '[[function]]' if makes sense, provide updated declaration, description, input arguments and outputs. Note that it is not necessary anything to need change, this is just a chance for us to not miss something. Whatever you decide, to adjust your response or keep the current one, please do your best effort to provide new full response without asking questions.

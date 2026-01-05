@@ -1,0 +1,12 @@
+Do you believe the previous response about listing all functions that the function '[[caller]]' requires and will call to fully implement its functionality without TODOs, placeholders and empty scopes meets all requirements? Especially about descriptions for each of the functions in the 'brief' sections?
+
+When reviewing the functions to be called by '[[caller]]', remember:
+- Custom structs, defined by the application cannot have member functions or callable members
+- Plan the execution flow using only global functions to operate on these types
+
+If you believe '[[caller]]' can be fully implemented, without TODOs and placeholders, within less than 100 lines of source code, without directly calling any functions defined in this application, by using only functionality from 'AVAILABLE LIBRARIES' section, then you can leave this list empty.
+[[exclude]]
+Please, start your answer with YES: or NO:, for example
+YES: your short positive review of the answer
+Or
+NO: your constructive and detailed review of the answer. But for now don't provide updated answer. I will ask for that in a bit.

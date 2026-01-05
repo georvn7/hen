@@ -1,0 +1,22 @@
+[[abstract]]
+
+PROVIDE FUNCTION DESCRIPTION
+
+Please, provide or update description and brief summary of the function '[[function]]'
+[[parent]]
+We are going to use the description of '[[function]]' for the purpose of code generation and as an implementation guideline. The brief summary along with declaration (not requested here) will be used for functions library search, comparison with other functions and indexing. 
+The description will also be used as comment in the source code so consider multi lines formatting for classical (console) code editors that don't support text wrapping.
+Ideally, this description will be no more that 10 sentences, less than 2000 characters, and less that the source of the implementation itself.
+[[api]]
+Describe operations performed by this function and what subset of the project features this function is responsible for?
+Explain what is the expected input to the function? What is the produced output by the function? 
+Access to all required input to '[[function]]' must be provided via function arguments. 
+All data, produced or updated by this function, that need to be accessed by other functions not called directly or indirectly by '[[function]]' , must be exposed as mutable arguments or return result.
+
+When describing the '[[function]]' and providing implementation guidelines, remember:
+- Custom structs, defined by the application cannot have member functions or callable members
+- Plan the execution flow using only global functions to operate on these types
+- For custom data structures that combine characteristics from other data types we use composition instead of inheritance.
+- In its implementation, the '[[function]]' function must not access global or external variables.
+
+There must be very clear explanation how each of the function outputs depends on the function inputs and what operations are required over the input data to produce the given output. Provide guidelines how this function has to be implemented by using the concepts from 'HOW TO EXPLAIN ALGORITHMS IN NATURAL LANGUAGE'. Any design patterns, architectural approaches, or domain-specific ideas beyond those concepts has to be thoroughly explained.

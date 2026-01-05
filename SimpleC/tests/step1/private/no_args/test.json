@@ -1,0 +1,33 @@
+{
+  "name": "S1_first_byte",
+  "description": "Return first char of argv[1] as exit code; if argc < 2, return 255.",
+  "pretest": {
+    "commands": [
+      "clang -E -P ./s1.c -o ./s1_pre.c"
+    ],
+    "input_files": ["s1.c"],
+    "output_files": ["s1_pre.c"]
+  },
+  "test": {
+    "commands": [
+      "[[result=0]]-v -o ./s1.s ./s1_pre.c"
+    ],
+    "input_files": ["s1_pre.c"],
+    "output_files": ["s1.s"]
+  },
+  "posttest": {
+    "commands": [
+      "test -f ./s1.s || (echo '_DEBUG_COMMAND_RESULT=65535' && exit 1)",
+      "clang --target=aarch64-apple-darwin -c ./s1.s -o ./s1.o",
+      "clang --target=aarch64-apple-darwin ./s1.o -o ./s1",
+      "[[debug,result=255]]./s1"
+    ],
+    "input_files": ["s1.s"],
+    "output_files": ["s1.o", "s1"]
+  },
+  "regression_files": ["s1.c"],
+  "io_files" : ["s1_pre.c", "s1.s"],
+  "io_hint": "Decide this branch solely from argc (no peeking at argv contents or external state) and avoid hard-coded outputs unrelated to inputs. Keep it deterministic and side-effect free",
+  "timeout": 5,
+  "expected_result": "0"
+}

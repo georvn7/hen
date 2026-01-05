@@ -1,0 +1,13 @@
+Some of the following data definitions might have been updated:
+
+[[data_def]]
+
+Here is the current implementation of '[[function]]' that uses some of the above data types.
+
+'[[implementation]]'
+
+Please review the implementation of '[[function]]' and update it if required. The purpose of this review is to revise the implementation based on the changes of the data definitions - new or removed members in structures or enums etc. At this point the implementation is considered more or less aligned with the requirements. However, here is the initial implementation requirements checklist, so you can address if something is not as expected
+
+[[checklist]] 
+
+Now please, go ahead and review '[[function]]'

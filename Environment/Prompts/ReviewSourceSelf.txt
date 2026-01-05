@@ -1,0 +1,14 @@
+Do you think the provided implementation of the function '[[function]]' meets all requirements from the 'Implementation checklist'? If not, can you reason which one and why?
+
+Review carefully whether the required data properly flows between function calls. Are variables and structures holding the data properly initialized? Assume they are defined outside of the reviewed code but still visible. Consult with descriptions for '[[function]]' and functions called by this function. Are functions that are supposed to produce certain data properly output it and functions supposed to consume the data properly reference it in their input?
+
+Ensure there aren't any placeholders, TODOs and empty scopes. Full implementation, needs to be provided! If this is not possible, consider calling a new helper function or functions to take this responsibility. Just call the new functions, we are going to declare and define them later based on usage in the code.
+
+When reviewing the implementation of '[[function]]' remember:
+- Custom structs, defined by the application cannot have member functions or callable members
+- The execution flow has to use only global functions to operate on these types
+
+Please, start your answer with YES: or NO:, for example
+YES: your short positive review of the answer
+Or
+NO: your constructive and detailed review of the answer. But for now don't provide updated answer. I will ask for that in a bit.

@@ -1,0 +1,23 @@
+DEBUGGING TRAJECTORY
+
+[[trajectory]]
+
+[[test_framework_manual]]
+
+FULL APPLICATION TEST (FAILED)
+
+[[full_test]]
+
+SYSTEM OVERVIEW
+
+[[system_data]]
+
+GENERATE UNIT TEST RECOMMENDATIONS
+
+The debugging session above ended with the full application test still FAILING. Analyze the trajectory and provide a summary focused on unit test generation.
+
+Identify which sub-system functions (from SYSTEM OVERVIEW) are currently failing against which features exercised by the full application test. Focus on issues that remain unresolved at the end of the trajectory, not on failures that were already fixed during debugging. Based on these remaining failure patterns, recommend what unit test should focus on for each affected sub-system—what inputs, edge cases, or behaviors tests should verify to isolate the outstanding issues. The goal is to unblock the debugging with focused unit tests.
+
+You should NOT assume what would be the file structure and layout for the individual unit tests, which file will be the driver, how the source of the unit test will be distributed over files etc. This will be decided later aligning with the test framework. Just focus on what fails and how on theory should be tested, what test cases etc.
+
+Note, here I'm asking only for detailed analysis and recommendations in plain text about the unit tests based on the debugging trajectory. After that I will ask you for help with each individual unit test

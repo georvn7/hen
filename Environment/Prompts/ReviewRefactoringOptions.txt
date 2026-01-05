@@ -1,0 +1,24 @@
+1. Syntax errors:
+    * This is for trivial syntax errors. Explain how to address these within '[[function]]'.
+2. Missing structure or enum members. Assigning or passing to a function incompatible members:
+    * First of all, familiarize yourself with the data types from the context of our discussion.
+    * For each error mention what exactly is the specific adaptation and which members to which existing one should be adapted.
+    * If a given data types are unknown from the context of our discussion, list them all in the unknown_types field and I will provide the definitions
+    * If the code uses a member not present in the struct/enum definition:
+        * Consider adapting the code to use existing members with similar meaning/purpose.
+        * If not possible, try adapting the function implementation to achieve its purpose without the missing value.
+        * As a last resort, consider introducing a new helper function (as described in point 5) to produce the required values.
+    * Our priority is to get the code to compile without destructive changes, but you can leave a comment with a suggestions for more proper or optimal solutions involving modifications on the data definition
+3. Function calls mismatches:
+    * Explain how to convert or prepare arguments and the return type to match required data types to the available functions signature.
+    * For each error explain the specific conversion method and the adaptation for each function argument and the return type.
+    * Note that some functions might require adaptation, but others, that look similar might actually satisfy the current call. Consult with the declaration of each of the function calls and decide case by case.
+    * Our priority is to get the code to compile without destructive changes, but you can leave a comment with a suggestions for more proper or optimal solutions involving modifications on the function declaration/signature.
+4. Search in list of existing functions, defined by the application to be used to reimplement '[[function]]'
+    * List only the names of the existing functions you are interested in and I will provide more information for each one of them
+5. Unsuccessful type cast
+    * Data structures defined in this software don't have inheritance relations. Don't use type casts that assume inheritance
+    * Consult with the data structures definitions and if they are binary compatible consider appropriate cast type - static, reinterpret
+    * Consider data type and lifetime when dealing with pointers
+6. Other approaches:
+    * If you have identified a different or more efficient solution that doesn't fit into the above categories, please describe it in detail. Everything should be acceptable as long as it doesn't introduce changes in application defined data types or function signatures!

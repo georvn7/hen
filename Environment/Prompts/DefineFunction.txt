@@ -1,0 +1,30 @@
+[[requirements]]
+
+PROVIDE FUNCTION DESCRIPTION
+
+Please, provide declaration and brief description of the function '[[function]]'. The brief description along with declaration will be used for functions library search, comparison with other functions and indexing. Describe operations performed by this function and what subset of the project features this function is responsible for? Here is a summary of of this function:
+[[brief]]
+[[parent]]
+In its implementation '[[function]]' must not access extern and global variables and data structures! To pass data to the function use function arguments, to output data from the function use the return result and the function arguments. All data, produced or updated by this function, that need to be accessed by other functions not called directly or indirectly by '[[function]]' must be exposed as mutable arguments or return result.
+
+When describing the '[[function]]', remember:
+- Custom structs, defined by the application cannot have member functions or callable members
+- Plan the execution flow using only global functions to operate on these types.
+
+Whenever it makes sense, prefer to pass arguments to the function by reference instead of passing by pointer.
+In the function declaration, try to leverage types defined in the libraries from the 'AVAILABLE LIBRARIES' section. Avoid introduction of new data types that are well defined in the libraries. The function must not return or accept as arguments function pointers or std::function<> types
+If the functions is an application entry point ensure the declaration matches with the expectations. 
+
+If the type of any of the function arguments or output parameters is a struct or enum defined by the application, try to provide unique name of the type that describes it. Application-defined types and functions must not have namespaces.
+
+Data types in the function declaration need to be properly qualified:
+- Consult with "REQUIREMENTS FOR FUNCTION DECLARATIONS" section for how to use data types in the function declaration 
+- If the type is defined in a library specified in 'Available Libraries' section, ensure it is prefixed with the appropriate namespace. Do not assume namespaces for those libraries are declared with 'using namespace'.
+- If the type is a custom C++ struct defined by the application it has to be accessed as a std::shared_ptr
+- If the type is a custom application-defined C++ enum, use the convention specified in the 'NAMING CONVENTION' section.
+- Only use these STL types in the function declaration: vector, list, queue, map, set, stack, string, shared_ptr
+Other STL types may be used within function implementations.
+
+Here you need to provide only the declaration for '[[function]]' but assume this function will be fully implemented later. Provide declaration without placeholders, stubs or missing arguments and return result. Ensure arguments and return in the declaration are declared with the proper data types to be able to hold all required input/output data
+
+If the usage of the '[[function]]' and its description suggest structured arguments and return type you need to provide the names of the data structures in the declaration

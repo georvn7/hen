@@ -1,0 +1,68 @@
+REQUIREMENTS FOR FUNCTION DECLARATIONS
+
+//Example enum definition
+enum class EPlayerState : uint32_t
+{
+ IDLE,
+ MOVING_LEFT,
+ MOVING_RIGHT
+};
+
+//Example struct definitions
+struct MyStructName{/* struct members */};
+
+struct CompilerConfig{/* struct members */};
+
+struct ParsedOptions{/* struct members */};
+
+1. Function declarations can only use these STL types:
+vector, list, queue, map, set, stack, string, shared_ptr
+Other STL types may be used within function implementations.
+
+2. In function declarations use enums directly, use custom application defined structs as shared pointers. For example:
+
+Bad practice examples:
+
+//get_player_state - returns EPlayerState enum as shared_ptr (wrong), argument config_data is a struct MyStructName accessed without shared_ptr (wrong), array_with_config_data is an vector from MyStructName without shared_ptr
+std::shared_ptr<EPlayerState> get_player_state(MyStructName config_data, std::vector<MyStructName> array_with_config_data);
+
+//configure_compiler - returns CompilerConfig struct directly by value (wrong)
+CompilerConfig configure_compiler(std::shared_ptr<ParsedOptions> parsed_options);
+
+Correct examples:
+
+//get_player_state - returns EPlayerState directly by value (correct), argument config_data is a struct MyStructName accessed via shared_ptr (correct), array_with_config_data is a vector with shared pointers to MyStructName
+EPlayerState get_player_state(std::shared_ptr<MyStructName> config_data, std::vector<std::shared_ptr<MyStructName>> array_with_config_data);
+
+//configure_compiler - return CompilerConfig struct as shared_ptr (correct)
+std::shared_ptr<CompilerConfig> configure_compiler(std::shared_ptr<ParsedOptions> parsed_options);
+
+3. In function declarations never wrap STL containers in shared pointers. 
+
+Bad practice examples:
+std::shared_ptr<std::vector<MyStructName>>
+std::shared_ptr<std::set<std::shared_ptr<MyStructName>>>
+
+Correct examples:
+std::vector<std::shared_ptr<MyStructName>>
+std::set<std::shared_ptr<MyStructName>>
+
+4. Function declarations must not have constant custom types or iterators for their arguments or return type. For example
+
+Bad practice example:
+//config_data is a constant shared_ptr from MyStructName (wrong)
+//config_iterator is an constant iterator
+EPlayerState get_player_state(const std::shared_ptr<MyStructName> config_data, std::vector<std::shared_ptr<MyStructName>>::const_iterator config_iterator);
+
+Correct example:
+EPlayerState get_player_state(std::shared_ptr<MyStructName> config_data, std::vector<std::shared_ptr<MyStructName>>::iterator config_iterator);
+
+5. Function declarations must not use variadic parameters. All function arguments must be explicitly named and typed.
+
+Wrong example:
+
+void print_message(const std::string& message, ...);
+
+Correct example:
+
+Void print_message(const std::string& message, const std::string& formattedString);

@@ -1,0 +1,70 @@
+REQUIREMENTS FOR CUSTOM DATA TYPES
+Requirements for data types defined by the application. To avoid data and headers cyclic dependencies:
+
+1. Enum data types in this projects must be defined as follows:
+Must use 'enum class'
+Must specify underlying type to uint32_t
+Name must start with 'E'
+Second letter must be capital
+Remaining letters in PascalCase, Example: EPlayerState, EToolType
+Enum values in UPPERCASE Snake Case. Example: IDLE, MOVING_LEFT, GAME_OVER
+Full Example:
+enum class EPlayerState : uint32_t
+{
+ IDLE,
+ MOVING_LEFT,
+ MOVING_RIGHT
+};
+
+This way we can use the enum types everywhere, without worrying for circular dependencies, when it is forward declared, like this:
+enum class EPlayerState : uint32_t;
+Don't use uint32_t as replacement for enum types in variables declaration! Use the enum type instead.
+
+2. Struct members which are user-defined enums must be stored directly. Example:
+
+struct MyStructName {
+	EPlayerState localPlayer;
+	EToolType currentTool;
+};
+
+3. Struct members which are user-defined structs must be stored as shared pointers (std::shared_ptr) to prevent circular dependencies and manage shared ownership of objects. Example:
+
+struct MyStructName {
+    // Correct:
+    std::shared_ptr<AnotherStructName> ptr;    // Enables shared ownership and breaks circular dependencies
+    
+    // Incorrect:
+    AnotherStructName direct;              // Don't store objects directly - can cause circular dependencies
+    AnotherStructName* rawPtr;             // Don't use raw pointers - no automatic memory management
+    std::unique_ptr<AnotherStructName> up; // Don't use unique_ptr - restricts to single owner
+};
+
+4. When a structure contains standard library containers (like std::vector or std::set) of user-defined structs, these containers must store smart pointers rather than objects directly. Example:
+
+struct MyStructName {
+    // Correct:
+    std::vector<std::shared_ptr<AnotherStructName>> arrayPtr;
+    std::set<std::shared_ptr<AnotherStructName>> setPtr;
+    
+    // Incorrect:
+    std::vector<AnotherStructName> array;      // Don't store objects directly
+    std::set<AnotherStructName> someSet;       // Don't store objects directly
+};
+
+5. In struct members definitions never wrap STL containers in shared pointers. 
+
+Bad practice examples:
+std::shared_ptr<std::vector<MyStructName>>
+std::shared_ptr<std::set<std::shared_ptr<MyStructName>>>
+
+Correct examples:
+std::vector<std::shared_ptr<MyStructName>>
+std::set<std::shared_ptr<MyStructName>>
+
+6. Don't define nested data types
+
+7. Struct members can only use these STL types:
+vector, list, queue, map, set, stack, string, shared_ptr
+Other STL types may be used within function implementations.
+
+8. Classes and inheritance aren't allowed. When required to design custom structures that combine characteristics from other data types, use composition.

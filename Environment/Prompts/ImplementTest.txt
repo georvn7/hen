@@ -1,0 +1,15 @@
+You have to implement the unit test for '[[function]]' following the description of this unit test, descriptions for the expected command line and input files if any.
+
+Implementing the test, you can use the language and libraries as specified in the 'Programming Language' and 'Available Libraries' sections
+
+In the source of unit test implementation you must to include the following headers:
+[[headers]]
+
+- Don't define the PRINT_TEST macro. It is already defined in the headers
+- Use std::cout with the << operator (avoid other methods) for output that should persist in release builds (user-facing messages, final results). Use PRINT_TEST for debug/diagnostic output that will be stripped from release builds.
+- Assume function declaration and data definitions required by '[[function]]' are included with the headers. No need to declare the function '[[function]]' or define any data types this function use
+[[other_notes]]
+
+Provide the code in your response in markdown syntax. Prefix the C++ source code with ```cpp and postfix the code in your response with ```
+
+Now please, go ahead and implement the unit test for function '[[function]]'

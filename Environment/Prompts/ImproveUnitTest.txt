@@ -1,0 +1,36 @@
+IMPROVE UNIT TEST
+
+I need you to help improve the unit test for the following function:
+
+[[function_ctx]]
+
+Review '[[function]]', including its description, inputs, and outputs.
+
+[[parent_ctx]]
+
+Primary Goal: Improve the unit test so that it does not itself become a barrier to successfully testing the correct behavior of '[[function]]'.
+
+Requirements:
+
+1. Scope: The unit test should cover the functionality required for '[[function]]' to pass the FULL APPLICATION TEST—no more, no less. We prefer a simple test that verifies subsystem contracts. Broader coverage can be added later.
+
+2. Analysis: Analyze the system-level dependencies of '[[function]]' and ensure the unit test covers the functionality '[[function]]' must implement to pass the full application test.
+
+3. Format: The test source must be a standalone console application with this entry point:
+int main(int argc, char* argv[])
+
+4. Output: Provide a detailed description of the unit test that will serve as implementation guidelines. Include clear instructions about the testing algorithm, test cases input and output files.
+
+5. Framework: Consult the test framework manual for implementation guidance.
+
+Constraints:
+
+The test resides in main.cpp, wrapping the tested function. The test script must NOT generate main.cpp or compile the executable. The unit test executable must NOT be invoked in pretest or posttest steps. The framework invokes the executable implicitly using arguments specified in test.commands[0]. Assume the PRINT_TEST macro is already defined; do not redefine it.
+
+What I'm asking for now: improved test description, expected command-line arguments, and required input files (names and purpose) based on the analysis from the debugging trajectory.
+
+What I'm NOT asking for yet: test source code implementation or input file contents. These will be requested in a separate step.
+
+Test name: [[test_name]]
+
+Please improve the unit test '[[test_name]]' for '[[function]]' as discussed.

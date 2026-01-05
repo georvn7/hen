@@ -1,0 +1,549 @@
+
+std::rave
+
+USER MANUAL
+
+std::rave is a coding agent that, given an input project description and test cases, can synthesize complex functions using C++ and STL.
+
+The agent uses specialized chain-of-thought to decompose the problem, reason about each step, ensure consistent functional and data flow and generate syntactically correct, working code. Embodied in high-bandwidth development environment that provides a constant stream of ground-truth data, the agent accumulates knowledge during inference to maintain a reliable long trajectory.
+
+For optimal quality, speed, and cost-efficiency, the agent uses a party of three LLMs with distinct roles:
+
+Developer: A fast model with excellent knowledge of C++ and the STL.
+Expert:    A model with comprehensive knowledge of algorithms, data structures, and design patterns.
+Director:  A powerful model with domain-specific knowledge in the researched area that guides the other two models through complex software development tasks. 
+
+[[llms]]
+
+Project Description Guidelines (Condensed)
+
+1 Project Purpose & Scope
+- Provide a concise project name.
+- Briefly describe what the project does and mention any significant constraints (for example, single-threaded or ASCII-only).
+2 Command-Line Interface (CLI)
+- Show the exact usage syntax: toolname [options] input_file
+- List and explain each command-line option.
+- Include at least one example command with expected behavior.
+3 Key Features & Requirements
+- Outline the core functionality (e.g., parsing text, generating output, handling errors).
+- Mention specific standards or elements (like operators, data types) the tool must support.
+- Highlight any performance or memory constraints if relevant.
+4 Error Handling & Output
+- Describe how errors should be reported in normal vs. verbose modes.
+- Specify the output format (console text, file output, etc.).
+- Explain how to handle edge cases (e.g., missing files, invalid data).
+5 Implementation Constraints
+- The agent uses C++17 and the STL, with a CMake build script.
+- No external libraries or multithreading.
+- Clarify whether simplicity or expanded functionality is more important.
+6 Testing & Final Steps
+- List any important test scenarios (input files, edge cases, etc.).
+- Provide sample data or indicate what test inputs will look like.
+- When the specification is final, instruct the agent to “start” to generate code.
+
+Examples:
+
+**********************************************************************
+
+PROJECT DESCRIPTION
+
+Command line calculator (clclc)
+
+CLI
+
+clclc "<expression>"
+
+• Evaluates a single expression and prints the result to stdout. No REPL, no files.
+
+Syntax
+ • Literals: int32 (-12, 0, 4096), float32 (3.14, -0.5, 1e-3)
+ • Operators: + - * / % ^
+ • Functions: log(x[, base]), sqrt(x), rcp(x), sin(x), cos(x)
+ • Parentheses: ( … ) for grouping
+ • Whitespace: ignored
+
+Precedence & Associativity (high → low)
+ 1 Functions, unary +/-
+ 2 ^ (right-associative)
+ 3 * / %
+ 4 + -
+
+Type & Evaluation Rules
+ • Default int32 arithmetic if both operands are int32.
+  ◦ / is integer division (trunc toward zero)
+  ◦ % allowed only on int32
+  ◦ ^ integer power; overflow → error
+ • Float promotion: if any operand is float32 or a function is involved → compute in float32.
+ • Unary minus binds before ^ (-2^2 → -(2^2) → -4).
+
+Errors (print to stdout)
+ • Format: ERROR: <one line explanation>
+ • Examples: ERROR: Division by zero
+ERROR: Remainder operator requires integer operands
+ERROR: Mismatched parentheses
+
+Domain Rules
+ • rcp(0) and division by zero → error
+ • sqrt(x<0), log(x<=0), log(x, base<=0 or base==1) → error
+ • % with any float → error
+
+Output
+ • int32 → decimal (e.g., 42)
+ • float32 → default %g-style (~7 significant digits)
+
+Implementation
+Implement Lexer, Parser, AST and Evaluator
+
+Examples
+clclc "(2 + 3*4)^2 - rcp(0.5)"       # 194
+clclc "cos(0) + sin(3.14159265/2)"   # ~2
+clclc "-3 % 2 + log(8,2)"            # 2
+clclc "7/2"                          # 3
+clclc "7/2.0"                        # 3.5
+clclc "1/0"                          # ERROR: Division by zero
+
+
+
+**********************************************************************
+
+PROJECT DESCRIPTION
+
+Neural Function Approximator (NFA)
+
+Command Line Interface:
+
+nfa [options] data_file
+
+Options:
+
+--train: Train the model using data_file.
+--infer: Run inference on data_file using a pre-trained model.
+--loss <type>        : Set loss function (default: mse). Supported: [mse, crossentropy].
+--activation <type>  : Set hidden-layer activation (default: tanh). Supported: [tanh, relu].
+-t <integer>: Training epochs (default: 200).
+-l <float>: Learning rate (default: 0.01).
+-H <integer>: Hidden layer size (default: 16).
+-m <file path>: Model file path (save if training, load if inferencing).
+-v: Verbose output (prints extra error/log details).
+
+Example Usage:
+
+Training:
+# Train with cross-entropy loss and ReLU activation:
+nfa --train --loss crossentropy --activation relu -t 300 -l 0.005 -H 32 -m "mymodel.bin" "digits_8x8_training.txt"
+
+Inference:
+nfa --infer -H 32 -m "mymodel.bin" "digits_8x8_test.txt"
+
+Supported Features:
+- Reads ASCII (UTF-8) files with lines of input-output pairs.
+- Single hidden-layer neural network with user-defined size.
+- Stochastic Gradient Descent training (optionally with a simple momentum or Adam-like update).
+- Selectable Loss Functions:
+  - MSE (default) for regression or simple numeric classification,
+  - Cross-Entropy for classification tasks.
+- Selectable Activations:
+  - tanh (default) for general use,
+  - ReLU for faster training in many cases.
+- Single-threaded
+
+Data Format (Float32)
+- Each input-output value is expected to be represented as 32-bit float in ASCII text format (e.g., 1.0, 0.123, -4.56).
+- By default, 64 inputs (float) and up to 4 outputs (float) per line.
+- Lines containing fewer or more total float values result in an error.
+
+Error Handling:
+
+- In normal mode, prints concise error messages.
+- In verbose mode (-v), prints detailed error and debug logs.
+
+Example digits_8x8_training.txt Format
+Each line contains 64 grayscale pixel values (floats) in [0.0, 1.0], plus 1 label (integer 0–9). For example:
+
+```txt
+0.0 0.0 0.0 0.0 0.0 0.0 0.1 0.2
+0.0 0.0 0.0 0.1 0.2 0.2 0.1 0.0
+0.0 0.1 0.5 0.9 0.8 0.2 0.0 0.0
+...
+(total of 64 pixel values)
+...
+4
+```
+
+- The last value 4 is the digit label for this sample.
+- Each line is 65 values total.
+- The tool expects exactly 64 float values + 1 label per line for training digit classification.
+
+
+digits_8x8_test.txt Example (8×8 grayscale digits):
+Each line has 64 pixel values (floats, range [0.0,1.0]) plus 1 label (integer 0–9). Total 65 values per line. Example snippet:
+
+```txt
+0.0 0.0 0.0 0.0 0.1 0.2 0.3 0.4
+0.0 0.0 0.0 0.2 0.4 0.5 0.3 0.0
+0.1 0.2 0.4 0.8 0.9 0.7 0.2 0.0
+...
+(64 floats in total for one row)
+...
+2
+```
+
+Here, the final value 2 is the label for that 8×8 pattern.
+
+Additional Notes:
+- The 8×8 digits example assumes 64 inputs plus 1 label. This is just an example for demonstration.
+- In reality, the tool can read any number of input features (N) followed by one or more outputs (M), as long as each line in the dataset is consistent (N + M values).
+- Cross-Entropy Loss is recommended for classification tasks (e.g., digit recognition). MSE remains the default for simpler numeric tasks.
+- ReLU activation can speed up training but might require adjusting the learning rate or initialization.
+- In the implementation, try to not use double, whenever possible prefer float 32 floating point type.
+
+Objective:
+Implement a simple command-line tool that trains and applies a small neural network to learn arbitrary numeric functions or classify digit images. The final output is either a saved model (.bin) or inference results on test data.
+
+**********************************************************************
+
+
+PROJECT DESCRIPTION
+
+Mini2D Engine
+
+1. Overview
+
+A command-driven 2D renderer generating PPM images from text commands. Operates on 90×30 canvas supporting three 30×30 scenes with multiple layers and 16-color palette.
+
+2. Command-Line Interface
+
+mini2d -o output.ppm [-v] scene_file
+
+3. Canvas Structure
+
+- Total size: 90×30 pixels
+- Up to 3 scenes (30×30 each)
+- 4 layers per scene (higher layers occlude lower ones)
+- Single 16-color palette shared across all scenes
+- Scenes arranged horizontally from left
+
+4. Coordinate Systems
+
+Grid Space (0-30, 0-30): Used for all drawing commands within each scene.
+Canvas Space (0-90, 0-30): Used for source regions in SPRITE and TILE commands.
+A SPRITE with source at (45,10) in canvas space (middle scene) placed at (15,15) in grid space.
+
+5. Commands
+
+All drawing commands operate in grid space (0-30, 0-30) coordinates except for source regions which use canvas space (0-90, 0-30).
+
+
+- Basic Setup
+
+GRID <scene_id> <width> <height> #scenes are automatically arranged horizontally
+PALETTE <index> <hex_color>    # hex_color format: 0xRRGGBB
+
+- Drawing
+
+BACKGROUND <scene_id> <layer> <color_index>
+LINE <scene_id> <layer> <color_index> <x1> <y1> <x2> <y2> <thickness>
+RECTANGLE <scene_id> <layer> <color_index> <x> <y> <width> <height> <fill:0|1>
+TRIANGLE <scene_id> <layer> <color_index> <x1> <y1> <x2> <y2> <x3> <y3> <fill:0|1>
+CIRCLE <scene_id> <layer> <color_index> <x> <y> <radius> <fill:0|1>
+
+- Advanced Drawing
+
+# Source coordinates (src_x, src_y) are in canvas space (0-90, 0-30)
+# Destination coordinates (dst_x, dst_y) are in grid space (0-30, 0-30)
+SPRITE <scene_id> <layer> <src_x> <src_y> <width> <height> <dst_x> <dst_y> [KEY <color1> [<color2> <color3> <color4>]] [TRANSFORM <scale_x> <scale_y> <rotation> <mirror:0|1>]
+
+# Define reusable tiles
+TILE <tile_id> <scene_id> <layer> <src_x> <src_y> <width> <height> [KEY <color1> [<color2> <color3> <color4>]] [TRANSFORM <scale_x> <scale_y> <rotation> <mirror:0|1>]
+
+# Use tile references in tilemap
+TILEMAP <scene_id> <layer> <grid_width> <grid_height> <wrap_mode:WRAP|MIRROR|CLAMP|BORDER> [TRANSFORM <scale_x> <scale_y> <rotation> <mirror:0|1>]
+0 1 0 1    # Each number references a TILE id
+1 0 1 0
+0 1 0 1
+1 0 1 0
+END_TILEMAP
+
+Wrap Modes:
+- WRAP: Repeats the tilemap pattern
+- MIRROR: Repeats the pattern with alternating reflections
+- CLAMP: Extends edge tiles
+- BORDER: Uses empty space beyond bounds
+
+6. Example
+
+# Scene setup
+GRID 0 30 30
+GRID 1 30 30
+GRID 2 30 30
+
+# Palette
+PALETTE 0 0x000000  # Black 
+PALETTE 1 0xFFFFFF  # White
+PALETTE 2 0xFF0000  # Red
+PALETTE 3 0x00FF00  # Green
+PALETTE 4 0x0000FF  # Blue
+PALETTE 5 0xFFFF00  # Yellow
+
+# Scene 0: Background + tilemap
+BACKGROUND 0 0 0    # Black background in scene 0, layer 0
+
+# Define tiles for grass and flowers
+TILE 0 0 1 0 0 8 8 KEY 0      # Grass tile
+TILE 1 0 1 8 0 8 8 KEY 0      # Flower tile
+
+# Create grassy field with flowers
+TILEMAP 0 1 4 4 WRAP
+0 1 0 1
+1 0 1 0
+0 1 0 1
+1 0 1 0
+END_TILEMAP
+
+# Scene 1: Simple shapes demo
+BACKGROUND 1 0 1    # White background
+LINE 1 1 2 5 5 25 25 2        # Red diagonal line
+RECTANGLE 1 2 3 2 2 26 26 0   # Green rectangle outline
+
+# Scene 2: Complex scene
+BACKGROUND 2 0 4    # Blue background
+CIRCLE 2 1 5 15 15 10 1       # Yellow filled circle
+TRIANGLE 2 2 1 5 5 25 5 15 25 1   # White filled triangle
+
+# Add a transformed sprite on top
+SPRITE 2 3 0 0 16 16 15 15 KEY 0 TRANSFORM 1.5 1.5 45.0 0
+
+**********************************************************************
+
+PROJECT DESCRIPTION
+
+Simple General-Purpose Solver (SGPS)
+
+1. Overview
+
+Simple General-Purpose Solver (SGPS) is a command-driven tool designed to configure systems with multiple degrees of freedom (DoF) to achieve specified goals. It supports basic DoF representation, simple constraints, and employs foundational solver algorithms to find feasible configurations. SGPS balances essential features with manageable complexity.
+
+2. Command-Line Interface
+
+sgps [options] project_file
+
+Options:
+
+-o <output_file>: Specify the output file for solver results.
+-v: Enable verbose logging for detailed error and debug information.
+-t <timeout>: Set the maximum time (in seconds) for the solver to run (default: 60).
+-s <solver_type>: Select the solver algorithm (default: "slsqp"). Supported: [slsqp, sqp].
+-h: Display help information.
+
+Example Command:
+
+sgps -o "solution.json" -v -t 120 -s "sqp" "config_project.json"
+
+3. Key Features & Requirements
+
+- Degrees of Freedom (DoF) Representation:
+ * Supports rotational and translational DoFs.
+ * Define DoFs with names, types, current values, and limits.
+- Constraints Handling:
+ * Basic equality and inequality constraints.
+ * Ability to define dependencies between DoFs.
+- Solver Integration:
+ * Implements general-purpose solver algorithms: SLSQP and SQP.
+   * SLSQP - Sequential Least Squares Programming
+   * SQP - Sequential Quadratic Programming
+ * Supports setting solver parameters like tolerance and maximum iterations.
+- Input/Output Formats:
+ * Input: JSON-based project files defining DoFs, constraints, and objectives.
+ * Output: JSON-formatted solver results, including DoF configurations and solver status.
+- Performance:
+ * Efficient handling of small to moderately sized DoF systems (up to 100 DoFs).
+
+4. Error Handling & Output
+
+- Error Reporting:
+ * Normal Mode: Displays concise error messages indicating the type and location of the error.
+ * Verbose Mode (-v): Provides detailed error logs, including stack traces and solver diagnostics.
+- Output Format:
+ * Results are written to the specified output file in JSON format, containing:
+  * Solver status (e.g., success, failure, timeout).
+  * Final DoF values.
+  * Objective function value.
+  * Solver diagnostics (if verbose).
+- Edge Case Handling:
+ * Detects and reports infeasible configurations.
+ * Validates input project files for consistency and completeness.
+ * Handles missing files or invalid data gracefully with appropriate error messages.
+
+5. Implementation Constraints
+
+- Single-threaded operation.
+- Prioritizes simplicity and core functionality to ensure a functional application.
+- Maintains a modular codebase to facilitate future expansions.
+- Try to not use double, whenever possible prefer float 32 floating point type.
+
+6. Example
+
+Project File (config_project.json):
+
+{
+  "degrees_of_freedom": [
+    {
+      "name": "shoulder_pitch",
+      "type": "rotational",
+      "current_value": 0.0,
+      "min_limit": -90,
+      "max_limit": 90
+    },
+    {
+      "name": "shoulder_yaw",
+      "type": "rotational",
+      "current_value": 0.0,
+      "min_limit": -90,
+      "max_limit": 90
+    },
+    {
+      "name": "elbow_pitch",
+      "type": "rotational",
+      "current_value": 0.0,
+      "min_limit": 0,
+      "max_limit": 135
+    }
+  ],
+  "constraints": [
+    {
+      "type": "equality",
+      "expression": "end_effector_x == 1.5"
+    },
+    {
+      "type": "equality",
+      "expression": "end_effector_y == 1.5"
+    }
+  ],
+  "objectives": {
+    "type": "minimize",
+    "expression": "distance_to_target"
+  }
+}
+
+Command Execution:
+
+sgps -o "solution.json" -v "config_project.json"
+
+Expected Output (solution.json):
+
+{
+  "status": "success",
+  "objective_value": 0.0,
+  "degrees_of_freedom": {
+    "shoulder_pitch": 35.26,
+    "shoulder_yaw": 0.0,
+    "elbow_pitch": 90.0
+  },
+  "solver_diagnostics": {
+    "iterations": 25,
+    "time_elapsed": 0.45
+  }
+}
+
+**********************************************************************
+
+PROJECT DESCRIPTION
+
+
+Simple C Preprocessor
+
+Command Line Interface:
+
+scp [options] source_file
+
+Single executable file (scp) with the following command line arguments:
+
+-I <directory>: Include additional directories.
+-D<macro> and -D<macro>=<value>: Define macros, optionally with values.
+-o <file path>: Specify output file location.
+-v: Enable verbose error reporting.
+source_file: The C file to preprocess. Supports only ASCII format for the source_file
+
+Example Command:
+
+scp -I "/path/to/include/dir" -DDEBUG -DVERSION=2.0 -o "~/main.c" "main.c"
+
+Supported Directives:
+#define, #undef: Manage macros.
+#include: Include files.
+#if, #ifdef, #ifndef, #else, #elif, #endif: Control compilation.
+#error: Emit a compilation error.
+No pragmas support in the preprocessor!
+
+Error Handling:
+Normal mode (default): Provides sufficient error details.
+Verbose mode (-v): Offers comprehensive error reports.
+
+The preprocessor recognizes and removes comments.
+The preprocessor supports nested macros.
+
+Additional Notes:
+The preprocessor operates in a single-threaded mode without concurrency support.
+
+Objective:
+Implement only the listed features, maintain simplicity to ensure functionality.
+
+**********************************************************************
+
+PROJECT DESCRIPTION
+
+
+Simple C Compiler (C17 standard revision)
+
+Command Line Interface:
+scc [options] source_file
+Options:
+  -o <file path>: Output assembly source file path
+  -v: Enable verbose error reporting
+Example: scc -o "~/Documents/output.s" input.c
+
+Supported Keywords: 
+break, case, const, continue, default, do, else, enum, extern, for, goto, if, return, sizeof, static, struct, switch, union, while
+
+Supported Operators:
+   - Arithmetic: +, -, *, /, %, ++, --
+   - Relational: ==, !=, >, <, >=, <=
+   - Logical: &&, ||, !
+   - Bitwise: &, |, ^, ~, <<, >>
+   - Assignment: =, +=, -=, *=, /=, %=, <<=, >>=, &=, ^=, |=
+   - Special: sizeof, & (address), * (dereference), ->, ., ?:, ,
+
+Supported Types:
+
+char - 8 bits signed value
+int - 32 bits signed value
+short - 16 bits signed value
+float - 32 bits floating point number
+
+By default, all types are signed. Unsigned versions available with 'unsigned' modifier.
+
+Custom data type definitions are supported by struct, enum and union features.
+
+Error Handling:
+Normal mode (default): Provides sufficient error details.
+Verbose mode (-v): Offers comprehensive error reports.
+
+Error handling in normal and verbose mode should report errors appropriately.
+
+Code Generation:
+- Target: ARM architecture 64-bit assembly source (ASCII format)
+- The generated output assembly source must be able to compile with clang. Example: clang --target=aarch64 -c source.s -o source.o
+- Object files, compiled with clang, from the generated by scc assembly sources must be able to link with other object files generated with clang toolchain and the C standard library.
+- Single-threaded compiler
+- No linking support (assembly output only)
+- IR support optional (only if simplifies the implementation)
+- Do not generate any kind of meta data or debug information in addition to the assembly source.
+
+Implementation Instructions:
+- DO NOT Implement preprocessor. Assume fully preprocessed input C source files (ASCII format)
+- Support only the features listed above
+- Focus on basic functionality
+- ASCII input files only
+- Maintain simplicity to ensure functionality.
+
+**********************************************************************

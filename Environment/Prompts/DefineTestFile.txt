@@ -1,0 +1,10 @@
+Please provide the content of the following unit test input file: '[[filename]]'
+This file will be specified as input argument in the command line for the unit test for function '[[function]]'. Here is the command line:
+[[command]]
+
+Here is the description of the file content we previously discussed:
+[[description]]
+
+Provide the file content in your response in markdown syntax. Prefix the content with ```[[srctype]] and postfix the content in your response with ```
+
+Now please go ahead and provide the content of the '[[filename]]' without asking any further questions!

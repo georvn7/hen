@@ -1,0 +1,22 @@
+FUNCTION IMPLEMENTATION
+
+You have to implement the function '[[declaration]]' following the description of this function
+
+Implementing '[[function]]', you can use the language and libraries as specified in the 'Programming Language' and 'Available Libraries' sections
+[[callers]]
+Available functions:
+[[call_api]]
+Available functions end here
+
+Please, have a look on the application-defined data types above, if any. Try to understand how to leverage already available enums structs and their members.
+
+Notice, some of the functions, if any, listed in 'Available functions' might already have declarations, other functions might have just name. For those with only name, you might have to figure out some of the data types produced and consumed by the function, you have to decide what are their arguments and return type based on functions descriptions. Based on your decision, we are going to declare and define those functions later.
+
+However, prefer existing application-defined data types (structs and enums) and their members when implementing the function. Introduce new ones if existing definitions cannot adequately serve the purpose. 
+
+If you introduce new data types and their members consider the following best practices about structure members and enums defined by the application.
+[[struct_members]]
+
+[[checklist]]
+
+Now please, go ahead and implement '[[declaration]]'

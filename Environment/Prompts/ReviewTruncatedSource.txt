@@ -1,0 +1,7 @@
+Please review implementation of the function '[[function]]'
+
+I found a few things in the previous implementation of '[[function]]' that might need attention:
+
+[[review]]
+
+Please review the listed notes and taking into account previous instructions about the implementation of '[[function]]' if it makes sense, provide updated implementation. Whatever you decide, please do your best effort to answer without asking questions and provide new full response.

@@ -1,0 +1,43 @@
+[[app_info]]
+
+DEBUGGING PROGRESS SUMMARIZATION
+
+We are debugging '[[application]]' using iterative LLM-assisted analysis.
+
+The current progress already accumulated too many steps. We need to summarize some of the steps. Let's have a look on the the part we want to summarize
+
+//STEPS TO SUMMARIZE start here
+[[to_summarize]]
+//STEPS TO SUMMARIZE end here
+
+Please summarize ONLY the content in the 'STEPS TO SUMMARIZE' section, up to and including the step [[step]]. If this section begins with a previous summary, incorporate it into your new summary.
+
+On the next debugging steps, the progress will be presented with the new summary followed by the steps in the 'REMAINING STEPS' section
+
+//REMAINING STEPS start here
+[[remaining_trajectory]]
+//REMAINING STEPS end here
+
+Please summarize ONLY the content in the 'STEPS TO SUMMARIZE' section, up to and including the step [[step]]. If this section begins with a previous summary, incorporate it into your new summary.
+
+On the next debugging steps, the progress will be presented with the new summary followed by the steps in the 'REMAINING STEPS' section
+
+SUMMARIZATION REQUIREMENTS:
+
+1. What you've learned about how to debug the application and how to use the available actions.
+2. Highlight resolved blockers: how they were identified and how they could have been caught earlier.
+3. Explain suboptimal fixes: the reasoning behind them and better alternatives.
+4. Highlight unnecessary changes: how they could have been prevented.
+5. Preserve learnings about key aspects of the high-level architecture of this application that are important when debugging it.
+6. Preserve diagnostic evidence: Error messages, log excerpts, specific symptoms
+7. Preserve a list of recent fixes applied to track potential regressions in subsequent steps
+8. Maintain hypothesis evolution: How understanding of the problem changed
+9. Keep decision points: Why certain approaches were chosen/abandoned
+10. Retain technical specifics: Function names, file names, line numbers, configurations
+11. Track verification results: What was confirmed working vs. still broken
+12. Preserve breakthrough moments: Key insights that advanced understanding
+13. Preserve the number/range of the debugging steps for the important artifacts as we might refer to those steps in the future
+
+Provide structured response in plain text or markdown format. One or two concise sentences for each of the above requirements, but this is not a hard requirement as we don't want to miss something important.
+
+Summarize knowledge besides what is already explained in the 'DEBUGGING WORKFLOW', 'PROJECT DESCRIPTION' and the 'TEST DESCRIPTION'

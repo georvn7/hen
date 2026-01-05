@@ -1,0 +1,132 @@
+DISTILL TRAJECTORY STEP FOR SYNTHETIC TRAINING DATA
+
+CONTEXT
+You are generating synthetic training data for an AI coding agent that debugs applications written in C++ and STL. You will be provided with a distilled debugging trajectory and must generate the next step that an expert debugger would take.
+
+TRAINING PURPOSE
+This data trains reasoning models to:
+- **From analysis**: Learn expert thinking patterns - how to observe, infer, hypothesize, and connect dots
+- **From motivation**: Learn decision-making - how to justify actions based on reasoning
+- **Together**: The analysis→motivation pair teaches both "how to think through debugging" and "how to justify and act on that thinking"
+
+Think of analysis as <thinking> tags in o1-style models - it's the reasoning trace that gets trained on.
+
+CURRENT TRAJECTORY STARTS HERE
+
+[[current_trajectory]]
+
+CURRENT TRAJECTORY ENDS HERE
+
+The trajectory contains:
+1. Summary - High-level overview of what has been accomplished
+2. Last Run - Most recent test execution results
+   - Test/LLDB logs showing failures or success
+   - Reward-hacking review (if applicable)
+3. Requested Information - Information gathered so far
+   - Function sources, traces, logs
+   - Call graphs, function summaries
+   - Source searches, debug traces
+4. Trajectory Steps - All steps taken up to this point
+
+TASK
+
+Generate the next debugging step that matches step [[step_id]] from the optimized trajectory. You must produce:
+
+1. **NextDebugStep** - The actual debug action
+2. **Analysis** - Expert-level reasoning for training
+3. **Motivation Summary** - Single line concise summary of the motivation. What you learned from the provided information so far and why the next step is selcted
+
+OUTPUT REQUIREMENTS
+
+NextDebugStep Fields:
+- action_type: Must match the optimized trajectory's action for step [[step_id]]
+- action_subject: Must match the optimized trajectory's subject for step [[step_id]]
+- breakpoints: Must match the optimized trajectory's breakpoints for step [[step_id]] (empty if none)
+  * Exact number of breakpoints as the original trajectory.
+  * Exact match of the condition and expression for each breakpoint from the original trajectory.
+- line_number: Relevant line number (0 if not applicable). Must match the optimized trajectory's line_number for step [[step_id]]
+- invocation: Function invocation number (1 if not applicable). Must match the optimized trajectory's invocation for step [[step_id]]
+- motivation: The CONCLUSION - what action to take and its justification
+  * States the decision clearly: "We need to [action] because [reason]"
+  * Explains what this accomplishes or reveals
+  * Provides any necessary instructions for executing the step (especially critical for fix_function)
+  * The fix for fix_function action should be clearly explained but without necessarily using C++ syntax. It could be in natural language using abstract programming explanations
+  * **CRITICAL**: Must preserve comprehensive context for future steps
+  * Accumulates knowledge: capture all specific data that led to this decision
+  * Include: function names, source locations, log messages, trace fragments, error patterns, observations
+  * This information becomes part of the trajectory and will be the only reference available later
+  * Target: 1-3 paragraphs, under 2048 characters (but prioritize completeness over brevity)
+  * Helpful to reference concrete details from logs/traces/code in the previous steps from the 'CURRENT TRAJECTORY'
+  * This is the OUTPUT of the reasoning process
+
+Analysis Field:
+- The THINKING PROCESS that leads to the motivation (3-8 sentences)
+- Chain-of-thought reasoning showing HOW you arrived at the conclusion
+- Shows intuitive leaps, pattern recognition, connecting observations
+- Must feel like ACTIVE reasoning, not post-hoc explanation
+- Build and express intuition based on all available information, including in the TRAJECTORY OPTIMIZATION framed as abstract intuition and inference
+- Must NOT directly reference the optimized trajectory or say things like "step 34 shows" (unless quoting facts from previous steps already in the CURRENT TRAJECTORY)
+- Should demonstrate debugging expert intuition and domain knowledge in action
+- Focus on the reasoning flow, not on accumulating details (that's motivation's job)
+
+CRITICAL DISTINCTION: ANALYSIS vs MOTIVATION
+
+**Analysis (Thinking):**
+- This is the place to use all available information from the original run and frame it as intuition and thinking process.
+- You can directly refer to the CURRENT TRAJECTORY (distilled) information but not to the information from the original trajectory.
+- Shows the reasoning process
+- Internal monologue, observations leading to hypothesis
+- Demonstrates expert thinking patterns
+- Can be more exploratory and show uncertainty
+
+**Motivation (Conclusion + Context):**
+- States the decision and justification
+- "We need to do X because Y. This will accomplish Z."
+- Preserves specific details for future reference
+- Comprehensive and definitive
+- Accumulates knowledge that will appear in future trajectory steps
+
+Think of it as: Analysis is the scratchpad; Motivation is the lab notebook entry.
+
+ANALYSIS CHAIN-OF-THOUGHT GUIDELINES
+
+The analysis shows the THINKING IN PROGRESS, not a finished explanation. Think like an expert muttering to themselves while debugging.
+
+Good patterns:
+"I see [observation]... that's interesting because [inference]..."
+"Wait, [symptom] combined with [symptom] usually means [hypothesis]..."
+"The error says [X], but the real issue is probably [Y] since [reasoning]..."
+"Let me think... [A] happens before [B], so if [A] is wrong, then [B] would fail exactly like this..."
+"This pattern - [description] - I've seen this when [cause]..."
+"Hmm, [observation] suggests [hypothesis], but I should verify [assumption] first..."
+
+Bad patterns:
+"Step 34 shows that..." or "The optimized trajectory indicates..." (Only as long as quoted facts are from the previous steps in the optimized trajectory, not from the original trajectory which is supposed only to provide intuitive insights and won't be visible in the final training data)
+"We should do X because Y" (that's the motivation, not the thinking)
+"The next step is..." (that's also the motivation)
+Post-hoc explanations that sound like documentation
+Generic statements without concrete observations driving them
+Repeating details that belong in motivation (save those for the conclusion)
+
+The analysis should feel like watching someone's reasoning unfold in real-time.
+[[new_functions]]
+GENERATION CHECKLIST
+
+Before submitting your response, verify:
+The step corresponds to the one already suggested in the optimized trajectory
+action_type, action_subject, line_number, invocation exactly match the optimized trajectory for step [[step_id]]
+for debug_function action the breakpoints count their conditions and expressions must exactly match the one from the original debug_function step (see the trajectory)
+analysis shows THINKING IN PROGRESS (chain of observations → inferences → hypothesis)
+motivation states the CONCLUSION (what action to take and why)
+motivation captures comprehensive context: function names, locations, error messages, observations
+motivation accumulates knowledge that will be available in future trajectory steps
+analysis reads like internal monologue/reasoning, not post-hoc explanation
+analysis is 3-5 dense sentences showing the reasoning flow
+motivation clearly explains the action and its justification (ideally under 2000 characters, but prioritize completeness)
+analysis connects observations from current_trajectory to reach the conclusion
+No references to "step X" or "the original trajectory" in analysis (current_trajectory facts are fine)
+The reasoning flow (analysis → motivation) feels natural and expert-level
+Technical details are accurate to C/C++ compilation domains
+For fix_function steps: motivation includes detailed implementation instructions
+
+Now please go ahead and provide next debugging step from the optimized trajectory as a continuation to the current debugging trajectory!

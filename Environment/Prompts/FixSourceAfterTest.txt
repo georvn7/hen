@@ -1,0 +1,12 @@
+Fix the source for the function '[[function]]' as suggested in the previous message 
+
+Here is the current implementation of '[[function]]'
+
+'[[implementation]]'
+
+Please review the implementation of '[[function]]' and update it if required. Don't change data types defined outside of the function scope. Don't change the function name and signature. 
+The purpose of this review is to revise the implementation based on the output from the unit test '[[test]]' but in the same time take into account the implementation checklist.
+
+[[checklist]] 
+
+Now please, go ahead and revise '[[function]]'

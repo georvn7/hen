@@ -1,0 +1,16 @@
+
+LOG DESCRIPTION
+
+The log contain messages printed by the application. Log messages printed by the application have the following format:
+
+210 comp_scan_identifier:3 ln 80 - Scanned identifier: 'RED' at line 2, column 5
+
+In this example;
+[log_line] [function_name]:[hit_count] ln [source_line] - [actual_message]
+Where:
+
+log_line is the line number from the log
+function_name is the name of the function generating the debug output (comp_scan_identifier)
+hit_count (or invocation ID) indicates how many times this function has been called (3)
+source_line shows which line in the source code produced this log (80)
+actual_message contains the specific information being logged (Scanned identifier: 'RED' at line 2, column 5)

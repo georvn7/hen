@@ -1,0 +1,24 @@
+HOW TO EXPLAIN ALGORITHMS IN NATURAL LANGUAGE
+
+This section outlines a set of abstract terms and natural language constructs to be used as a specialized vocabulary for describing functional and logical concepts. The idea is to use these concepts and not a specific programming language
+
+Explaining operations: ensure parentheses for grouping variables, operations and precedence, conditions and program flow are clearly explained.
+
+Iterative operations: while, for
+Explain the loop conditions, operations performed in the loop
+
+Conditional execution operation: if, else, in case of
+Ensure the execution path is clearly explained.
+
+Data containers: string, vector, map, set, stack, list, queue
+For the listed containers assume similar functionality as in the Standard C++ Library but we only explain them in a plain, procedural style in natural language
+
+Data structures: similar to the C language, no inheritance and member functions.
+
+Variables: Each variable has type and name. The type could be a number, structure or a data container
+
+Logical operations, math functions, bitwise operations, algorithms - assume similar to concepts in C++ programming language and the Standard C++ Library 
+
+Functions: Ensure name of the function, input and output variables and performed operations are clearly explained
+
+You can explain logic by mentioning well known abstract algorithms, data structures and design templates that don't require domain specific knowledge. The goal is to explain ideas on natural language as briefly as possible but ensuring clarity and consistency.

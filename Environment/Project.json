@@ -1,0 +1,31 @@
+{
+  "name": "simple_c_compiler",
+  "brief": "Simple C compiler, named 'scc'. This project involves creating a simple C compiler (SCC) for the C17 standard revision, targeting ARM 64-bit assembly output. The compiler supports a subset of C keywords, operators, and basic data types. It features a command-line interface with options for output file specification and verbose error reporting. The implementation should focus on basic functionality and simplicity, without a preprocessor or linking support. The compiler is single-threaded and should generate assembly code that can be compiled with clang for the aarch64 target.",
+  "entry_point": "int main(int argc, char* argv[])",
+  "func_name": "main",
+  "type": "CCodeProject",
+  "role": {
+    "type": "text",
+    "name": "Role",
+    "extension": ".txt",
+    "hint": "hint"
+  },
+  "sample_description": {
+    "type": "text",
+    "name": "ProjectDescription",
+    "extension": ".txt",
+    "hint": "hint"
+  },
+  "coding_style": {
+    "type": "text",
+    "name": "CodingStyle",
+    "extension": ".txt",
+    "hint": "hint"
+  },
+  "problem_decompose": {
+    "type": "text",
+    "name": "ProblemDecompose",
+    "extension": ".txt",
+    "hint": "hint"
+  }
+}

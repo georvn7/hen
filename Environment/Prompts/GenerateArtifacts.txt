@@ -1,0 +1,3 @@
+[[functions_list]]
+
+Review the listed functions and their description, review the 'PROJECT DESCRIPTION' section and try to group functions in 3 to 6 categories. The groups will serve as filters or virtual folders in the IDE project files. Return only the names of the functions in the 'file_groups' field.

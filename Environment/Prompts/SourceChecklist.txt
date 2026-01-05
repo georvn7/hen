@@ -1,0 +1,37 @@
+Implementation checklist:
+
+- Provide full implementation of '[[function]]', no placeholders and stubs, no "TO DO" comments, no empty scopes. Implement everything!
+- If it is not possible to implement everything in '[[function]]', instead of adding "TO DO" in the comments, consider calling helper functions and we are going to declare and define them later.
+- Don't provide include statements in the source. I will add them later.
+- Don't provide data structures and enums definitions in the source. I will ask you for the data definitions a bit later.
+- Don't declare extern and global variables and data structures! To pass data to the function use function arguments, to output data from the function use the return result and when necessary function arguments.
+- Provide implementation only for '[[function]]'.
+- Don't declare, define and implement the functions listed it the 'Available functions' section above. Assume they are already declared and the implementation can call them. They will be implemented later.
+- In the implementation, if possible, try to use only the functions listed it the 'Available functions' and functionality from the 'Available Libraries'
+- You must not use functions from external libraries, except from libraries listed in 'AVAILABLE LIBRARIES' section
+- For data structures or enums, except those from 'available libraries', that aren't defined or declared in the current scope, you have to assume they exist and all required members are defined in those data structures or enums so you can use them in the implementation.
+- If a given variable used in the scope of '[[function]]' is not a member of a struct or enum and it is not an function argument, then it must be declared in the scope of the function!
+- You can modify existing or add new function parameters to the functions from 'Available functions' which are listed only by name, but not to the functions listed with declarations or those from the 'available libraries'.
+- You can modify existing or add new data structures and enums. But don't modify structures, classes and enums defined in the 'available libraries'.
+- Avoid lambda expressions in the implementation. If not possible to implement everything by using available functions and libraries, consider calling a new helper function. Just call the new function, we'll declare and define it later based on the usage.
+- Prefer existing application-defined data types (structs and enums) and their members when implementing the function. Introduce new ones if existing definitions cannot adequately serve the purpose.
+- All produced or updated data from this function that will be accessible outside of the scope of the function must be exposed by the return result or mutable arguments.
+- Using global variables from 'available libraries' is permitted!
+- When using the C++ Standard Library don't assume the 'std' and other namespaces from STD library are defined. You must prefix all appropriate types and functions form the STD library with their namespace
+- Don't assume this software declares and defines its own C++ classes. This software defines only struct type of data. Classes might be used only from the available libraries
+- Classes and inheritance aren't allowed. When required to design custom structures that combine characteristics from other data types, use composition.
+- In the data structures, defined by this software, don't define member functions, constructors and destructors.
+- In the data structures, defined by this software, don't define members that are function pointers, lambdas or std::function<> types.
+- The implementation must not call any type of function pointers stored in the application defined structs. It has to use only global functions. It still can call function pointers, lambdas, std::function<>  and member functions from types defined in 'Available Libraries'
+- Don't define nested data structures and types.
+- Don't use exception handling!
+- Don't use preprocessor directives in the provided source.
+- Be careful when calling functions recursively. Consult with the provided call stack information to find if you call functions that directly or indirectly call '[[function]]' and ensure this won't cause problems with the execution flow.
+- Don't use the 'auto' keyword for data types that are defined in this software. It is fine to use 'auto' for data types from 'available libraries'.
+- Consult with available libraries section how to leverage functionality provided by the libraries when appropriate.
+- The code you generate will be compiled with Clang compiler
+- Use PRINT_TEST(fmt, args...) in the implementation of '[[function]]' to print as much verbose information as required for the purpose of unit tests and debugging. Assume the definition of the macro is available. The definition will be empty in release builds. Unit test code for '[[function]]' will be implemented on a separate step.
+- Use std::cout with the << operator (avoid other methods) for output that should persist in release builds (user-facing messages, final results). Use PRINT_TEST for debug/diagnostic output that will be stripped from release builds.
+- In your response I want only the C++ source of the function definition, no data definition, no includes, no test cases.
+- Provide the code in your response in single section with markdown syntax. Prefix the C++ source code with ```cpp and postfix the code in your response with ```
+- Based on this checklist, provide the best answer without asking questions

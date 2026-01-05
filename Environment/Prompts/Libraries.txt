@@ -1,0 +1,46 @@
+PROGRAMMING LANGUAGE
+
+Use the C++ 14 programming language
+
+In this project we don't use C++ classes. We use simple C-like functions and structs. However, we can fully benefit from and use the C++ 14 Standard Library functions, containers and data types as function arguments and output parameters, in the functions implementation or as member fields in the structures. It's kind of "C but with the C++ standard library". Since classes and inheritance aren't allowed. When required to design custom structures that combine characteristics from other data types, use composition.
+
+AVAILABLE LIBRARIES
+
+C++ 14 Standard Library
+
+When appropriate, please use the features provided by the Standard C++ Library. DO NOT redefine and reimplement functionality that is already available in the C++ standard library!
+
+Here’s a list of key components of the C++ standard library:
+
+Containers: These are used to manage collections of objects or data. For example:
+Files and streams I/O
+vector, list, queue, map, set, stack
+Algorithms: The library provides a set of predefined algorithms that can be used to perform operations such as searching, sorting, counting, manipulating, etc., on containers. Some common algorithms include sort, find, max_element, accumulate, etc.
+Iterators: Iterators are used to point at memory locations of containers. They play a central role in connecting containers with algorithms. Types include input, output, forward, bidirectional, and random access iterators.
+Memory Management: This includes utilities to help manage dynamic memory:
+Smart pointers like shared_ptr
+Strings and Stream Classes: For handling textual data:
+The string class
+Stream classes like istream, ostream, stringstream for input and output operations
+Concurrency Support: Features that support multi-threaded programming:
+thread - to handle threads
+mutex, lock_guard, unique_lock - for synchronization
+Condition variables, atomic operations, etc.
+Numerics: Utilities and functions that assist with mathematical operations:
+Random number generators
+Numeric functions like std::accumulate and std::inner_product
+Complex numbers support with std::complex
+Error Handling: Facilities to handle errors in programs, such as error codes.
+Regular Expressions: Provides support for regular expression processing.
+
+- Avoid C standard library when similar functionality is available in STL
+
+- Don't use platform specific functions and data types
+
+- When using the C++ Standard Library don't assume the 'std' and other namespaces from STD library are defined. You must prefix all appropriate types and functions form the STD library with their namespace
+
+- For struct members and function declarations, use only these std:: types:
+vector, list, queue, map, set, stack, string, shared_ptr
+Other STL types and namespaces may be used only within function implementations.
+
+When necessary, you can also use functionality from the 'C standard library'

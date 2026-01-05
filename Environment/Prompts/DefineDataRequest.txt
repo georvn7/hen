@@ -1,0 +1,21 @@
+
+Based on the request to define or if required update the C++ data type for '[[struct]]' or other related structs and enums would you provide your analysis and list all relevant structs and enums?
+
+To perform your analysis, please consult with what we've discussed so far. Probably we need to define or update '[[struct]]' in some context related to its usage in the code of a given functions or to incorporate feedback from a review. Familiarize with that information to deduce what data structures and their members related to '[[struct]]' might require new definition or update of the existing definitions. Try to introduce only the required changes and explain your motivation.
+
+In your response focus on providing requested analysis rather than source code.
+Format your response by following one of the 2 options:
+
+1. If the existing data type definition for '[[struct]]' and other dependent struct and enum types don't require update you must leave the array 'items' empty
+ 
+2. If you have to define new or update existing struct and enum types, in your response, for each of the struct or enum types that require modification or update:
+- In the 'type_name' field provide the name of the custom data type
+- In the 'type' field provide the type of the data - is it struct or enum?
+- In the 'description' field provide brief description of the data type, one or two sentences, taking into account suggested modifications
+- In the 'motivation' field explains the motivation to introduce this new data type or to update the existing one. Explain what struct or enum members need to be added or updated, their name and data type. Explain your motivation based on the usage or requirements from the provided code or feedback. Explain it relates to '[[struct]]'
+
+Don't include in your response, in the 'items' array, data types that aren't newly introduced or require modification.
+Don't include in your response C++ data types or data types that aren't application defined struct or enum types.
+Include in your response, in the 'items' array, only data types that are newly introduced or require modification.
+
+The main idea of this analysis is to provide enough and clear information how to introduce new or update existing struct or enum types related to our discussion about '[[struct]]'

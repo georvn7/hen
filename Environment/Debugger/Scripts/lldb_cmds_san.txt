@@ -1,0 +1,30 @@
+settings set auto-confirm true
+process launch --stop-at-entry
+script import lldb,subprocess,sys
+
+# start a timer that will send SIGALRM to the inferior
+script pid = lldb.debugger.GetSelectedTarget().process.GetProcessID()
+script t = [[timeout]]
+script subprocess.Popen(["/bin/sh","-c","(sleep %d; kill -ALRM %d) &" % (t, pid)])
+process handle SIGALRM -s true -n false -p false
+
+process handle SIGABRT -s true -n true -p false
+process handle SIGSEGV -s true -n true -p false
+process handle SIGBUS  -s true -n true -p false
+process handle SIGILL  -s true -n true -p false
+# process handle SIGTRAP -s true -n true -p false
+
+process continue
+
+# >>> PRINT RESULT EARLY <<<
+# If exited: print the exit status; if merely stopped (e.g., timeout): print TIMEOUT
+script import lldb,sys; p=lldb.debugger.GetSelectedTarget().process; st=p.GetState(); sys.stdout.write("_DEBUG_COMMAND_RESULT=%d\n" % p.GetExitStatus() if st==lldb.eStateExited else "_DEBUG_COMMAND_RESULT=TIMEOUT\n")
+
+# Optional diagnostics only when stopped (e.g., timeout)
+script import lldb; p=lldb.debugger.GetSelectedTarget().process; lldb.debugger.HandleCommand("thread backtrace all -c 32") if p.GetState()==lldb.eStateStopped else None
+script import lldb; p=lldb.debugger.GetSelectedTarget().process; lldb.debugger.HandleCommand("frame variable") if p.GetState()==lldb.eStateStopped else None
+
+# Kill only if it's still around
+script import lldb; p=lldb.debugger.GetSelectedTarget().process; lldb.debugger.HandleCommand("process kill") if p.GetState()!=lldb.eStateExited else None
+
+quit

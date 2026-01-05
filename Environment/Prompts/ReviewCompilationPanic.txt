@@ -1,0 +1,36 @@
+I've tried to compile the function '[[declaration]]'
+
+[[function_ctx]]
+
+'[[function]]' has been compiled with the following command line:
+
+[[command]]
+
+Here is the output from the Clang compiler:
+
+[[output]]
+
+Here is the list of 'available data types and functions' for the implementation of '[[function]]'
+
+[[api]]
+
+We must compile the function '[[function]]' For that purpose we have to eliminate all the code that causes the errors. We can deactivate (by commenting out) as much code as needed in order to compile the function!
+
+You must not change functions signatures and data types definitions!
+
+Please review the compiler output for errors and explain the best single solution approach. Focus on describing how to fix the compilation without providing actual code changes. You can consider the following interventions: 
+
+1. Incompatible structure or enum members:
+   - Comment out code referencing the missing member
+   - Add a comment explaining why the code is disabled
+
+2. Incompatible function calls:
+   - Consider comment out the function call
+   - Add a brief informative comment (but avoid 'TODO' word - there is automated review check)  to implement the function later
+
+3. Other compilation errors:
+   - Consider commenting out the code 
+
+4. Ensure the code will compile after eliminating problematic sections
+
+In your response provide only the review of the recommended solution. Don't list anything in the existing_functions and unknown_types fields and don't list any new functions! Focus on the overall strategy rather than providing updated source code.

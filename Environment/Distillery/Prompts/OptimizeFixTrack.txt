@@ -1,0 +1,199 @@
+[[app_info]]
+
+TRAJECTORY OPTIMIZATION TASK
+
+==============================================================================
+CONTEXT
+==============================================================================
+
+I'm generating synthetic training data to train an LLM-based AI coding agent for C++ debugging. 
+
+The agent's debugging trajectory consists of multiple steps.
+
+Please familiarize yourself with the 'DEBUGGING WORKFLOW' section.
+
+STEP TYPES IN THE TRAJECTORY:
+1. Test and analysis (run_test action)
+2. Collect information (various info-gathering actions)
+3. Debugging - debug_function action to debug a given function with optional breakpoints
+4. Fix function (fix_function action)
+
+Note: After each fix_function action, the agent automatically schedules a run_test action to verify the fix and assess progress.
+
+==============================================================================
+PROVIDED DATA
+==============================================================================
+
+TRAJECTORY PRECEDING THE SEGMENT TO OPTIMIZE:
+[[trajectory]]
+
+TRAJECTORY SEGMENT TO OPTIMIZE:
+[[fix_track]]
+
+==============================================================================
+YOUR TASK
+==============================================================================
+
+OBJECTIVE:
+Optimize the provided 'TRAJECTORY SEGMENT TO OPTIMIZE' by finding a more efficient sequence of actions (from first run_test to the next fix_function) that achieves the same result.
+
+WHAT'S ALREADY DONE:
+In the provided segment, consecutive fix_function steps (if any) targeting the same function have already been merged and marked with "NOTE: Merge step X into step Y" annotations.
+
+OPTIMIZATION GOAL:
+From first run_test to last fix_functin sequence, identify only the necessary steps that will produce the same effect on the source code and test outcome. Create a distilled sequence that:
+- Starts with the first run_test
+- Includes only essential information-gathering actions
+- Contains the final consolidated fix_function
+- Ends with the final fix_function
+- Mimics expert-level debugging without intermediate fixes
+
+CRITICAL: The optimized sequence must show LOGICAL, STEP-BY-STEP progression where each action is a natural consequence of the information available up to that point.
+
+Think of it as: "An expert debugger works through the problem efficiently, where each step makes sense given only what they know so far."
+
+This means:
+- Each information-gathering action should be justified by what was discovered in previous steps
+- You cannot request information about something you haven't identified yet
+- The fix_function should only appear after enough information has been gathered to understand the problem
+- Each step should answer: "Given what I know NOW, what's the most logical next action?"
+  
+The sequence should feel like watching an experienced developer work efficiently - not jumping to conclusions, but also not taking unnecessary detours.
+
+==============================================================================
+OUTPUT FORMAT
+==============================================================================
+
+For each step in the optimized sequence, provide:
+
+1. action: Must be one from the DEBUGGING WORKFLOW
+2. subject: Function/file/data type/etc. (when applicable)
+3. If the step is for debug_fucntion action, this step and breakpoints, if any, has to be exact copy form the similar step. The motivation could be adjusted to the new sequence.
+4. motivation: Concise explanation (ideally <1000 characters, but don't omit important details)
+
+For the 'analysis' field provide detailed reasoning about the decision to select those steps in the sequence.
+
+==============================================================================
+CRITICAL REQUIREMENTS
+==============================================================================
+
+STEP NUMBERING:
+- The first step number in the optimized sequence must match the first step from the original segment
+- Subsequent steps use ascending numbers
+- All step number references within motivations must align with the new sequence
+
+ACTIONS debug_function
+- Must exactly match a debug_function step from the original trajectory. The original_step field must have the index of the original step
+
+ACTIONS search_source
+- Based on the provided information, and as we know the trajectory already, try to narrow the regex expression in a way that is more specific so it won't return too much information to pollute the training data and better train the model.
+- The regex must be logical and appear as natural continuation to the debugging process based on what we know up to this step.
+
+CONTEXT AWARENESS & INFORMATION AVAILABILITY:
+
+The 'motivation' field:
+- Is directly shown to the user
+- Must assume ONLY information from previous steps in the optimized sequence is visible
+- Should not reference or quote information from skipped steps
+- It is very useful to mention the source of the conclusions - from the logs, traces, or source code
+
+The 'analysis' field:
+- Is for hidden thinking tokens during training
+- May incorporate insights from skipped steps in the original trajectory
+- But express them abstractly as intuition, reasoning, or educated guesses
+- NOT as direct quotes or specific facts from those skipped steps
+- Think of it as: "An experienced developer might suspect X based on similar patterns"
+
+The 'breakpoints' array
+- Should be empty of all actions except debug_function
+- For debug_function it must exactly match the 'breakpoints' array from the original step
+
+INFORMATION RESET RULES (CRITICAL):
+- After each run_test: ALL information from previous steps becomes unavailable in context
+- After each fix_function: Previous traces/logs are replaced with NEW traces/logs collected during the debugging batch run for the same functions
+- When the next step is fix_function: The 'motivation' must be extremely explicit about exactly what the fix should be, with implementation details
+
+SOURCE CODE CHANGES:
+- When describing the final fix_function, consider ALL changes from the before/after sources of each intermediate fix_function in the original segment
+- Incorporate any changes that contribute to the final outcome
+- The final fix should be comprehensive and address all the issues that were fixed incrementally in the original trajectory
+
+INDEPENDENCE:
+- The optimized trajectory must NOT reference or acknowledge the existence of the original trajectory
+- Present it as if this is the natural, expert-level debugging progression
+- Don't say things like "based on the previous attempts" or "as we saw in earlier fixes"
+
+WORKFLOW ADHERENCE & LOGICAL PROGRESSION:
+- All actions must be valid actions from the DEBUGGING WORKFLOW
+- The sequence must show realistic, logical progression where each step builds on available information
+- At each step, ask: "Given only what I know from previous steps, what's the most logical next action?"
+- Don't request information about elements that haven't been identified or mentioned yet
+- Don't jump directly to a fix without gathering sufficient information first
+- Each information-gathering action should be justified by discoveries in prior steps
+- The fix_function should only appear after enough context has been collected to understand the root cause
+- Maintain proper causality: each motivation should reference specific details from previous steps that led to this action
+
+================================================
+HOW THE AI AGENT WORKS (FOR YOUR UNDERSTANDING)
+================================================
+
+- The agent requests information for each new step from the LLM
+- When a new step is requested, information from all previous steps (since the last run_test) is provided in context
+- After run_test: context is cleared, only the test results are available
+- After fix_function during a debug session: traces/logs are refreshed with new execution data
+
+
+==============================================================================
+EXAMPLE TRANSFORMATION
+==============================================================================
+
+ORIGINAL SEGMENT (with multiple trial-and-error attempts):
+- Step 10: run_test → "parser fails inside function body, errors at 'if' and 'return' tokens"
+- Step 11: function_info on ps_parse_stmt_compound
+- Step 12: fix_function ps_parse_stmt_compound (adds lookahead, but incomplete)
+- Step 13: run_test → still fails, now different error about expressions
+- Step 14: function_info on ps_parse_expr (investigating new error)
+- Step 15: fix_function ps_parse_stmt_compound (adds more logic)
+
+OPTIMIZED SEGMENT (logical expert progression):
+- Step 10: run_test → "parser fails inside function body, errors at 'if' and 'return' tokens"
+  ↓ Logical next: examine the function that parses compound statements
+  
+- Step 11: function_info on ps_parse_stmt_compound
+  motivation: "Logs show parser fails inside function body with errors at statement starts.
+               Need to examine ps_parse_stmt_compound to understand how it handles statements."
+  ↓ After reviewing source: we see it unconditionally calls parse_declspecs
+  
+- Step 12: function_info on ps_parse_declspecs  
+  motivation: "Source shows ps_parse_stmt_compound unconditionally calls ps_parse_declspecs.
+               Need to understand what happens when declaration specifiers aren't found."
+  ↓ Now we have enough information about both functions
+  
+- Step 15: fix_function ps_parse_stmt_compound (comprehensive fix incorporating all needed changes)
+  motivation: "ps_parse_stmt_compound unconditionally attempts declaration parsing and treats
+               failures as errors. Need to add lookahead to distinguish declarations from 
+               statements, only call ps_parse_declspecs when appropriate tokens present.
+               [detailed implementation specifics]"
+
+Note how each step naturally flows from the previous:
+- Step 10 identifies WHERE (function body)
+- Step 11 examines the WHAT (the function responsible)
+- Step 12 examines the WHY (what the function is calling that causes errors)
+- Step 15 applies the FIX (with full understanding from steps 11-12)
+
+Steps 12, 13, 14 from original are removed because they were trial-and-error. The optimized 
+version goes directly to the comprehensive fix once sufficient information is gathered.
+
+==============================================================================
+YOUR TASK (REPEATED FOR CLARITY)
+==============================================================================
+
+Now please provide an optimized version of the trajectory segment with a more efficient sequence of actions that achieves the same final result (both source code state and test outcome).
+
+Remember:
+- Keep step numbers aligned (first step matches original, rest are sequential)
+- Make motivations self-contained based only on previous steps in the optimized sequence
+- Make the final fix comprehensive, incorporating all incremental fixes from the original
+- Express analysis as abstract reasoning/intuition, not facts from skipped steps
+- Ensure the sequence is realistic and follows proper debugging workflow
+- Never reference the existence of the original trajectory

@@ -1,0 +1,15 @@
+[[context]]
+Define or update if required the C++ data type for '[[struct]]'
+If necessary, you can define or update other structures and enums that this data type depends on. Avoid nested definitions for structures and enums, unions can be nested.
+In your response, provide definitions exactly as in the C++ .h and .cpp, including the ; character at the end.
+Use C++ structures but don't use C++ specific features as access specifiers, constructors, destructors, inheritance.
+Don't provide include statements in the source. I will ask you which files I need to include later.
+Consult with the 'AVAILABLE LIBRARIES' section what features and data types you can use when defining structure fields. Avoid reimplementation and redefinition of functionality and data already available in the libraries or other parts of this software.
+
+Consult with the implementation of '[[function]]' to see how the data is used and what type of fields are required
+You can also check the description for the parameter from the same data type [[param_desc]]
+[[parent]]
+[[existing]]
+
+Provide the code in your response in markdown syntax. Prefix the C++ source code with ```cpp and postfix the code in your response with ```
+Now go ahead and define '[[struct]]' 

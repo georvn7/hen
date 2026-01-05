@@ -1,0 +1,49 @@
+TEST FRAMEWORK MANUAL
+
+Tests describe specific features of the implemented application (see PROJECT DESCRIPTION).
+
+name - Unique identifier of the test.
+
+description - Brief summary of what the test verifies and which parts of the application it covers.
+
+pretest - Commands run before application. Typically used to prepare input files or other artifacts consumed by the main test.
+
+test - Main test step, exactly one command (only test.commands[0] will be executed); usually a single invocation of application with the desired command-line arguments.
+
+posttest - Commands run after the main test (for example, validation or extra checks).
+
+Execution order and failure handling
+All commands within pretest and posttest are executed sequentially, in the order they appear in the .json file.
+The single command in test is executed after pretest and before posttest.
+
+Command failures do not abort test execution.
+All commands are attempted regardless of the success or failure of earlier commands, in order to collect as much diagnostic information as possible.
+
+regression_files - Files from this test that will be shown to the LLM when it attempts the next test. The next test is usually this one plus a small functional change.
+
+io_files - Empty for public tests. For private tests - Text files provided or produced by the test or debug runtime that will be shown to the model when checking for reward-hacking behavior. Used only for private tests; empty for public tests.
+
+io_hint - Empty for public tests. For private tests - Short hint shown to the model when checking for reward-hacking behavior.
+
+timeout - Maximum time to wait for the test to finish before treating it as a hang and terminating it. There is a hardcoded upper limit, so choose a reasonable value.
+
+Each of the commands is described by the following syntax:
+
+For pretest and posttest: [[attributes]] executable arguments
+
+For test: [[attributes]] arguments (the executable is implicit, must not be included, only arguments, if any, should be provided)
+
+Command attributes are:
+result - specifies the expected result. If omitted, exit code is still reported but does not affect pass/fail.
+debug - if this flag is present, the executable will be run under lldb, and if it crashes or hangs the resulting logs are captured for debugging.
+stdout - ECMAScript regex to FULLY match expected output. If omitted, output is still captured but does not affect pass/fail.
+Note: Only std::cout is captured for stdout matching. Use PRINT_TEST for diagnostic output—it is stripped from release builds and does not affect test results.
+
+A command is considered failed if any of the following conditions occur:
+- the process exit code does not match the declared result attribute
+- the command’s standard output does not fully match the declared stdout regular expression
+- the command times out or crashes
+
+Arguments are parsed as space-separated tokens. Double quotes group text into a single argument (the quotes themselves are stripped). Single quotes and backslash escapes are not supported.
+
+The output from each of the commands and the lldb logs in case of crash/hang will be presented to the debugging AI agent for analysis

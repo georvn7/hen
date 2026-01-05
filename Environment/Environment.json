@@ -1,0 +1,303 @@
+{
+  "coding_style": {
+    "type": "text",
+    "name": "CodingStyle",
+    "extension": ".txt"
+  },
+  "problem_decompose": {
+    "type": "text",
+    "name": "ProblemDecompose",
+    "extension": ".txt"
+  },
+  "define_function": {
+    "type": "text",
+    "name": "DefineFunction",
+    "extension": ".txt",
+    "hint": "Defining function '[[function]]'"
+  },
+  "list_functions": {
+    "type": "text",
+    "name": "ListFunctions",
+    "extension": ".txt",
+    "hint": "Analyzing dependencies for function '[[caller]]'"
+  },
+  "review_list_functions": {
+    "type": "text",
+    "name": "ReviewListFunctions",
+    "extension": ".txt",
+    "hint": "Reasoning about dependencies for function '[[caller]]'"
+  },
+  "define_data": {
+    "type": "text",
+    "name": "DefineData",
+    "extension": ".txt",
+    "hint": "Revising requirements for data type '[[struct]]'"
+  },
+  "define_data_loop": {
+    "type": "text",
+    "name": "DefineDataLoop",
+    "extension": ".txt",
+    "hint": "Revising requirements for data type '[[struct]]'"
+  },
+  "define_data_request": {
+    "type": "text",
+    "name": "DefineDataRequest",
+    "extension": ".txt",
+    "hint": "Analyze requirements for data type '[[struct]]'"
+  },
+  "libraries": {
+    "type": "text",
+    "name": "Libraries",
+    "extension": ".txt"
+  },
+  "implement": {
+    "type": "text",
+    "name": "ImplementSource",
+    "extension": ".txt",
+    "hint": "Prototyping operations performed by '[[function]]'"
+  },
+  "review_function": {
+    "type": "text",
+    "name": "ReviewFunction",
+    "extension": ".txt",
+    "hint": "Analyzing function definition '[[function]]'"
+  },
+  "review_function_self": {
+    "type": "text",
+    "name": "ReviewFunctionSelf",
+    "extension": ".txt",
+    "hint": "Reasoning about function '[[function]]'"
+  },
+  "review_source": {
+    "type": "text",
+    "name": "ReviewSource",
+    "extension": ".txt",
+    "hint": "Verifying operations performed by '[[function]]'"
+  },
+  "review_source_self": {
+    "type": "text",
+    "name": "ReviewSourceSelf",
+    "extension": ".txt",
+    "hint": "Reasoning about operations performed by '[[function]]'"
+  },
+  "review_data": {
+    "type": "text",
+    "name": "ReviewData",
+    "extension": ".txt",
+    "hint": "Ensuring consistent data flow for data type '[[struct]]'"
+  },
+  "review_data_self": {
+    "type": "text",
+    "name": "ReviewDataSelf",
+    "extension": ".txt",
+    "hint": "Reasoning about data type '[[struct]]'"
+  },
+  "review_data_request_self": {
+    "type": "text",
+    "name": "ReviewDataRequestSelf",
+    "extension": ".txt",
+    "hint": "Reasoning about data type '[[struct]]'"
+  },
+  "source_checklist": {
+    "type": "text",
+    "name": "SourceChecklist",
+    "extension": ".txt"
+  },
+  "compare_functions": {
+    "type": "text",
+    "name": "CompareFunctions",
+    "extension": ".txt",
+    "hint": "Resolve dependencies for function '[[function]]'"
+  },
+  "review_compare_functions": {
+    "type": "text",
+    "name": "ReviewCompareFunctions",
+    "extension": ".txt",
+    "hint": "Resolve function name conflict. Renaming '[[old_name]]' to '[[new_name]]'"
+  },
+  "define_test": {
+    "type": "text",
+    "name": "DefineTest",
+    "extension": ".txt"
+  },
+  "review_test_self": {
+    "type": "text",
+    "name": "ReviewTestSelf",
+    "extension": ".txt"
+  },
+  "implement_test": {
+    "type": "text",
+    "name": "ImplementTest",
+    "extension": ".txt"
+  },
+  "review_test_source": {
+    "type": "text",
+    "name": "ReviewTestSource",
+    "extension": ".txt"
+  },
+  "define_test_file": {
+    "type": "text",
+    "name": "DefineTestFile",
+    "extension": ".txt"
+  },
+  "review_test_file": {
+    "type": "text",
+    "name": "ReviewTestFile",
+    "extension": ".txt"
+  },
+  "revise_function": {
+    "type": "text",
+    "name": "ReviseFunction",
+    "extension": ".txt"
+  },
+  "review_test_result": {
+    "type": "text",
+    "name": "ReviewTestResult",
+    "extension": ".txt"
+  },
+  "fix_source_after_test": {
+    "type": "text",
+    "name": "FixSourceAfterTest",
+    "extension": ".txt"
+  },
+  "review_compilation_panic": {
+    "type": "text",
+    "name": "ReviewCompilationPanic",
+    "extension": ".txt",
+    "hint": "Mitigating syntax errors in the source code of '[[function]]'"
+  },
+  "review_compilation_luck": {
+    "type": "text",
+    "name": "ReviewCompilationLuck",
+    "extension": ".txt",
+    "hint": "Reviewing implementation of '[[function]]'"
+  },
+  "review_compilation_lib": {
+    "type": "text",
+    "name": "ReviewCompilationLib",
+    "extension": ".txt",
+    "hint": "Refactoring implementation of '[[function]]'"
+  },
+  "find_in_library": {
+    "type": "text",
+    "name": "FindInLibrary",
+    "extension": ".txt",
+    "hint": "Identifying functionality reuse opportunities for '[[function]]'"
+  },
+  "refactor_truncated_source": {
+    "type": "text",
+    "name": "RefactorTruncatedSource",
+    "extension": ".txt",
+    "hint": "Refactoring function '[[function]]'"
+  },
+  "review_refactor_brief": {
+    "type": "text",
+    "name": "ReviewRefactorBrief",
+    "extension": ".txt",
+    "hint": "Analyzing refactoring for function '[[function]]'"
+  },
+  "refactor_original_source": {
+    "type": "text",
+    "name": "RefactorOriginalSource",
+    "extension": ".txt",
+    "hint": "Improve refactoring for function '[[function]]'"
+  },
+  "review_compilation_slef": {
+    "type": "text",
+    "name": "ReviewCompilationSelf",
+    "extension": ".txt",
+    "hint": "Reasoning about source for function '[[function]]'"
+  },
+  "fix_compilation": {
+    "type": "text",
+    "name": "FixCompilation",
+    "extension": ".txt",
+    "hint": "Fixing source for function '[[function]]'"
+  },
+  "define_struct_members": {
+    "type": "text",
+    "name": "DefineStructMembers",
+    "extension": ".txt"
+  },
+  "review_compilation_options": {
+    "type": "text",
+    "name": "ReviewCompilationOptions",
+    "extension": ".txt"
+  },
+  "review_refactoring_options": {
+    "type": "text",
+    "name": "ReviewRefactoringOptions",
+    "extension": ".txt"
+  },
+  "generate_artifacts": {
+    "type": "text",
+    "name": "GenerateArtifacts",
+    "extension": ".txt",
+    "hint": "Generating build scripts for the project"
+  },
+  "abstract_programming": {
+    "type": "text",
+    "name": "AbstractProgramming",
+    "extension": ".txt"
+  },
+  "generate_readme": {
+    "type": "text",
+    "name": "GenerateReadme",
+    "extension": ".txt",
+    "hint": "Generating documentation for the project"
+  },
+  "proj_desc_from_conversation": {
+    "type": "text",
+    "name": "ProjDescFromConversation",
+    "extension": ".txt",
+    "hint": "Analyzing project requirements..."
+  },
+  "proj_items_from_desc": {
+    "type": "text",
+    "name": "ProjItemsFromDesc",
+    "extension": ".txt",
+    "hint": "Selecting application entry point type..."
+  },
+  "analyze_data_requirements": {
+    "type": "text",
+    "name": "AnalyzeDataRequirements",
+    "extension": ".txt",
+    "hint": "Analyzing data flow for function '[[function]]'"
+  },
+  "review_data_requirements_self": {
+    "type": "text",
+    "name": "ReviewDataRequirementsSelf",
+    "extension": ".txt",
+    "hint": "Reasoning about data flow for function '[[function]]'"
+  },
+  "verify": {
+    "type": "text",
+    "name": "Verify",
+    "extension": ".txt",
+    "hint": "Assessing trajectory reliability at function '[[function]]'"
+  },
+  "review_data_and_source": {
+    "type": "text",
+    "name": "ReviewDataAndSource",
+    "extension": ".txt",
+    "hint": "Assessing trajectory reliability at function '[[function]]'"
+  },
+  "define_function_signatures": {
+    "type": "text",
+    "name": "DefineFunctionSignatures",
+    "extension": ".txt",
+    "hint": "Assessing trajectory reliability at function '[[function]]'"
+  },
+  "review_function_description_self": {
+    "type": "text",
+    "name": "ReviewFunctionDescriptionSelf",
+    "extension": ".txt",
+    "hint": "Reviewing documentation for function '[[function]]'"
+  },
+  "describe_function": {
+    "type": "text",
+    "name": "DescribeFunction",
+    "extension": ".txt",
+    "hint": "Documenting function '[[function]]'"
+  }
+}

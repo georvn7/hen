@@ -1,0 +1,31 @@
+Current progress:
+[[trajectory]]
+
+[[call_graph]]
+
+SYSTEM ANALYSIS
+
+I've executed the '[[application]]' application with debug support to perform test as described in the 'TEST DESCRIPTION' section
+
+The following functions are classified as sub-systems as they are with call stack length < [[max_depth]] and are called just once:
+[[sub_systems]]
+
+I will ask you to review the source, log entries and trace data for each of those functions.
+
+[[system_data]]
+
+[[fixed_function]]
+
+Review the current progress and steps debugging the application. Investigate how current fixes impact the status of the system and sub-systems based on the progress. Review listed source, log entries and trace data for each of the listed sub-system functions. Verify the function and data flow, confirm the produced/consumed data for all of the sub-systems is correct and expected. Analyze the completion status for each sub-system based on the function and data flow between the sub-systems.
+
+IMPORTANT TASK: Based on the provided information identify the current highest priority blocker for the entire application that prevents passing the test (no reward-hacking please!) and in which sub-system is it. Explain what is wrong and how it should be. Think about this way - the task to continue investigation and fix this will be delegated to someone who is super expert in debugging function and data flow but doesn't necessarily have expertise in the project domain as described in the 'PROJECT DESCRIPTION'
+
+Note that the trace events for 'return' and 'exit' report more verbose information from the trace events for 'enter' - this is to give a better idea what data the sub-system functions produce or modify
+
+Update your debug notes. We are going to use this information later to decide what would be the next step debugging the application. If the test is successful the 'debug_notes' field must have only one word - "PASS"
+
+Update the log summary. In the log summary add quotes from the log sections and traces that are relevant to the finding collected in the new debug notes. 
+
+Observe for reward-hacking practices as they are strictly prohibited!
+
+Ideally, 'debug_notes' and 'log_summary' fields have to be 3 paragraphs or fewer, less than 2048 characters each, but this is not a hard limit as we don't want to miss something important.

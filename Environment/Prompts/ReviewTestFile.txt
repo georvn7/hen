@@ -1,0 +1,7 @@
+Do you think the previous response about the content of the file '[[filename]]' that will be used as input to the unit test for function '[[function]]' meets the discussed requirements?
+
+Please, start your answer with YES: or NO:
+For example
+YES: your short positive review of the answer
+Or
+NO: your constructive and detailed review of the answer

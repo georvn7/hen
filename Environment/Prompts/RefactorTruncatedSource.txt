@@ -1,0 +1,29 @@
+Your previous response about the source of the function [[declaration]] seems to contain truncated source or the source just has too many lines of code:
+
+******* Response with truncated or too long source starts here
+[[truncated]]
+******* Response with truncated or too long source ends here
+
+The amount of source code required to fully implement '[[function]]' turned out to be too large. I suggest splitting this function into two parts - the existing '[[function]]', and a new function. The goal is to decrease the size of the original function by half but do not fully delegate everything to the new function. Then the existing function '[[function]]' will call the new function in its refactored implementation.
+
+Split the function by consider various strategies for refactoring such as: split by functionality, by level of abstraction, split longer and complex loops, switch statements and conditions. Consider also other known strategies for refactoring and select one that works best.  
+
+In the description of the new function, list all functions that are currently supposed '[[function]]' to call and now after the split, the new function will have to call in its implementation.
+
+Review our conversation for key details about '[[function]]' and ensure any relevant information about functionality being moved to the new function is included in its description.
+
+Provide information for the new function, which should have unique name, representative of the operations it performs and aligned with the 'NAMING CONVENTION' section.
+
+In your response, include:
+
+1. A brief description of:
+
+The operations performed by this new function and for what subset of the functionality from '[[function]]' it will take the responsibility.
+Which operations remain in '[[function]]'
+The expected input to the new function and the produced output.
+The data structures necessary for the function's input arguments and the output result.
+
+2. A suggested name for the new function that is representative of its operations.
+
+The function shouldn't assume access to external and global variables and data structures except from the 'available libraries'. Pass all required data using arguments. Any produced or updated data from this function that needs to be accessed by other functions not called directly or indirectly by the function must be exposed by the return result or mutable arguments.
+I will ask you for the revised source of '[[function]]' later, but first provide the information for the new function as described above.

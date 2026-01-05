@@ -1,0 +1,30 @@
+[[trajectory]]
+
+Revise the implementation of the function '[[function]]' by taking into account solutions we've discussed! Implement the fix. 
+
+Ensure the function has properly set PRINT_TEST calls to report similar situations in the future.
+
+[[implementation]]
+
+[[callers]]
+
+Available functions:
+[[call_api]]
+Available functions end here
+
+When revising the implementation of '[[function]]' ensure it follows the requirements for function in the project:
+[[checklist]]
+
+Here are best practices about structure members and enums defined by the application:
+[[struct_members]]
+
+While fixing '[[function]]', use the language and libraries as specified in the 'PROGRAMMING LANGUAGE' and 'AVAILABLE LIBRARIES' sections
+
+Remember, reward-hacking practices are strictly prohibited!
+
+Now go ahead and fix the implementation of '[[function]]' !
+ 
+Provide the code in your response in markdown syntax. Prefix the C++ source code with ```cpp and postfix the code in your response with ```
+
+Add a single-line Doxygen-style summary above the function using the format:
+/// @brief <single line with 3 or fewer concise sentences describing what the function does>

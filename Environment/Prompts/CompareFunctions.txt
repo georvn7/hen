@@ -1,0 +1,27 @@
+I'm trying to define a function: '[[function]]' but function with the same name (case-insensitively) already exists.
+
+Call stack for the function being defined: [[current_callstack]]
+Brief Description of the function being defined: [[current_brief]]
+
+Existing function with call stack: [[existing_callstack]]
+Description for the existing function: [[existing_description]]
+[[existing_implementation]]
+
+Please compare the information above for the two functions. 
+- If they appear to be similar, and the existing function (considering case-insensitive name match) can be used instead of defining a new one, please keep the name and description of the function being defined.
+- If the functions have differences, and the existing function can't satisfy the requirements of the function being defined, to resolve the conflict, adjust the name and description of the function being defined with the call stack: [[current_callstack]]
+
+Important: Function name conflicts are considered case-insensitively. For example, "MyFunc" conflicts with "myfunc", "myFunc", "MYFUNC", etc.
+
+Here is a remainder what to keep in mind if you have to adjust the name and the description
+
+Existing functions names start:
+[[existing_functions]]
+Existing functions names end
+
+The new name of the function must be different from the existing functions (case-insensitively)!
+
+Provide description of the operations performed by this function and what subset of the project features this function is responsible for. Explain what is the expected input to the function. Explain what is the produced output by the function. What data structures are necessary for the function input arguments and the output result.
+
+The functions shouldn't assume in their implementation access to external and global variables and data structures except from the 'available libraries'!
+To pass the data required by the function - use arguments. All produced or updated data from this function that need to be accessed by other functions not called directly or indirectly by the function must be exposed by the return result or mutable arguments.
