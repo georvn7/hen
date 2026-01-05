@@ -1,0 +1,34 @@
+{
+  "name": "S5_expressions_pack",
+  "description": "Standalone runner for five expression tests: arithmetic, relational, logical, bitwise, assignments. Params are comma‑separated ints. Returns bitmap of failing tests; 255 no args; 254 unknown name.",
+  "pretest": {
+    "commands": [
+      "clang -E -P ./s5.cpp -o ./s5_pre.c"
+    ],
+    "input_files": ["s5.cpp"],
+    "output_files": ["s5_pre.c"]
+  },
+  "test": {
+    "commands": [
+      "[[result=0]]-v -o ./s5.s ./s5_pre.c"
+    ],
+    "input_files": ["s5_pre.c"],
+    "output_files": ["s5.s"]
+  },
+  "posttest": {
+    "commands": [
+      "test -f ./s5.s || (echo '_DEBUG_COMMAND_RESULT=65535' && exit 1)",
+      "clang --target=aarch64-apple-darwin -c ./s5.s -o ./s5.o",
+      "clang --target=aarch64-apple-darwin ./s5.o -o ./s5",
+      "[[debug,result=4]]./s5 logical:1,0,+1 arithmetic:5,2 relational:5,2 bitwise:6,3 assignments:10
+"
+    ],
+    "input_files": ["s5.s"],
+    "output_files": ["s5.o", "s5"]
+  },
+  "regression_files": ["s5.c"],
+  "io_files" : ["s5_pre.c", "s5.s"],
+  "io_hint": "Process all tokens with the same split→match→parse→call pipeline and accumulate bits; results must be independent of argument order and free of special-casing.",
+  "timeout": 5,
+  "expected_result": "0"
+}

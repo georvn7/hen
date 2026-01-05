@@ -1,0 +1,33 @@
+{
+  "name": "S6_expr_ctrlflow_pack",
+  "description": "Standalone runner with ten tests (expressions + control flow): arithmetic, relational, logical, bitwise, assignments, loops, goto, conditional, comma, else. Int‑only params. Returns bitmap of failing tests; 255/254 for no args/unknown name.",
+  "pretest": {
+    "commands": [
+      "clang -E -P ./s6.cpp -o ./s6_pre.c"
+    ],
+    "input_files": ["s6.cpp"],
+    "output_files": ["s6_pre.c"]
+  },
+  "test": {
+    "commands": [
+      "[[result=0]]-v -o ./s6.s ./s6_pre.c"
+    ],
+    "input_files": ["s6_pre.c"],
+    "output_files": ["s6.s"]
+  },
+  "posttest": {
+    "commands": [
+      "test -f ./s6.s || (echo '_DEBUG_COMMAND_RESULT=65535' && exit 1)",
+      "clang --target=aarch64-apple-darwin -c ./s6.s -o ./s6.o",
+      "clang --target=aarch64-apple-darwin ./s6.o -o ./s6",
+      "[[debug,result=64]]./s6 goto:-1 arithmetic:5,2 relational:5,2 logical:1,0 bitwise:6,3 assignments:10 loops:5,2,3 conditional:5,3,10,20 comma:3,4 else:0,1,5"
+    ],
+    "input_files": ["s6.s"],
+    "output_files": ["s6.o", "s6"]
+  },
+  "regression_files": ["s6.c"],
+  "io_files" : ["s6_pre.c", "s6.s"],
+  "io_hint": "Process every token through the same pipeline and accumulate bits; outcomes must be independent of argument order. The failure of a single test must stem only from its parsed input (no special-casing or external state) and produce the same bitmap across permutations.",
+  "timeout": 5,
+  "expected_result": "0"
+}
