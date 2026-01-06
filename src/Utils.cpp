@@ -23,6 +23,20 @@
 
 #include <boost/filesystem.hpp>
 
+#if defined(__APPLE__) || defined(__linux__)
+
+#include <spawn.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <unistd.h>
+
+extern char **environ;
+#define EXEC_ENVIRON environ
+#else
+#define EXEC_ENVIRON nullptr
+#endif
+
 using namespace utility;  // Common utilities like string conversions
 using namespace web;      // Common features like URIs
 using namespace web::json;  // JSON features
@@ -626,6 +640,135 @@ std::string checkStringEnd(const std::string& input) {
 
     return "UNKNOWN";
 }
+
+static int wait_with_timeout(pid_t pid, std::chrono::milliseconds timeout)
+{
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    int status = 0;
+
+    while (true) {
+        pid_t r = ::waitpid(pid, &status, WNOHANG);
+        if (r == pid) return status;         // finished
+        if (r == -1) return -1;              // error
+
+        if (std::chrono::steady_clock::now() >= deadline) {
+            return -2; // timeout sentinel
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+}
+
+ExecResult exec_with_timeout(const std::string& cmd,
+                             const std::string& workingDir,
+                             const std::string& operation,
+                             bool deleteOutput,
+                             std::chrono::milliseconds timeout)
+{
+    const std::string workingDirectory = boost_fs::absolute(workingDir).string();
+    const std::string outputFilePath   = workingDirectory + "/" + operation + "Output.txt";
+    const std::string commandFilePath  = workingDirectory + "/" + operation + "Command.txt";
+
+    // Ensure no stale output
+    if (boost_fs::exists(outputFilePath)) {
+        boost_fs::remove(outputFilePath);
+    }
+
+    {
+        std::ofstream header(commandFilePath);
+        header << cmd;
+    }
+
+    // Build a single shell command that cd's + redirects output
+#if defined(__APPLE__) || defined(__MACH__)
+    const char* shell = "/bin/zsh";
+    const char* shellFlag = "-c";
+#else
+    const char* shell = "/bin/bash";
+    const char* shellFlag = "-c";
+#endif
+
+    // Quote paths minimally: safest is to avoid shell, but we're keeping your model.
+    std::string shellCmd;
+    shellCmd += "cd ";
+    shellCmd += "'";
+    for (char c : workingDirectory) shellCmd += (c == '\'' ? std::string("'\\''") : std::string(1, c));
+    shellCmd += "'";
+    shellCmd += " && ";
+    shellCmd += cmd;
+    shellCmd += " > ";
+    shellCmd += "'";
+    for (char c : outputFilePath) shellCmd += (c == '\'' ? std::string("'\\''") : std::string(1, c));
+    shellCmd += "'";
+    shellCmd += " 2>&1";
+
+    // Prepare argv for shell
+    std::vector<char*> argv;
+    argv.push_back(const_cast<char*>(shell));
+    argv.push_back(const_cast<char*>(shellFlag));
+    argv.push_back(const_cast<char*>(shellCmd.c_str()));
+    argv.push_back(nullptr);
+
+    // Spawn in its own process group so we can kill the whole tree
+    posix_spawnattr_t attr;
+    posix_spawnattr_init(&attr);
+
+    short flags = 0;
+#ifdef POSIX_SPAWN_SETPGROUP
+    flags |= POSIX_SPAWN_SETPGROUP;
+    posix_spawnattr_setflags(&attr, flags);
+    posix_spawnattr_setpgroup(&attr, 0); // child pid becomes pgid
+#endif
+
+    pid_t pid = -1;
+    int spawn_rc = posix_spawn(&pid, shell, nullptr, &attr, argv.data(), environ);
+    posix_spawnattr_destroy(&attr);
+
+    if (spawn_rc != 0) {
+        throw std::runtime_error("posix_spawn failed: " + std::to_string(spawn_rc));
+    }
+
+    // Wait with timeout
+    int status = wait_with_timeout(pid, timeout);
+    bool timed_out = false;
+    int exit_code = -1;
+
+    if (status == -2) {
+        timed_out = true;
+
+        // Kill process group: -pid means "process group pid"
+        ::kill(-pid, SIGTERM);
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        ::kill(-pid, SIGKILL);
+
+        // Reap
+        (void)::waitpid(pid, &status, 0);
+    } else if (status >= 0) {
+        if (WIFEXITED(status)) exit_code = WEXITSTATUS(status);
+        else if (WIFSIGNALED(status)) exit_code = 128 + WTERMSIG(status);
+    }
+
+    // Read output (if exists)
+    std::string result;
+    {
+        std::ifstream inFile(outputFilePath);
+        if (inFile) {
+            result.assign((std::istreambuf_iterator<char>(inFile)),
+                          std::istreambuf_iterator<char>());
+        }
+    }
+
+    // Trim trailing newlines
+    while (!result.empty() && (result.back() == '\n' || result.back() == '\r')) {
+        result.pop_back();
+    }
+
+    if (deleteOutput && boost_fs::exists(outputFilePath)) {
+        boost_fs::remove(outputFilePath);
+    }
+
+    return ExecResult{result, exit_code, timed_out};
+}
+
 
 std::string exec(const std::string& cmd, const std::string& workingDir, const std::string& operation, bool deleteOutput)
 {

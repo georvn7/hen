@@ -2258,7 +2258,26 @@ bool Debugger::executeTestStep(std::ostream& log, CCodeProject* project, const T
             log << cmd << std::endl << std::endl;
             
             std::string commandName = stepName + "_cmd" + std::to_string(i);
-            std::string result = exec(instrumentedCmd, m_workingDirectory, commandName, false);
+            
+            
+            std::string result;
+            if(debug)
+            {
+                result = exec(instrumentedCmd, m_workingDirectory, commandName, false);
+            }
+            else
+            {
+                //When debugging we set timeout in the lldb scrip, but here we, without debugging we need to execute with timeout
+                auto timeoutMillisecs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::duration<double>(RUN_TEST_LLDB_TIMEOUT));
+                
+                ExecResult execResult = exec_with_timeout(instrumentedCmd,
+                                             m_workingDirectory,
+                                             commandName,
+                                             false,timeoutMillisecs);
+                
+                result = execResult.output;
+            }
             
             std::string resultStr = getTestResult(result);
             

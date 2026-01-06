@@ -948,6 +948,18 @@ namespace stdrave {
     bool hasMainFunction(const std::string& objFilePath);
     std::string checkStringEnd(const std::string& input);
     std::string exec(const std::string& cmd, const std::string& workingDir, const std::string& operation, bool deleteOutput);
+
+    struct ExecResult {
+        std::string output;
+        int exit_code;     // shell exit code (or -1 if timed out)
+        bool timed_out;
+    };
+    ExecResult exec_with_timeout(const std::string& cmd,
+                                 const std::string& workingDir,
+                                 const std::string& operation,
+                                 bool deleteOutput,
+                                 std::chrono::milliseconds timeout);
+
     std::unique_ptr<boost_prc::process> spawn(const std::string& cmd, const std::string& workingDir,
                                          const std::string& outputDir, const std::string& operation,
                                               bool detached);
