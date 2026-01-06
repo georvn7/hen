@@ -99,6 +99,8 @@ namespace stdrave {
         
         std::string m_buildCacheDir;
         
+        void clear();
+        
 	public:
         
         std::map<std::string, std::string> m_tempGraph;
@@ -252,6 +254,7 @@ namespace stdrave {
                                std::set<std::string>& structs,
                                std::set<std::string>& enums);
         void load() override;
+        void reload() override;
         
         void saveDataDefinitions();
         std::map<std::string, std::string> loadDataDefinitions();
@@ -328,6 +331,12 @@ namespace stdrave {
         std::string commit(const std::string& commitMessage);
         std::string revert(const std::string& folder);
         std::string revert();
+        
+        std::string revertToCommit(const std::string& folder, const std::string& commitish);
+        std::string revertToCommit(const std::string& commitish);
+        
+        std::string currentCommit(const std::string& folder);
+        std::string currentCommit();
         
         std::string createBranchFromCurrent(const std::string& folder,
                                             const std::string& branchName);

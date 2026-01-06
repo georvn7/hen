@@ -2471,6 +2471,24 @@ namespace stdrave {
         }
     }
 
+    void CCodeProject::clear()
+    {
+        Project::clear();
+        
+        m_objectTypes.clear();
+        m_objectTypesSnapshot.clear();
+        m_updatedData.clear();
+        m_tempGraph.clear();
+        m_refactoringDepth = 0;
+        m_buildingNow.clear();
+    }
+
+    void CCodeProject::reload()
+    {
+        clear();
+        load();
+    }
+
     void CCodeProject::saveDataDefinitions()
     {
         auto jsonDataDefinitions = json::value::object();
@@ -4010,6 +4028,123 @@ namespace stdrave {
                          repo.string(), "gitRevParseHeadAfterRevert", /*deleteOutput*/true));
     }
 
+    /**
+     * Revert working tree + index to a specific commit (hard reset) unconditionally.
+     * - Aborts in-progress operations best-effort (merge/rebase/cherry-pick/revert).
+     * - Verifies the target resolves to a commit object.
+     * - Resets tracked files + index to that commit (discard local changes + staging).
+     * - Removes untracked files/dirs (git clean -fd).
+     * - Returns resulting HEAD hash, or "" if repo has no commits yet.
+     *
+     * NOTE: This MOVES HEAD (and the current branch pointer if you're on a branch).
+     *       If you want to keep HEAD and only restore files, use git restore --source instead.
+     */
+    std::string CCodeProject::revertToCommit(const std::string& folder,
+                                            const std::string& commitish)
+    {
+        const boost_fs::path repo = boost_fs::absolute(folder);
+
+        if (!boost_fs::exists(repo) || !boost_fs::is_directory(repo)) {
+            throw std::runtime_error("revertToCommit(): folder does not exist or is not a directory: " + repo.string());
+        }
+
+        const std::string repoQ = shQuote(repo.string());
+
+        if (!boost_fs::exists(repo / ".git")) {
+            throw std::runtime_error("revertToCommit(): not a git repo (missing .git): " + repo.string());
+        }
+
+        auto tryGit = [&](const std::string& cmd, const char* tag) -> std::string {
+            try { return exec(cmd, repo.string(), tag, /*deleteOutput*/true); }
+            catch (...) { return std::string(); }
+        };
+
+        // Determine if HEAD exists (repo might have no commits yet)
+        const std::string headBefore = trim(tryGit(
+            "git -C " + repoQ + " rev-parse --verify HEAD",
+            "gitRevParseHeadBeforeRevertToCommit"
+        ));
+
+        if (headBefore.empty()) {
+            // No commits yet -> nothing meaningful to reset.
+            boost_fs::remove(repo / ".git" / "index");
+            return "";
+        }
+
+        if (trim(commitish).empty()) {
+            throw std::runtime_error("revertToCommit(): empty commitish");
+        }
+
+        // Best-effort: abort any in-progress operations (ignore failures)
+        (void)tryGit("git -C " + repoQ + " merge --abort",       "gitMergeAbort");
+        (void)tryGit("git -C " + repoQ + " rebase --abort",      "gitRebaseAbort");
+        (void)tryGit("git -C " + repoQ + " cherry-pick --abort", "gitCherryPickAbort");
+        (void)tryGit("git -C " + repoQ + " revert --abort",      "gitRevertAbort");
+
+        // Resolve + verify target is a commit object
+        const std::string targetSpecQ = shQuote(commitish + "^{commit}");
+        const std::string targetHash = trim(tryGit(
+            "git -C " + repoQ + " rev-parse --verify " + targetSpecQ,
+            "gitRevParseVerifyTargetCommit"
+        ));
+
+        if (targetHash.empty()) {
+            throw std::runtime_error("revertToCommit(): target does not resolve to a commit: " + commitish);
+        }
+
+        const std::string targetHashQ = shQuote(targetHash);
+
+        // 1) Move HEAD (and current branch pointer if on a branch) to the target commit
+        (void)exec("git -C " + repoQ + " reset --hard " + targetHashQ,
+                   repo.string(), "gitResetHardTarget", /*deleteOutput*/true);
+
+        // 2) Remove untracked files/dirs (keeps ignored files)
+        (void)exec("git -C " + repoQ + " clean -fd",
+                   repo.string(), "gitCleanFdAfterResetTarget", /*deleteOutput*/true);
+
+        // Return resulting HEAD
+        return trim(exec("git -C " + repoQ + " rev-parse HEAD",
+                         repo.string(), "gitRevParseHeadAfterRevertToCommit", /*deleteOutput*/true));
+    }
+
+    std::string CCodeProject::currentCommit(const std::string& folder)
+    {
+        const boost_fs::path repo = boost_fs::absolute(folder);
+
+        if (!boost_fs::exists(repo) || !boost_fs::is_directory(repo)) {
+            throw std::runtime_error("currentCommit(): folder does not exist or is not a directory: " + repo.string());
+        }
+
+        if (!boost_fs::exists(repo / ".git")) {
+            throw std::runtime_error("currentCommit(): not a git repo (missing .git): " + repo.string());
+        }
+
+        const std::string repoQ = shQuote(repo.string());
+
+        auto tryGit = [&](const std::string& cmd, const char* tag) -> std::string {
+            try { return exec(cmd, repo.string(), tag, /*deleteOutput*/true); }
+            catch (...) { return {}; }
+        };
+
+        // HEAD may not exist in a repo with no commits.
+        return trim(tryGit("git -C " + repoQ + " rev-parse --verify HEAD",
+                           "gitRevParseHeadCurrent"));
+    }
+
+    std::string CCodeProject::currentCommit()
+    {
+        std::string dagDirectory = m_projDir + "/dag";
+    }
+
+    std::string CCodeProject::revertToCommit(const std::string& commitish)
+    {
+        std::string dagDirectory = m_projDir + "/dag";
+        std::string result = revertToCommit(dagDirectory, commitish);
+        
+        reload();
+        return result;
+    }
+
     std::string CCodeProject::commit(const std::string& commitMessage)
     {
         std::string dagDirectory = m_projDir + "/dag";
@@ -4021,6 +4156,7 @@ namespace stdrave {
         std::string dagDirectory = m_projDir + "/dag";
         std::string result = revert(dagDirectory);
         
+        reload();
         return result;
     }
 

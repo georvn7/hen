@@ -271,6 +271,28 @@ namespace stdrave {
         loadStats();
     }
 
+    void Project::clear()
+    {
+        pools.clear();
+        m_nodeMap.clear();
+        
+        if(m_dag.m_root)
+        {
+            //This should delete all nodes recursively
+            delete m_dag.m_root;
+        }
+        m_dag.m_root = nullptr;
+        
+        m_stats = web::json::value();
+    }
+
+    void Project::reload()
+    {
+        clear();
+        
+        load();
+    }
+
     //TODO: Consider moving this to the Client since not much from the Project is involved here
     bool Project::handleResponse(web::json::value& response, web::json::value* object, bool print)
     {

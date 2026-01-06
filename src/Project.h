@@ -94,6 +94,8 @@ namespace stdrave {
         std::map<std::string, Node*, CaseInsensitiveLess> m_nodeMap;
         std::string m_projDir;
         
+        void clear();
+        
     public:
         Project():
         //m_dag(this),
@@ -136,6 +138,7 @@ namespace stdrave {
         virtual void traversal();
         virtual void save(const std::string& directory, bool overwrite);
         virtual void load();
+        virtual void reload();
         virtual bool handleResponse(web::json::value& response, web::json::value* object = nullptr, bool print=true);
         bool sendRequest(web::json::value* schemas, std::string& content, web::json::value* object);
         uint32_t pushMessage(const std::string& content, const std::string& role, bool print);

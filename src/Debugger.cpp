@@ -6224,18 +6224,14 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             
             std::set<std::string> funcSnapshotBefore = project->getNodeNames();
             
+            std::string commitBeforeTheFix = project->currentCommit();
+            
             std::string before;
             std::string implementation = fixFunction(project, test, functionName, before, debugNotes);
             
             std::string addedFunctions;
             if(!implementation.empty())
             {
-                /*infoForCurrentStep += before;
-                infoForCurrentStep += "\n\n//Implementation of the function after applying the fix. ";
-                infoForCurrentStep += "Note this modification has been already applied to the source file! ";
-                //infoForCurrentStep += "Consider running the test\n";
-                infoForCurrentStep += printFunctionSource(project, functionName, implementation);*/
-                
                 std::string asciiGraph = project->printNewNodes(functionName, funcSnapshotBefore);
                 if(!asciiGraph.empty())
                 {
@@ -6247,14 +6243,6 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
                     infoForCurrentStep += addedFunctions;
                 }
             }
-            /*else
-            {
-                //TODO: revert to the last commit!
-                
-                //We can't continue debugging if this fix is not successful
-                criticalError(debugNotes);
-                return false;
-            }*/
             
             //After fixing the function we need to regenerate all sources,
             //compile functions that require update and build the binary
@@ -6281,7 +6269,8 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             else
             {
                 debugNotes += "The function '" + functionName + "' couldn't be fixed due to compilation issues. Reverting changest to the previous stable state";
-                project->revert();
+                project->revertToCommit(commitBeforeTheFix);//how safe is this, we still have the call graph in memomry
+                
                 project->generateSources();
                 compile(project);
                 
@@ -6293,8 +6282,6 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
                 
                 if(!compiled)
                 {
-                    //TODO: revert to the last commit!
-                    
                     //We can't continue debugging if this fix is not successful
                     criticalError(debugNotes);
                     return false;
