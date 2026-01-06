@@ -1921,11 +1921,15 @@ namespace stdrave {
                     }
                     else
                     {
-                        
+                        //Delete unit tests so we can recreate them in the next attempt but with
+                        //analysis and recommendations from the recently failed trajectory
+                        config.current_unit_test.clear();
+                        config.ramp_unit_tests.clear();
+                        saveJson(config.to_json(), testDirecotry + "/config.json");
                     }
                 }
                 
-                //TODO: Delete unit tests from the config
+                //Delete unit tests from the config
                 config.current_unit_test.clear();
                 config.ramp_unit_tests.clear();
                 saveJson(config.to_json(), testDirecotry + "/config.json");
