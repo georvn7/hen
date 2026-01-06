@@ -4134,6 +4134,7 @@ namespace stdrave {
     std::string CCodeProject::currentCommit()
     {
         std::string dagDirectory = m_projDir + "/dag";
+        return currentCommit(dagDirectory);
     }
 
     std::string CCodeProject::revertToCommit(const std::string& commitish)
