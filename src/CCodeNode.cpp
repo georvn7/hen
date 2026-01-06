@@ -4933,6 +4933,10 @@ namespace stdrave {
                     defineTestMsg += pretestLog + "\n\n";
                     defineTestMsg += "Consider to fix and redefine the unit test to avoid this! ";
                     defineTestMsg += "Then, if necessary, we can redefine the test's main.cpp and the input files, if any\n";
+                    defineTestMsg += "Note: I'm not asking here for the content of the test main.cpp or any of the input files. ";
+                    defineTestMsg += "You can specify the test, describe the test cases and the required input files ";
+                    defineTestMsg += "(if any, excluding the test driver main.cpp) as explained in the test framework manual. ";
+                    defineTestMsg += "Then, based on the test description, in a next step, we will define the content of the main.cpp and any input files\n\n";
                     
                     inferenceUnitTestDef(defineTestMsg);
                     
