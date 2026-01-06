@@ -25,6 +25,7 @@ Implementation checklist:
 - The implementation must not call any type of function pointers stored in the application defined structs. It has to use only global functions. It still can call function pointers, lambdas, std::function<>  and member functions from types defined in 'Available Libraries'
 - Don't define nested data structures and types.
 - Don't use exception handling!
+- Avoid manual memory management (malloc/free, new/delete), instead leverage std::shared_ptr
 - Don't use preprocessor directives in the provided source.
 - Be careful when calling functions recursively. Consult with the provided call stack information to find if you call functions that directly or indirectly call '[[function]]' and ensure this won't cause problems with the execution flow.
 - Don't use the 'auto' keyword for data types that are defined in this software. It is fine to use 'auto' for data types from 'available libraries'.

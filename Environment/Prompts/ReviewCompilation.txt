@@ -48,6 +48,7 @@ And here is the review checklist:
 - Use std::cout with the << operator (avoid other methods) for output that should persist in release builds (user-facing messages, final results). Use PRINT_TEST for debug/diagnostic output that will be stripped from release builds.
 - Provide the code in your response in markdown syntax. Prefix the C++ source code with ```cpp and postfix the code in your response with ```
 - Based on this checklist, provide the best answer without asking questions
+- Avoid manual memory management new/delete malloc/free, instead leverage std::shared_ptr
 
 In your response, provide ONLY the modified definitions of '[[function]]'
 Now go ahead fix '[[function]]'
