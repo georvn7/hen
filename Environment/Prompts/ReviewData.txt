@@ -1,4 +1,3 @@
-[[source]]
 
 Review the C data type definitions in the source above. These data types have been defined or updated as a request to define or revise the '[[struct]]' data type definition. I found a few things in these data type definitions that might need attention:
 

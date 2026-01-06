@@ -1714,6 +1714,8 @@ namespace stdrave {
         std::string regressionTestPath;
         
         bool started = false;
+        
+        //Ramp up in the problem space
         for(auto test : config.ramp)
         {
             std::string filePath = testDirecotry + "/" + *test;
@@ -1754,8 +1756,8 @@ namespace stdrave {
                 
                 for(int i=0; i<2; ++i)
                 {
-                    //Here we need to build/update unit tests and initially compile link them
-#if 1
+#if 1 //this is basically ramp up the solution space via unit tests
+                    //Here we need to build/update unit tests and initially compile and link them
                     std::multimap<uint32_t, std::string, std::greater<uint32_t>> unitTests;
                     if (!config.current_unit_test.empty() && config.ramp_unit_tests.size() > 0)
                     {
