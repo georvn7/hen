@@ -8794,6 +8794,12 @@ void Debugger::startCodeInstrumentation(CCodeProject* project,
     std::string commonDebug = envDir + "/source/common_debug.h";
     boost_fs::copy(commonDebug, instrumentedDir + "/common.h", boost_fs::copy_options::overwrite_existing);
     
+    {
+        //empty data_defs.h to enable unit test driver compilation
+        //data_printers.h will have all necessary data definitions instead
+        std::ofstream ofs(instrumentedDir + "/data_defs.h");
+    }
+    
     std::string projConfigPath = instrumentedDir + "/project_config.h";
     std::string projConfig = generateConfig();
     saveToFile(projConfig, projConfigPath);
@@ -8860,6 +8866,8 @@ void Debugger::switchToDefaultBuild(CCodeProject* project) const
         //Rename the backup dir to build dir
         boost_fs::rename(backupDir, buildDir);
     }
+    
+    project->generateDataHeader();
     
     std::string builCache = "cache/build";
     project->setBuildCacheDir(builCache);

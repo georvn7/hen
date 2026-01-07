@@ -3445,6 +3445,45 @@ namespace stdrave {
         return printers;
     }
 
+    void CCodeProject::generateDataHeader()
+    {
+        std::string declarations;
+        std::string forwardDeclarations;
+        std::set<std::string> includes;
+        
+        //1 Data printers for all custom data types
+        
+        for(auto& obj : m_objectTypes)
+        {
+            includes.insert(obj.second.m_ownerPath);
+            
+            if(obj.second.m_typeDef.m_type == TypeDefinition::STRUCT)
+            {
+                declarations += "struct " + obj.second.m_typeDef.m_name + ";\n";
+                
+                forwardDeclarations += generateStructPrinterDecl(obj.second.m_typeDef);
+            }
+            else
+            {
+                declarations += "enum class " + obj.second.m_typeDef.m_name + " : uint32_t;\n";
+                forwardDeclarations += generateEnumPrinterDecl(obj.second.m_typeDef);
+            }
+            
+        }
+        
+        std::string includesList = listIncludes(includes, false);
+
+        std::string path = getProjDir() + "/build";
+        boost_fs::create_directories(path);
+        std::ofstream sourceFile(path + "/data_defs.h");
+        
+        sourceFile << "#pragma once" << std::endl << std::endl;
+        sourceFile << includesList << std::endl;
+        sourceFile << declarations << std::endl;
+        sourceFile << forwardDeclarations << std::endl;
+        sourceFile.close();
+    }
+
     void CCodeProject::generateSources()
     {
         m_dag.depthFirstTraversal(m_dag.m_root, [this](DAGNode<Node*>* node, DAGraph<Node*>& g) {},

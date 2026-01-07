@@ -2,8 +2,7 @@ You have to implement the unit test for '[[function]]' following the description
 
 Implementing the test, you can use the language and libraries as specified in the 'Programming Language' and 'Available Libraries' sections
 
-In the source of unit test implementation you must to include the following headers:
-[[headers]]
+In the source of unit test implementation you must not include any header files. I will add all required headers later before compilation.
 
 - Don't define the PRINT_TEST macro. It is already defined in the headers
 - Use std::cout with the << operator (avoid other methods) for output that should persist in release builds (user-facing messages, final results). Use PRINT_TEST for debug/diagnostic output that will be stripped from release builds.

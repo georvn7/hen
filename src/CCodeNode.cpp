@@ -4580,6 +4580,7 @@ namespace stdrave {
         std::stringstream sout;
         
         sout << "#include \"common.h\"" << std::endl;
+        sout << "#include \"data_defs.h\"" << std::endl;
         
         sout << std::endl;
         
@@ -4599,7 +4600,6 @@ namespace stdrave {
         std::string dataDef = getDataTypes(false, referencedNodes);
         std::string implement_test = proj->implement_test.prompt({
             {"function", m_brief.func_name},
-            {"headers", sout.str()},
             {"other_notes", otherNotes}
         });
         
@@ -4610,6 +4610,7 @@ namespace stdrave {
         
         //Does a code review makes sense here, we have compile implement-compile loop?
         
+        source = sout.str() + source;
         m_unitTest.implementation = source;
         
         boost_fs::create_directories(buildDir + "/" + testDir);
@@ -4895,6 +4896,8 @@ namespace stdrave {
         
         if(unitTestExists())
             return;
+        
+        proj->generateDataHeader();
 
         captureContext();//Start unit test definition
         

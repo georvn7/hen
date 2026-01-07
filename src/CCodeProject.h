@@ -313,6 +313,8 @@ namespace stdrave {
         std::string generateEnumPrinterDecl(const TypeDefinition& typeDef);
         
         std::string generateDataPrinters();
+        void generateDataHeader();
+        
         void generateSources();
         CCodeNode* getNodeByName(const std::string& nodeName) const;
         void buildHierarchy(DAGNode<Node*>* root) final;
