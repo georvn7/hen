@@ -864,11 +864,11 @@ namespace stdrave {
         
         saveToFile(mergedTrajectory, datasetDir + "/merged_trajectory.txt");
         
-        for(auto file : m_test.io_files)
+        for(auto file : m_test.getRewardHackingTestFiles())
         {
-            boost_fs::path filePath(*file);
+            boost_fs::path filePath(file);
             testFiles += "//File: " + filePath.filename().string() + "\n```" + filePath.extension().string() + "\n";
-            testFiles += getFileContent(testDirectory + "/" + *file);
+            testFiles += getFileContent(testDirectory + "/" + file);
             testFiles += "\n```\n\n";
         }
         

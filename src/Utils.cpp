@@ -2092,6 +2092,120 @@ bool isTextOnlyFile(const std::string& path)
     return true;
 }
 
+static bool decodeOneUtf8(const unsigned char* s, size_t len, size_t& adv)
+{
+    adv = 0;
+    if (len == 0) return true;
+
+    const unsigned char b0 = s[0];
+
+    // ASCII: allow your whitespace + printable ASCII
+    if (b0 < 0x80) {
+        adv = 1;
+        if (b0 == 0x09 || b0 == 0x0A || b0 == 0x0B || b0 == 0x0C || b0 == 0x0D) return true; // \t \n \v \f \r
+        if (b0 >= 0x20 && b0 <= 0x7E) return true;
+        return false;
+    }
+
+    // Multibyte UTF-8 (reject overlongs and invalid ranges)
+    auto need = [&](size_t n) { return len >= n; };
+    auto cont = [&](unsigned char b) { return (b & 0xC0) == 0x80; };
+
+    if (b0 >= 0xC2 && b0 <= 0xDF) {                    // 2-byte
+        if (!need(2) || !cont(s[1])) return false;
+        adv = 2; return true;
+    }
+    if (b0 == 0xE0) {                                  // 3-byte, special lower bound
+        if (!need(3) || !(s[1] >= 0xA0 && s[1] <= 0xBF) || !cont(s[2])) return false;
+        adv = 3; return true;
+    }
+    if (b0 >= 0xE1 && b0 <= 0xEC) {                    // 3-byte
+        if (!need(3) || !cont(s[1]) || !cont(s[2])) return false;
+        adv = 3; return true;
+    }
+    if (b0 == 0xED) {                                  // 3-byte, avoid UTF-16 surrogates
+        if (!need(3) || !(s[1] >= 0x80 && s[1] <= 0x9F) || !cont(s[2])) return false;
+        adv = 3; return true;
+    }
+    if (b0 >= 0xEE && b0 <= 0xEF) {                    // 3-byte
+        if (!need(3) || !cont(s[1]) || !cont(s[2])) return false;
+        adv = 3; return true;
+    }
+    if (b0 == 0xF0) {                                  // 4-byte, special lower bound
+        if (!need(4) || !(s[1] >= 0x90 && s[1] <= 0xBF) || !cont(s[2]) || !cont(s[3])) return false;
+        adv = 4; return true;
+    }
+    if (b0 >= 0xF1 && b0 <= 0xF3) {                    // 4-byte
+        if (!need(4) || !cont(s[1]) || !cont(s[2]) || !cont(s[3])) return false;
+        adv = 4; return true;
+    }
+    if (b0 == 0xF4) {                                  // 4-byte, max U+10FFFF
+        if (!need(4) || !(s[1] >= 0x80 && s[1] <= 0x8F) || !cont(s[2]) || !cont(s[3])) return false;
+        adv = 4; return true;
+    }
+
+    return false;
+}
+
+bool isTextFileAsciiOrUtf8(const std::string& path)
+{
+    const boost_fs::path p(path);
+    if (!boost_fs::exists(p) || !boost_fs::is_regular_file(p))
+        return false;
+
+    std::ifstream in(path, std::ios::binary);
+    if (!in) return false;
+
+    constexpr size_t CHUNK_SIZE = 4096;
+    std::array<unsigned char, CHUNK_SIZE> buf{};
+
+    // Handle optional UTF-8 BOM at start: EF BB BF
+    bool firstChunk = true;
+
+    std::array<unsigned char, 4> carry{};
+    size_t carryLen = 0;
+
+    while (in.read(reinterpret_cast<char*>(buf.data()), buf.size()) || in.gcount() > 0) {
+        size_t n = static_cast<size_t>(in.gcount());
+
+        size_t start = 0;
+        if (firstChunk) {
+            firstChunk = false;
+            if (n >= 3 && buf[0] == 0xEF && buf[1] == 0xBB && buf[2] == 0xBF) {
+                start = 3; // skip UTF-8 BOM
+            }
+        }
+
+        // Combine carry + current chunk (from `start`)
+        std::vector<unsigned char> data;
+        data.reserve(carryLen + (n - start));
+        data.insert(data.end(), carry.begin(), carry.begin() + carryLen);
+        data.insert(data.end(), buf.begin() + start, buf.begin() + n);
+
+        // Quick binary signal: NUL byte
+        for (unsigned char b : data) {
+            if (b == 0x00) return false; // (will still reject UTF-16/32, by design)
+        }
+
+        size_t i = 0;
+        while (i < data.size()) {
+            size_t adv = 0;
+            if (!decodeOneUtf8(data.data() + i, data.size() - i, adv))
+                return false;
+            if (adv == 0) break; // incomplete sequence at end
+            i += adv;
+        }
+
+        carryLen = data.size() - i;
+        if (carryLen > 3) return false; // should never happen with UTF-8
+        for (size_t k = 0; k < carryLen; ++k) carry[k] = data[i + k];
+    }
+
+    // No dangling partial UTF-8 sequence
+    return (carryLen == 0);
+}
+
+
 bool parsePrefixFlags(const std::string& s,
                       bool& debug,
                       bool& checkResult,

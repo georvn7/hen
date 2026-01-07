@@ -1020,6 +1020,7 @@ namespace stdrave {
     std::size_t getFileHash(const std::string& filePath);
     std::vector<std::string> parseCommandLine(const std::string &cmdLine);
     bool isTextOnlyFile(const std::string& path);
+    bool isTextFileAsciiOrUtf8(const std::string& path);
     bool parsePrefixFlags(const std::string& s,
                           bool& debug,
                           bool& checkResult,

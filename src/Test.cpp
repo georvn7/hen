@@ -23,7 +23,6 @@ DEFINE_FIELD(TestDef, test)
 DEFINE_FIELD(TestDef, posttest)
 DEFINE_FIELD(TestDef, timeout)
 DEFINE_FIELD(TestDef, io_hint)
-DEFINE_ARRAY_FIELD(TestDef, io_files)
 
 DEFINE_TYPE(UnitTest)
 DEFINE_FIELD(UnitTest, definition)
@@ -73,6 +72,34 @@ std::set<std::string> TestDef::getInputFiles() const
 std::set<std::string> TestDef::getRegressionFiles() const
 {
     return getInputFiles();
+}
+
+//TODO: One day we can add images
+std::set<std::string> TestDef::getRewardHackingTestFiles() const
+{
+    std::set<std::string> files;
+    
+    auto baseName = [](const std::string& p) {
+        return boost_fs::path(p).filename().string();
+    };
+    
+    for (const auto& file : test.output_files) {
+        
+        if(isTextFileAsciiOrUtf8(*file))
+        {
+            files.insert(baseName(*file));
+        }
+    }
+    
+    for (const auto& file : posttest.output_files) {
+        
+        if(isTextFileAsciiOrUtf8(*file))
+        {
+            files.insert(baseName(*file));
+        }
+    }
+    
+    return files;
 }
 
 std::set<std::string> TestDef::getCommandLineFiles() const
@@ -150,16 +177,6 @@ std::string TestDef::validate(bool isPrivate)
         }
     }
     
-    if(!isPrivate)
-    {
-        if(!io_files.empty() || (!io_hint.empty() && io_hint != "none"))
-        {
-            feedback += "For public tests (like this one) 'io_files' must be an empty array and ";
-            feedback += "'io_hint' must be an empty string or \"none\". ";
-            feedback += "These fields are still required and cannot be omitted.\n";
-        }
-    }
-    
     const auto ioFiles = getIOFiles();
     const auto cmdFiles = getCommandLineFiles();
     
@@ -223,7 +240,6 @@ void TestDef::clear()
     posttest.clear();
     timeout = 0;
     io_hint.clear();
-    io_files.clear();
     m_lastResult.clear();
 }
 

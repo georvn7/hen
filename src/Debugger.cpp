@@ -1492,19 +1492,7 @@ void Debugger::analysisTrace(CCodeProject* project,
 
 std::set<std::string> Debugger::getTestTextFiles(CCodeProject* project, const TestDef& test)
 {
-    //First we need to get the content of the all output files
-    std::set<std::string> testFiles;
-    
-    for(auto file : test.io_files)
-    {
-        std::string fullPath = m_workingDirectory + "/" + *file;
-        //if(isTextOnlyFile(fullPath))
-        {
-            testFiles.insert(fullPath);
-        }
-    }
-    
-    return testFiles;
+    return test.getRewardHackingTestFiles();
 }
 
 bool Debugger::rewardHackingAnalysis(CCodeProject* project,
