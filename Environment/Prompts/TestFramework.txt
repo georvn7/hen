@@ -19,8 +19,6 @@ The single command in test is executed after pretest and before posttest.
 Command failures do not abort test execution.
 All commands are attempted regardless of the success or failure of earlier commands, in order to collect as much diagnostic information as possible.
 
-regression_files - Files from this test that will be shown to the LLM when it attempts the next test. The next test is usually this one plus a small functional change.
-
 io_files - Empty for public tests. For private tests - Text files provided or produced by the test or debug runtime that will be shown to the model when checking for reward-hacking behavior. Used only for private tests; empty for public tests.
 
 io_hint - For public tests should be 'none'. For private tests - Short hint shown to the model when checking for reward-hacking behavior.

@@ -24,7 +24,6 @@ DEFINE_FIELD(TestDef, posttest)
 DEFINE_FIELD(TestDef, timeout)
 DEFINE_FIELD(TestDef, io_hint)
 DEFINE_ARRAY_FIELD(TestDef, io_files)
-DEFINE_ARRAY_FIELD(TestDef, regression_files)
 
 DEFINE_TYPE(UnitTest)
 DEFINE_FIELD(UnitTest, definition)
@@ -69,6 +68,11 @@ std::set<std::string> TestDef::getInputFiles() const
                         std::inserter(testInput, testInput.begin()));
     
     return testInput;
+}
+
+std::set<std::string> TestDef::getRegressionFiles() const
+{
+    return getInputFiles();
 }
 
 std::set<std::string> TestDef::getCommandLineFiles() const
@@ -220,7 +224,6 @@ void TestDef::clear()
     timeout = 0;
     io_hint.clear();
     io_files.clear();
-    regression_files.clear();
     m_lastResult.clear();
 }
 

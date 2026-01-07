@@ -2036,7 +2036,6 @@ std::string Debugger::getTestDescription(CCodeProject* project, const TestDef& t
         
         testFuncDelta << "Files from the current test, useful to analyze the delta in the functionality between the passed and the current test:\n\n";
         const auto& inputFiles = test.getInputFiles();
-        //for(auto file : test.regression_files)
         for(auto file : inputFiles)
         {
             std::string fileContent = getFileContent(m_workingDirectory + "/" + file);

@@ -2007,11 +2007,11 @@ public:
         testFuncDelta << jsonFile;
         
         regressionTest.from_json(regressionTestJson);
-        for(auto file : regressionTest.regression_files)
+        for(auto file : regressionTest.getRegressionFiles())
         {
-            std::string fileContent = getFileContent(regressionTestPath + "/public/" + *file);
-            testFuncDelta << "File: " << *file;
-            testFuncDelta << "```" << boost_fs::path(*file).extension() << std::endl;
+            std::string fileContent = getFileContent(regressionTestPath + "/public/" + file);
+            testFuncDelta << "File: " << file;
+            testFuncDelta << "```" << boost_fs::path(file).extension() << std::endl;
             testFuncDelta << fileContent;
             testFuncDelta << "```\n\n";
         }
@@ -2019,11 +2019,11 @@ public:
         testFuncDelta << "PASSED TEST END" << std::endl << std::endl;
         
         testFuncDelta << "Files from the current test, useful to analyze the delta in the functionality between the passed and the current test:\n\n";
-        for(auto file : test.regression_files)
+        for(auto file : test.getRegressionFiles())
         {
-            std::string fileContent = getFileContent(m_workingDirectory + "/" + *file);
-            testFuncDelta << "File: " << *file;
-            testFuncDelta << "```" << boost_fs::path(*file).extension() << std::endl;
+            std::string fileContent = getFileContent(m_workingDirectory + "/" + file);
+            testFuncDelta << "File: " << file;
+            testFuncDelta << "```" << boost_fs::path(file).extension() << std::endl;
             testFuncDelta << fileContent;
             testFuncDelta << "```\n\n";
         }

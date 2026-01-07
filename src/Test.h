@@ -48,9 +48,9 @@ public:
     DECLARE_FIELD(int32_t, timeout, "Timeout in seconds for all commands to complete: pretest, test and postest")
     DECLARE_FIELD(std::string, io_hint, "IO hint, must be 'none' if no hint, not empty or missing")
     DECLARE_ARRAY_FIELD(std::string, io_files, "IO files, must be presented but could be empty array")
-    DECLARE_ARRAY_FIELD(std::string, regression_files, "Files to check to verify regressions in the next test, must be presented but could be empty array")
     
     std::set<std::string> getInputFiles() const;
+    std::set<std::string> getRegressionFiles() const;
     std::pair<std::set<std::string>, std::set<std::string>> getIOFiles() const;
     std::set<std::string> getCommandLineFiles() const;
     std::string getDescription(const std::string& workingDir) const;
