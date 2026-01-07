@@ -4751,7 +4751,7 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
     
     if(m_system != "main") //Are we in unit test debugging
     {
-        if(m_nextStep.action_type == "fix_function" && m_nextStep.action_subject == "main")
+        if(m_nextStep.action_type == "fix_function" && (m_nextStep.action_subject == "main" || boost_fs::path(m_nextStep.action_subject).stem().string() == "main"))
         {
             feedback += "We are currently debugging the unit test for function '" + m_system + "'\n";
             feedback += "When debugging unit tests it is not possible to edit the source of the test main function. ";

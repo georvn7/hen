@@ -1569,7 +1569,7 @@ namespace stdrave {
         std::string buildSourcePath = ccNode->getNodeBuildSourcePath();
         std::string buildDir = getProjDir() + "/build";
         std::string nodeDir = buildDir + "/" + buildSourcePath;
-        std::string testExec = nodeDir + "/test/" + function;
+        std::string testExec = nodeDir + "/test/main";
         
         boost_fs::remove(testExec + ".o");
         boost_fs::remove(testExec);
@@ -1879,11 +1879,17 @@ namespace stdrave {
                                 
                                 if(ccNode->improveUnitTest(trajectory, fullTestDesc))
                                 {
+                                    UnitTest unitTest = ccNode->m_unitTest;
+                                    
                                     //Destructive hard reset
                                     std::string revertToCommit = resetBranchToBranchedFromCommit(getProjDir() + "/dag", branchName);
                                     assert(revertToCommit == beforeTheUTest);
                                     j=0;
                                     resetOnce = true;
+                                    
+                                    ccNode = getNodeByName(test.second);
+                                    
+                                    ccNode->m_unitTest = ccNode->m_unitTest;
                                     
                                     //Directly delete the trajectory as it is unusable
                                     boost_fs::remove_all(trajectoryDir);
@@ -4042,6 +4048,8 @@ namespace stdrave {
     std::string CCodeProject::revertToCommit(const std::string& folder,
                                             const std::string& commitish)
     {
+        int32_t request_id = Client::getInstance().getRequestId();
+        
         const boost_fs::path repo = boost_fs::absolute(folder);
 
         if (!boost_fs::exists(repo) || !boost_fs::is_directory(repo)) {
@@ -4105,6 +4113,10 @@ namespace stdrave {
         // Return resulting HEAD
         return trim(exec("git -C " + repoQ + " rev-parse HEAD",
                          repo.string(), "gitRevParseHeadAfterRevertToCommit", /*deleteOutput*/true));
+        
+        reload();
+        Client::getInstance().setRequestId(request_id);
+        saveStats();
     }
 
     std::string CCodeProject::currentCommit(const std::string& folder)
@@ -4141,8 +4153,6 @@ namespace stdrave {
     {
         std::string dagDirectory = m_projDir + "/dag";
         std::string result = revertToCommit(dagDirectory, commitish);
-        
-        reload();
         return result;
     }
 
@@ -4275,6 +4285,8 @@ namespace stdrave {
     std::string CCodeProject::resetBranchToBranchedFromCommit(const std::string& folder,
                                                               const std::string& branchName)
     {
+        uint32_t request_id = Client::getInstance().getRequestId();
+        
         const boost_fs::path repo = boost_fs::absolute(folder);
         if (!boost_fs::exists(repo) || !boost_fs::is_directory(repo)) {
             std::cout << "resetBranchToBranchedFromCommit(): invalid folder: " << repo.string() << std::endl;
@@ -4307,6 +4319,10 @@ namespace stdrave {
         // Optional: also remove untracked files/dirs
         (void)exec("git -C " + repoQ + " clean -fd",
                    repo.string(), "gitCleanUntracked", true);
+        
+        reload();
+        Client::getInstance().setRequestId(request_id);
+        saveStats();
 
         return base;
     }
