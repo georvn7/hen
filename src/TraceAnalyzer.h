@@ -717,7 +717,7 @@ public:
             }
             else
             {
-                os << "Unable to find any events recorded in the trace for the requested function '" << function << "'.\n";
+                os << "Unable to find any events recorded in the trace for any invocation of the requested function '" << function << "'.\n";
             }
         }
     }
