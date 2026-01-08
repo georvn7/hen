@@ -21,7 +21,6 @@ DEFINE_FIELD(TestDef, description)
 DEFINE_FIELD(TestDef, pretest)
 DEFINE_FIELD(TestDef, test)
 DEFINE_FIELD(TestDef, posttest)
-DEFINE_FIELD(TestDef, timeout)
 DEFINE_FIELD(TestDef, io_hint)
 
 DEFINE_TYPE(UnitTest)
@@ -238,7 +237,6 @@ void TestDef::clear()
     pretest.clear();
     test.clear();
     posttest.clear();
-    timeout = 0;
     io_hint.clear();
     m_lastResult.clear();
 }

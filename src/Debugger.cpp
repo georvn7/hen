@@ -1335,11 +1335,9 @@ std::pair<bool, std::string> Debugger::analysisFullTrace(CCodeProject* project, 
                 (lastSectionType == "exit" || lastSectionType == "return"))
         {
             analysisHint += "The application executed without crashes or hangs! ";
-            //if(analysis.m_testResult != test.expected_result)
+            
             if(!analysis.m_testResult)
             {
-                //analysisHint += "However, the returned result for _DEBUG_COMMAND_RESULT=" + analysis.m_testResult;
-                //analysisHint += " doesn't match the expected result: " + test.expected_result;
                 analysisHint += "However, results for some of the commands don't match expected outcomes. ";
                 analysisHint += " Further investigation and debugging are required!\n";
             }
@@ -1361,8 +1359,6 @@ std::pair<bool, std::string> Debugger::analysisFullTrace(CCodeProject* project, 
         analysisHint += "The application executed without crashes or hangs! ";
         if(!analysis.m_testResult)
         {
-            //analysisHint += "However, the returned result for _DEBUG_COMMAND_RESULT=" + analysis.m_testResult;
-            //analysisHint += " doesn't match the expected result: " + test.expected_result;
             analysisHint += "However, results for some of the commands don't match expected outcomes. ";
             analysisHint += " Further investigation and debugging are required!\n";
         }
@@ -2364,7 +2360,7 @@ bool Debugger::execTestScript(CCodeProject* project,
     checkTestStepInput(debugLogTest, project, test.test, "test", true);
     
     int returnCode;
-    auto logs = runTest(traceOnlyLog, project, execPath, cmd, m_workingDirectory, test.timeout, instrument, returnCode);
+    auto logs = runTest(traceOnlyLog, project, execPath, cmd, m_workingDirectory, 10, instrument, returnCode);
     debugAppLog = logs.first;
     
     std::string consoleLog = logs.second;//getFileContent(m_workingDirectory + "/console.log");
@@ -2551,9 +2547,7 @@ void Debugger::runAnalysis(CCodeProject* project, const TestDef& test, RunAnalys
         }
         else
         {
-            //analysis.m_testResult = test.expected_result;
             analysis.debug_notes = "PASS";
-            //analysis.log_summary = "_DEBUG_COMMAND_RESULT=" + test.expected_result;
             analysis.log_summary =  "Results for all commands match the expected outcomes.\n";
             
             return;

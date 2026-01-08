@@ -4553,10 +4553,13 @@ namespace stdrave {
         std::string cache = "";
         inference(cache, reviewMessge, source);
         
+        
+        std::string headers = getUnitTestHeaders();
         //Save source
         std::string cppFile = testDir + "/main.cpp";
-        m_unitTest.implementation = source;
+        m_unitTest.implementation = headers + source;
         std::ofstream cpp(cppFile);
+        cpp << headers;
         cpp << source;
         cpp.close();
         
@@ -4564,6 +4567,29 @@ namespace stdrave {
         output = exec(compileCL, testDir, "CompileTest");
         
         return unitTestObjectExists();
+    }
+
+    std::string CCodeNode::getUnitTestHeaders()
+    {
+        CCodeProject* proj = (CCodeProject*)Client::getInstance().project();
+        
+        std::string buildSourcePath = getNodeBuildSourcePath();
+        std::string buildDir = proj->getProjDir() + "/build";
+        //std::string nodeDir = buildDir + "/" + buildSourcePath;
+        std::string nodeDir = buildSourcePath;
+        std::string testDir = nodeDir + "/test";
+        
+        std::stringstream sout;
+        
+        sout << "#include \"common.h\"" << std::endl;
+        sout << "#include \"data_defs.h\"" << std::endl;
+        
+        sout << std::endl;
+        
+        std::string thisInclude = nodeDir + "/" + m_brief.func_name;
+        sout << "#include \"" << thisInclude << ".h\"" << std::endl;
+        
+        return sout.str();
     }
 
     void CCodeNode::generateUnitTestSource()
@@ -4576,16 +4602,6 @@ namespace stdrave {
         std::string nodeDir = buildSourcePath;
         std::string testDir = nodeDir + "/test";
         std::string platform = getPlatform() + "_test";
-        
-        std::stringstream sout;
-        
-        sout << "#include \"common.h\"" << std::endl;
-        sout << "#include \"data_defs.h\"" << std::endl;
-        
-        sout << std::endl;
-        
-        std::string thisInclude = nodeDir + "/" + m_brief.func_name;
-        sout << "#include \"" << thisInclude << ".h\"" << std::endl;
         
         std::string otherNotes;
         std::string stdoutChecks = m_unitTest.definition.checksStdout();
@@ -4610,13 +4626,14 @@ namespace stdrave {
         
         //Does a code review makes sense here, we have compile implement-compile loop?
         
-        source = sout.str() + source;
-        m_unitTest.implementation = source;
+        std::string headers = getUnitTestHeaders();
+        m_unitTest.implementation = headers + source;
         
         boost_fs::create_directories(buildDir + "/" + testDir);
         std::string cppFile = buildDir + "/" + testDir + "/main.cpp";
         
         std::ofstream cpp(cppFile);
+        cpp << headers;
         cpp << source;
         cpp.close();
     }
@@ -6418,11 +6435,9 @@ namespace stdrave {
         return message;
     }
 
-    bool CCodeNode::improveUnitTest(const std::string& prevTestTrajectory, const std::string& fullTestDesc)
+    bool CCodeNode::unitTestIsBroken(const std::string& prevTestTrajectory, const std::string& fullTestDesc)
     {
         CCodeProject* proj = (CCodeProject*)Client::getInstance().project();
-        
-        captureContext();
         
         storeUnitTestContent();
         
@@ -6439,6 +6454,18 @@ namespace stdrave {
             { "full_test", fullTestDesc}
         });
         
+        Cache cache;
+        
+        bool needsImrpovement = false;
+        std::string needToImproveMsg = needToImprove.str();
+        std::string response;
+        bool result = proj->inference(cache, needToImproveMsg, true, response);
+        
+        return !result;
+    }
+
+    bool CCodeNode::improveUnitTest()
+    {
         CCodeNode* parent = nullptr;
         std::string parentCtx;
         std::set<std::string> referencedNodes;
@@ -6455,35 +6482,23 @@ namespace stdrave {
         
         std::string functionCtx = getContexInfo(true, false, false, referencedNodes);
         
-        Cache cache;
+        Prompt improve("ImproveUnitTest.txt", {
+            { "function",  getName()  },
+            { "function_ctx", functionCtx},
+            { "parent_ctx", parentCtx},
+            { "test_name", m_unitTest.definition.name }
+        });
         
-        bool needsImrpovement = false;
-        std::string needToImproveMsg = needToImprove.str();
-        std::string response;
-        if(!proj->inference(cache, needToImproveMsg, true, response))
-        {
-            needsImrpovement = true;
-            
-            Prompt improve("ImproveUnitTest.txt", {
-                { "function",  getName()  },
-                { "function_ctx", functionCtx},
-                { "parent_ctx", parentCtx},
-                { "test_name", m_unitTest.definition.name }
-            });
-            
-            deleteUnitTest(); //Ensure we first delete the old one
-            
-            inferenceUnitTestDef(improve.str());
-            
-            generateUnitTestSource();
-            
-            compileUnitTestSource();
-            
-            linkUnitTest(true);
-        }
-
-        popContext();
+        deleteUnitTest(); //Ensure we first delete the old one
         
-        return needsImrpovement;
+        inferenceUnitTestDef(improve.str());
+        
+        generateUnitTestSource();
+        
+        compileUnitTestSource();
+        
+        linkUnitTest(true);
+    
+        return true;
     }
 }

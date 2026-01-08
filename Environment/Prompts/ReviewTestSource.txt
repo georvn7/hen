@@ -8,4 +8,6 @@ And here is the output:
 
 Review the output for errors and try to fix them in the unit test source.
 
+In the source of unit test implementation you must not include any header files. I will add all required headers later before compilation.
+
 Provide the code in your response in markdown syntax. Prefix the C++ source code with ```cpp and postfix the code in your response with ```

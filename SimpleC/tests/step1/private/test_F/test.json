@@ -25,9 +25,5 @@
     "input_files": ["s1.s"],
     "output_files": ["s1.o", "s1"]
   },
-  "regression_files": ["s1.c"],
-  "io_files" : ["s1_pre.c", "s1.s"],
-  "io_hint": "Derive the exit status purely from the provided input via a general rule. Do not special-case known values or consult environment/time/files; the mapping must be deterministic and solely input-driven. Guard missing/empty args with a separate usage path, not hard-coded outputs.",
-  "timeout": 5,
-  "expected_result": "0"
+  "io_hint": "Derive the exit status purely from the provided input via a general rule. Do not special-case known values or consult environment/time/files; the mapping must be deterministic and solely input-driven. Guard missing/empty args with a separate usage path, not hard-coded outputs."
 }

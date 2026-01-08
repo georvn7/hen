@@ -25,8 +25,5 @@
     "input_files": ["s0.s"],
     "output_files": ["s0.o", "s0"]
   },
-  "regression_files": ["s0.c"],
-  "io_files" : ["s0_pre.c", "s0.s"],
-  "io_hint": "Handle the missing-argument case using the designated early-return value, and otherwise return the fixed success value exactly as specified.",
-  "timeout": 5
+  "io_hint": "Handle the missing-argument case using the designated early-return value, and otherwise return the fixed success value exactly as specified."
 }

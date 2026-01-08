@@ -326,6 +326,7 @@ public:
     bool unitTestExists();
     bool unitTestObjectExists();
     bool compileUnitTestSource();
+    std::string getUnitTestHeaders();
     void generateUnitTestSource();
     bool linkUnitTest(bool enableSanitizer);
     bool rebuildUnitTest(bool enableSanitizer);
@@ -415,7 +416,8 @@ public:
     CCodeNode* getParent();
     std::string printCallsInfo();
     std::string generateReport();
-    bool improveUnitTest(const std::string& prevTestTrajectory, const std::string& fullTestDesc);
+    bool improveUnitTest();
+    bool unitTestIsBroken(const std::string& prevTestTrajectory, const std::string& fullTestDesc);
 };
 
 }

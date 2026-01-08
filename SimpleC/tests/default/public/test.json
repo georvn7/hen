@@ -25,9 +25,5 @@
     "input_files": ["s2.s"],
     "output_files": ["s2.o", "s2"]
   },
-  "regression_files": ["s2.c"],
-  "io_files" : ["s2_pre.c", "s2.s"],
-  "io_hint": "none",
-  "timeout": 5,
-  "expected_result": "0"
+  "io_hint": "none"
 }

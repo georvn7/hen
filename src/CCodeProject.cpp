@@ -1877,23 +1877,25 @@ namespace stdrave {
                                 
                                 std::string fullTestDesc = fullTest.getDescription(publicTestPath);
                                 
-                                if(ccNode->improveUnitTest(trajectory, fullTestDesc))
+                                captureContext("");
+                                //TODO: THIS REQUIRES SERIOUS TESTING
+                                if(ccNode->unitTestIsBroken(trajectory, fullTestDesc))
                                 {
-                                    UnitTest unitTest = ccNode->m_unitTest;
-                                    
                                     //Destructive hard reset
                                     std::string revertToCommit = resetBranchToBranchedFromCommit(getProjDir() + "/dag", branchName);
                                     assert(revertToCommit == beforeTheUTest);
                                     j=0;
                                     resetOnce = true;
                                     
+                                    //Get pointer to the new node after reload
                                     ccNode = getNodeByName(test.second);
-                                    
-                                    ccNode->m_unitTest = ccNode->m_unitTest;
+                                    ccNode->improveUnitTest();
                                     
                                     //Directly delete the trajectory as it is unusable
                                     boost_fs::remove_all(trajectoryDir);
                                 }
+                                
+                                popContext();
                             }
                             
                             //After the first unit test smoke test, let's reset to the default steps count
@@ -3448,11 +3450,9 @@ namespace stdrave {
     void CCodeProject::generateDataHeader()
     {
         std::string declarations;
-        std::string forwardDeclarations;
         std::set<std::string> includes;
         
         //1 Data printers for all custom data types
-        
         for(auto& obj : m_objectTypes)
         {
             includes.insert(obj.second.m_ownerPath);
@@ -3460,13 +3460,10 @@ namespace stdrave {
             if(obj.second.m_typeDef.m_type == TypeDefinition::STRUCT)
             {
                 declarations += "struct " + obj.second.m_typeDef.m_name + ";\n";
-                
-                forwardDeclarations += generateStructPrinterDecl(obj.second.m_typeDef);
             }
             else
             {
                 declarations += "enum class " + obj.second.m_typeDef.m_name + " : uint32_t;\n";
-                forwardDeclarations += generateEnumPrinterDecl(obj.second.m_typeDef);
             }
             
         }
@@ -3478,9 +3475,8 @@ namespace stdrave {
         std::ofstream sourceFile(path + "/data_defs.h");
         
         sourceFile << "#pragma once" << std::endl << std::endl;
-        sourceFile << includesList << std::endl;
         sourceFile << declarations << std::endl;
-        sourceFile << forwardDeclarations << std::endl;
+        sourceFile << includesList << std::endl;
         sourceFile.close();
     }
 

@@ -25,9 +25,5 @@
     "input_files": ["s2.s"],
     "output_files": ["s2.o", "s2"]
   },
-  "regression_files": ["s2.c"],
-  "io_files" : ["s2_pre.c", "s2.s"],
-  "io_hint": "When required inputs are missing, take the explicit usage/error path and return the agreed sentinel status. Decide this branch only from input arity and make any access to later inputs unreachable; keep it deterministic and side-effect free.",
-  "timeout": 5,
-  "expected_result": "0"
+  "io_hint": "When required inputs are missing, take the explicit usage/error path and return the agreed sentinel status. Decide this branch only from input arity and make any access to later inputs unreachable; keep it deterministic and side-effect free."
 }

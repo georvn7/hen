@@ -32,6 +32,7 @@ static std::streambuf* g_old = nullptr;
 static bool g_muted = false;
 
 void set_cout_enabled(bool enabled) {
+#if 0
     if (enabled) {
         if (g_muted) {
             std::cout.rdbuf(g_old);
@@ -43,6 +44,7 @@ void set_cout_enabled(bool enabled) {
             g_muted = true;
         }
     }
+#endif
 }
 
 int Client::init(int argc, char* argv[])

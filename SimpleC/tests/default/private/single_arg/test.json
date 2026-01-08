@@ -25,9 +25,5 @@
     "input_files": ["s2.s"],
     "output_files": ["s2.o", "s2"]
   },
-  "regression_files": ["s2.c"],
-  "io_files" : ["s2_pre.c", "s2.s"],
-  "io_hint": "Derive the result from a general mapping of the first provided token (e.g., transform its first byte/feature), then combine it with an aggregation over all inputs. With only one token, the aggregation should reduce to its neutral element, yielding the base mapping—no special-casing literal values.",
-  "timeout": 5,
-  "expected_result": "0"
+  "io_hint": "Derive the result from a general mapping of the first provided token (e.g., transform its first byte/feature), then combine it with an aggregation over all inputs. With only one token, the aggregation should reduce to its neutral element, yielding the base mapping—no special-casing literal values."
 }

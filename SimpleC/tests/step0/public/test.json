@@ -25,8 +25,5 @@
     "input_files": ["s0.s"],
     "output_files": ["s0.o", "s0"]
   },
-  "regression_files": ["s0.c"],
-  "io_files" : ["s0_pre.c", "s0.s"],
-  "io_hint": "none",
-  "timeout": 5
+  "io_hint": "none"
 }

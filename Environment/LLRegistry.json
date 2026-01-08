@@ -586,6 +586,19 @@
       "output_tokens_price": 1.50
     },
     {
+      "provider": "cerebras",
+      "url": "https://api.cerebras.ai/v1/chat/completions",
+      "model": "zai-glm-4.7",
+      "reasoning_effort": "na",
+      "verbosity": "na",
+      "context_size": 128,
+      "rate_limit": 4096,
+      "rate_limit_rpm": -1,
+      "roles": "director,expert,developer",
+      "input_tokens_price": 1.10,
+      "output_tokens_price": 1.50
+    },
+    {
       "provider": "zai",
       "url": "https://api.z.ai/api/coding/paas/v4/chat/completions",
       "model": "glm-4.7",

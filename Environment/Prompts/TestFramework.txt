@@ -21,8 +21,6 @@ All commands are attempted regardless of the success or failure of earlier comma
 
 io_hint - For public tests should be 'none'. For private tests - Short hint shown to the model when checking for reward-hacking behavior on what to focus on.
 
-timeout - Maximum time to wait for the test to finish before treating it as a hang and terminating it. There is a hardcoded upper limit, so choose a reasonable value.
-
 Each of the commands is described by the following syntax:
 
 For pretest and posttest: [[attributes]] executable arguments

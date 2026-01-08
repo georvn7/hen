@@ -45,7 +45,6 @@ public:
     DECLARE_FIELD(TestStep, pretest, "Setp with commands that will be executed before running the test")
     DECLARE_FIELD(TestStep, test, "Step with a command line to run the executable being debugged. This step is the actual test")
     DECLARE_FIELD(TestStep, posttest, "Setp with commands that will be executed after running the test")
-    DECLARE_FIELD(int32_t, timeout, "Timeout in seconds for all commands to complete: pretest, test and postest")
     DECLARE_FIELD(std::string, io_hint, "IO hint, must be 'none' if no hint, not empty or missing")
     
     std::set<std::string> getInputFiles() const;
