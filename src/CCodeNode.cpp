@@ -4307,7 +4307,7 @@ namespace stdrave {
         std::string nodeDir = buildDir + "/" + buildSourcePath;
         std::string testDir = nodeDir + "/test";
         
-        std::string soruceFile = testDir + "/" + getName() + ".cpp";
+        std::string soruceFile = testDir + "/main.cpp";
         
         saveJson(m_unitTest.definition.to_json(), testDir + "/test.json");
         
@@ -4581,6 +4581,9 @@ namespace stdrave {
         
         std::stringstream sout;
         
+        sout << "//INCLUDE SECTION MANAGED BY THE BUILD SYSTEM START\n";
+        sout << "//All files here are also created by the build system\n";
+        sout << "//Do not edit this section\n";
         sout << "#include \"common.h\"" << std::endl;
         sout << "#include \"data_defs.h\"" << std::endl;
         
@@ -4588,6 +4591,7 @@ namespace stdrave {
         
         std::string thisInclude = nodeDir + "/" + m_brief.func_name;
         sout << "#include \"" << thisInclude << ".h\"" << std::endl;
+        sout << "//INCLUDE SECTION MANAGED BY THE BUILD SYSTEM END\n\n\n";
         
         return sout.str();
     }
@@ -4952,7 +4956,7 @@ namespace stdrave {
                     std::string defineTestMsg = "Execution of the pretest step for unit test '" + m_unitTest.definition.name + "' exits with error:\n\n";
                     defineTestMsg += pretestLog + "\n\n";
                     defineTestMsg += "Consider to fix and redefine the unit test to avoid this! ";
-                    defineTestMsg += "Then, if necessary, we can redefine the test's main.cpp and the input files, if any\n";
+                    defineTestMsg += "Then, if necessary, we can reimplement the test's main.cpp and the input files (if any)\n";
                     defineTestMsg += "Note: I'm not asking here for the content of the test main.cpp or any of the input files. ";
                     defineTestMsg += "You can specify the test, describe the test cases and the required input files ";
                     defineTestMsg += "(if any, excluding the test driver main.cpp) as explained in the test framework manual. ";

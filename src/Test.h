@@ -37,6 +37,8 @@ private:
         fn(posttest);
     }
     
+    std::string validateIOFiles();
+    
 public:
     DECLARE_TYPE(TestDef, "Description")
     DECLARE_FIELD(std::string, name, "The name of the test")

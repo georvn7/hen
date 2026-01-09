@@ -1560,14 +1560,8 @@ bool Debugger::rewardHackingAnalysis(CCodeProject* project,
                 continue;
             }
             
-            m_workingDirectory = filePath.string();
-            
             TestDef privateTest;
-            std::ifstream file(m_workingDirectory + "/test.json");
-            std::string jsonStr((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-            auto uJsonStr = utility::conversions::to_string_t(jsonStr);
-            auto json = web::json::value::parse(uJsonStr);
-            privateTest.from_json(json);
+            deployToWorkingDirectory(project, filePath.string(), false, privateTest);
             
             std::string lldbOnlyLog, debugLogTest, debugLogApp;
             
@@ -6557,6 +6551,49 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
     return true;
 }
 
+bool Debugger::deployToWorkingDirectory(CCodeProject* project, const std::string& testJsonDir, bool isPublic, TestDef& test)
+{
+    m_workingDirectory = project->getProjDir();
+    m_workingDirectory += isPublic ? "/debug/wd_pub" : "/debug/wd_priv";
+    
+    if(boost_fs::exists(m_workingDirectory))
+    {
+        boost_fs::remove_all(m_workingDirectory);
+    }
+    
+    boost_fs::create_directories(m_workingDirectory);
+    
+    if(!test.load(testJsonDir + "/test.json"))
+    {
+        return false;
+    }
+    
+    if(!boost_fs::exists(testJsonDir + "/test.json"))
+    {
+        return false;
+    }
+    
+    boost_fs::copy(testJsonDir + "/test.json", m_workingDirectory + "/test.json");
+    
+    const auto& inputFiles = test.getInputFiles();
+    for(auto file : inputFiles)
+    {
+        std::string fileName = boost_fs::path(file).filename().string();
+        boost_fs::copy(testJsonDir + "/" + fileName, m_workingDirectory + "/" + fileName);
+    }
+    
+    if(m_system != "main") //Are we in unit test
+    {
+        if(!boost_fs::exists(testJsonDir + "/main.cpp"))
+        {
+            return false;
+        }
+        
+        //Copy the main.cpp for the unit test
+        boost_fs::copy(testJsonDir + "/main.cpp", m_workingDirectory + "/main.cpp");
+    }
+}
+
 bool Debugger::debug(CCodeProject* project,
                      int stepsCount,
                      const std::string& system,
@@ -6566,12 +6603,13 @@ bool Debugger::debug(CCodeProject* project,
                      uint16_t debugPort)
 {
     m_system = system;
+    
     m_workingDirectory = testJsonPath;
     m_privateWorkingDirectory = privateTestJsonPath;
     m_debugPort = debugPort;
     
     TestDef test;
-    if(!test.load(testJsonPath + "/test.json"))
+    if(deployToWorkingDirectory(project, testJsonPath, true, test))
     {
         return false;
     }

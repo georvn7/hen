@@ -1762,6 +1762,7 @@ namespace stdrave {
                     std::multimap<uint32_t, std::string, std::greater<uint32_t>> unitTests;
                     if (!config.current_unit_test.empty() && config.ramp_unit_tests.size() > 0)
                     {
+                        generateDataHeader();
                         // TODO: handle starting from specific unit test if needed
                         for(auto test : config.ramp_unit_tests)
                         {
@@ -1773,6 +1774,7 @@ namespace stdrave {
                             
                             //Ensure all required files are in the test directory
                             ccNode->storeUnitTestContent();
+                            buildUnitTest(functionAndDepth[0], true);
                             
                             auto testPair = std::make_pair((uint32_t)std::atoi(functionAndDepth[1].c_str()), functionAndDepth[0]);
                             unitTests.insert(testPair);
@@ -2494,6 +2496,11 @@ namespace stdrave {
     void CCodeProject::reload()
     {
         clear();
+        
+        CCodeNode* root = shareNode<CCodeNode>(m_description.func_name, nullptr);
+        m_dag.m_root = new DAGNode<Node*>(root);//root;
+        root->m_this = m_dag.m_root;
+        
         load();
     }
 

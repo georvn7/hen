@@ -466,6 +466,8 @@ namespace stdrave {
         bool visibleTraceAndLog(std::ostream& log, const std::pair<std::string, uint32_t>& frame);
         std::string generateConfig();
         
+        bool deployToWorkingDirectory(CCodeProject* project, const std::string& testJsonDir, bool isPublic, TestDef& test);
+        
 	public:
         bool debug(CCodeProject* project,
                    int stepsCount,

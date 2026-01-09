@@ -127,6 +127,45 @@ std::set<std::string> TestDef::getCommandLineFiles() const
     return files;
 }
 
+std::string TestDef::validateIOFiles()
+{
+    std::string feedback;
+    
+    static std::set<std::string> disabledNames = {"common","main", "data_defs", "data_printers",
+        "trace_printers", "common_debug", "common_eval", "black_box_api"
+    };
+    
+    auto baseName = [](const std::string& p) {
+        return boost_fs::path(p).stem().string();
+    };
+
+    forAllSteps([&](const TestStep& step) {
+        for (const auto& file : step.input_files) {
+            
+            if(disabledNames.find(baseName(*file)) != disabledNames.end())
+            {
+                feedback += baseName(*file) + " ";
+            }
+        }
+        for (const auto& file : step.output_files) {
+            
+            if(disabledNames.find(baseName(*file)) != disabledNames.end())
+            {
+                feedback += baseName(*file) + " ";
+            }
+        }
+    });
+    
+    if(!feedback.empty())
+    {
+        std::string message = "\nThe following file names are reserved for files managed by the build system ";
+        message += "and must not be used to name files produced or consumed by the test:\n";
+        feedback = message + feedback + "\n";
+    }
+    
+    return feedback;
+}
+
 std::string TestDef::validate(bool isPrivate)
 {
     std::string feedback;
@@ -197,6 +236,8 @@ std::string TestDef::validate(bool isPrivate)
         feedback += "but aren't specified as 'input_files' or 'output_files' for any of the steps: " + getAsCsv(cmdOnly);
         feedback += "\n";
     }
+    
+    feedback += validateIOFiles();
     
     return feedback;
 }
