@@ -1972,7 +1972,6 @@ std::vector<std::string> splitCTypeByNamespace(const std::string& input, const s
 
 //**************************
 
-// https://chatgpt.com/c/671d9944-bf60-8010-8dbb-5cde6cf90326
 // The cleanClangOutput function is designed to process and filter the output from the Clang compiler,
 // focusing on extracting and presenting only the most relevant error messages and code snippets related
 // to the user's project. Its primary goal is to aid in debugging by providing a concise and clear summary
@@ -2447,7 +2446,6 @@ std::set<std::string> extractUnknownTypes(const std::string& diagnostics) {
     return unknownTypes;
 }
 
-//https://chatgpt.com/c/67875c62-e950-8010-970f-90a3f7416a92
 /**
  * \brief Returns a filtered version of the diagnostics string, removing any
  * diagnostic block that contains the specific error:
@@ -2584,8 +2582,6 @@ std::string filterAnyReturnErrors(const std::string& diagnostics)
     return filteredOutput.str();
 }
 
-
-//https://chatgpt.com/c/6767b30f-1fb4-8010-a63e-161a86b2dcb3
 /**
  * Transforms all C++ string literals in the given code snippet into empty ones.
  *

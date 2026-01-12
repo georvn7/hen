@@ -13,9 +13,7 @@
         ]
     },
     "test": {
-        "commands": [
-            "[[result=0]]-v -o ./feature_test.s ./feature_test_preprocessed.c"
-        ],
+        "command": "[[result=0]]-v -o ./feature_test.s ./feature_test_preprocessed.c",
         "input_files" : [
             "feature_test_preprocessed.c"
         ],
@@ -25,7 +23,6 @@
     },
     "posttest": {
         "commands": [
-            "test -f ./feature_test.s || (echo '_DEBUG_COMMAND_RESULT=65535' && exit 1)",
             "clang --target=aarch64-apple-darwin -c ./feature_test.s -o ./feature_test.o",
             "clang --target=aarch64-apple-darwin ./feature_test.o -o ./feature_test",
             "codesign -s - --entitlements ./debug.entitlements ./feature_test",
@@ -40,11 +37,5 @@
             "feature_test"
         ]
     },
-    "io_files" : [
-            "feature_test_preprocessed.c",
-            "feature_test.s"
-        ],
-    "io_hint": "none",
-    "timeout": 5,
-    "expected_result": "0"
+    "io_hint": "none"
 }

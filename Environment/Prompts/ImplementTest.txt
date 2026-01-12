@@ -7,6 +7,7 @@ In the source of unit test implementation you must not include any header files.
 - Don't define the PRINT_TEST macro. It is already defined in the headers
 - Use std::cout with the << operator (avoid other methods) for output that should persist in release builds (user-facing messages, final results). Use PRINT_TEST for debug/diagnostic output that will be stripped from release builds.
 - Assume function declaration and data definitions required by '[[function]]' are included with the headers. No need to declare the function '[[function]]' or define any data types this function use
+- Do not define or declare functions and data types defined by the application in the test source
 [[other_notes]]
 
 Provide the code in your response in markdown syntax. Prefix the C++ source code with ```cpp and postfix the code in your response with ```

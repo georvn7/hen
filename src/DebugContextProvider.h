@@ -334,7 +334,13 @@ struct DebugVisibility
         if(invocation < 1) invocation = 1;
         if(lineNumber < 1) lineNumber = 1;
         
-        std::string key = function + ":" + std::to_string(invocation) + ":" + std::to_string(lineNumber);
+        std::string functionKey = function;
+        if(functionKey.empty() || functionKey == "none")
+        {
+            functionKey.clear();
+        }
+        
+        std::string key = functionKey + ":" + std::to_string(invocation) + ":" + std::to_string(lineNumber);
         if(m_log.find(key) == m_log.end())
         {
             m_log.insert(key);
@@ -1432,10 +1438,14 @@ public:
         return "";
     }
     
-    void checkTestStepInput(std::ostream& log, const TestStep& step, const std::string& stepName, bool deleteOutput)
+    void checkTestStepInput(std::ostream& log,
+                            const std::vector<std::shared_ptr<std::string>>& input_files,
+                            const std::vector<std::shared_ptr<std::string>>& output_files,
+                            const std::string& stepName,
+                            bool deleteOutput)
     {
         std::string missingInputFiles;
-        for(auto file : step.input_files)
+        for(auto file : input_files)
         {
             if(!boost_fs::exists(m_workingDirectory + "/" + *file))
             {
@@ -1455,7 +1465,7 @@ public:
         //Delete all files that this step has to generate
         if(deleteOutput)
         {
-            for(auto file : step.output_files)
+            for(auto file : output_files)
             {
                 std::string filePath = m_workingDirectory + "/" + *file;
                 if(boost_fs::exists(filePath))
@@ -1465,11 +1475,16 @@ public:
             }
         }
     }
+    
+    void checkTestStepInput(std::ostream& log, const TestStep& step, const std::string& stepName, bool deleteOutput)
+    {
+        checkTestStepInput(log, step.input_files, step.output_files, stepName, deleteOutput);
+    }
 
-    void checkTestStepOutput(std::ostream& log, const TestStep& step, const std::string& stepName)
+    void checkTestStepOutput(std::ostream& log, const std::vector<std::shared_ptr<std::string>>& output_files, const std::string& stepName)
     {
         std::string missingOutputFiles;
-        for(auto file : step.output_files)
+        for(auto file : output_files)
         {
             if(!boost_fs::exists(m_workingDirectory + "/" + *file))
             {
@@ -1485,6 +1500,11 @@ public:
             log << "Missing files that should have been produced by the " << stepName << " step: " << std::endl;
             log << missingOutputFiles << std::endl << std::endl;
         }
+    }
+    
+    void checkTestStepOutput(std::ostream& log, const TestStep& step, const std::string& stepName)
+    {
+        checkTestStepOutput(log, step.output_files, stepName);
     }
     
     std::string loadTestLogFromStep(CCodeProject* project, const TestDef& test, uint32_t debugStepId)
@@ -1507,7 +1527,7 @@ public:
             bool debug = false;
             bool testResult = false;
             
-            std::string rawCmd = *test.test.commands[0];
+            std::string rawCmd = test.test.command;
             std::string cmd = rawCmd;
             std::string expectedResult;
             std::string stdoutRegex;
@@ -1518,7 +1538,7 @@ public:
             
             std::string consoleLog = getFileContent(m_workingDirectory + "/console.log");
             
-            log += "Test command output:\n";
+            log += "Test command stdout:\n";
             if(!consoleLog.empty())
             {
                 std::string consoleLogLimited = consoleLog.length() > 2048 ? consoleLog.substr(0, 2048) + "...[[truncated]]": consoleLog;
@@ -1526,11 +1546,11 @@ public:
             }
             else
             {
-                log += "Empty output string\n\n";
+                log += "Empty stdout string\n\n";
             }
             
             std::stringstream ssTestInput;
-            checkTestStepInput(ssTestInput, test.test, "test", false);
+            checkTestStepInput(ssTestInput, test.test.input_files, test.test.output_files, "test", false);
             
             std::string lldbLog = getFileContent(directoryForThisStep + "/lldb.log");
             std::string stdoutLog = getFileContent(directoryForThisStep + "/stdout.log");
@@ -1552,7 +1572,7 @@ public:
             }
             
             std::stringstream ssTestOutput;
-            checkTestStepOutput(ssTestOutput, test.test, "test");
+            checkTestStepOutput(ssTestOutput, test.test.output_files, "test");
             
             std::string returnCodeStr = std::to_string(returnCode);
             bool mainTestPass = true;
@@ -1925,7 +1945,7 @@ public:
         std::string projDir = project->getProjDir();
         std::string execPath = projDir + "/build/" + getPlatform() + "_test/main";
         
-        std::string testRawCmd = *test.test.commands[0];
+        std::string testRawCmd = test.test.command;
         std::string testCmd = testRawCmd;
         std::string testResultStr;
         bool testDebug = false;

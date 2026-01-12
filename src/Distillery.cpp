@@ -864,7 +864,9 @@ namespace stdrave {
         
         saveToFile(mergedTrajectory, datasetDir + "/merged_trajectory.txt");
         
-        for(auto file : m_test.getRewardHackingTestFiles())
+        //TODO: There is a serious chance testWD to be wrong!
+        std::string testWD = project->getProjDir() + "/debug/wd_pub";
+        for(auto file : m_test.getRewardHackingTestFiles(testWD))
         {
             boost_fs::path filePath(file);
             testFiles += "//File: " + filePath.filename().string() + "\n```" + filePath.extension().string() + "\n";

@@ -313,7 +313,7 @@ namespace stdrave {
                                    std::string& review,
                                    std::string& hint);
         
-        std::set<std::string> getTestTextFiles(CCodeProject* project, const TestDef& test);
+        std::set<std::string> getTestTextFiles(CCodeProject* project, const TestDef& test, const std::string& workingDirectory);
         
         std::string getStackTrace(CCodeProject* project, const std::string& stack, bool log, uint32_t maxTailToPrint);
         
@@ -326,8 +326,22 @@ namespace stdrave {
                            RunAnalysis& analysis,
                            const TestDef& test);
         
+        void checkTestStepInput(std::ostream& log,
+                                CCodeProject* project,
+                                const std::vector<std::shared_ptr<std::string>>& input_files,
+                                const std::vector<std::shared_ptr<std::string>>& output_files,
+                                const std::string& stepName,
+                                bool deleteOutput);
+        
         void checkTestStepInput(std::ostream& log, CCodeProject* project, const TestStep& step, const std::string& stepName, bool deleteOutput);
+        
+        void checkTestStepOutput(std::ostream& log,
+                                 CCodeProject* project,
+                                 const std::vector<std::shared_ptr<std::string>>& output_files,
+                                 const std::string& stepName);
+        
         void checkTestStepOutput(std::ostream& log, CCodeProject* project, const TestStep& step, const std::string& stepName);
+        
         bool executeTestStep(std::ostream& log, CCodeProject* project, const TestStep& step, const std::string& stepName, bool enforceResult0);
         
         void runAnalysis(CCodeProject* project, const TestDef& test, RunAnalysis& analysis, bool analyzeLog);
@@ -469,7 +483,7 @@ namespace stdrave {
         bool deployToWorkingDirectory(CCodeProject* project, const std::string& testJsonDir, bool isPublic, TestDef& test);
         
 	public:
-        bool debug(CCodeProject* project,
+        std::pair<bool, std::string> debug(CCodeProject* project,
                    int stepsCount,
                    const std::string& system,
                    const std::string& testJsonPath,

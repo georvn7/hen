@@ -14,6 +14,10 @@ CURRENT UNIT TEST
 
 [[old_test]]
 
+LAST TEST SCRIPT EXECUTION LOG
+
+[[test_exec_log]]
+
 REVIEW UNIT TEST
 
 Debugging of unit test '[[old_test_name]]' for function '[[function]]' has concluded with failure.
@@ -32,6 +36,12 @@ Wrong expected values (especially floating-point comparisons, edge cases)
 Wrong assertions (testing the wrong property)
 Missing setup/teardown logic
 Hardcoded paths or environment-specific assumptions
+Matching stdout in tests with PRINT_TEST. Only std::cout is captured for stdout matching. PRINT_TEST is only for debug log and must not be used to match the regex pattern provided in the 'stdout' in the test specification (see test framework manual)
+PRINT_TEST is a system level macro and can't be changed!
+
+Note:
+Stdout regex is checked with C++ std::regex ECMAScript using std::regex_match (FULL string) after normalizing newlines to \n; . does not match \n, so .* won’t cross lines or consume a trailing newline—use [\s\S]* (or \n? at the end).
+Example: log TEST: SUCCESS\n → use ^.*TEST: SUCCESS.*\n?$ (not ^.*TEST: SUCCESS.*$).
 
 If the unit test needs improvement, provide a detailed diagnosis explaining:
 

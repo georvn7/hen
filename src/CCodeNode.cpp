@@ -4488,7 +4488,7 @@ namespace stdrave {
             std::string fileContent = proj->define_test_file.prompt({
                 {"filename", file},
                 {"function", m_brief.func_name},
-                {"command", *m_unitTest.definition.test.commands[0]},
+                {"command", m_unitTest.definition.test.command},
                 {"description", ""}, //TODO: Need to remove description from the prompt
                 {"srctype", source}
             });
@@ -4515,7 +4515,7 @@ namespace stdrave {
             
             File inputFile;
             inputFile.content = source;
-            inputFile.file_name = fileName.stem().string();
+            inputFile.file_name = fileName.filename().string();
             m_unitTest.input_files.push_back(std::make_shared<File>(inputFile));
             
             //Store the file
@@ -4532,7 +4532,7 @@ namespace stdrave {
         }
     }
 
-    bool CCodeNode::reviewUnitTest(const std::string& compileCL, std::string& output)
+    bool CCodeNode::reviewUnitTest(const std::string& compileCL, const std::string& feedback, std::string& output)
     {
         CCodeProject* proj = (CCodeProject*)Client::getInstance().project();
         
@@ -4546,7 +4546,8 @@ namespace stdrave {
         std::string reviewMessge = proj->review_test_source.prompt({
             {"test", m_brief.func_name},
             {"command", compileCL},
-            {"output", output}
+            {"output", output},
+            {"feedback", feedback}
         });
         
         std::string source = "cpp";
@@ -4674,6 +4675,343 @@ namespace stdrave {
         return boost_fs::exists(testExecutable);
     }
 
+    // -----------------------------
+    // Small CXString helper
+    // -----------------------------
+    static std::string cxToString(CXString s) {
+        const char* c = clang_getCString(s);
+        std::string out = c ? c : "";
+        clang_disposeString(s);
+        return out;
+    }
+
+    static bool isInMainFile(CXCursor c) {
+        CXSourceLocation loc = clang_getCursorLocation(c);
+        return clang_Location_isFromMainFile(loc) != 0;
+    }
+
+    // Build a scope prefix: ns1::Class::Inner::
+    static std::string scopePrefix(CXCursor c) {
+        std::vector<std::string> scopes;
+        CXCursor p = clang_getCursorSemanticParent(c);
+        while (!clang_Cursor_isNull(p) && clang_getCursorKind(p) != CXCursor_TranslationUnit) {
+            CXCursorKind pk = clang_getCursorKind(p);
+
+            if (pk == CXCursor_Namespace ||
+                pk == CXCursor_StructDecl || pk == CXCursor_ClassDecl || pk == CXCursor_UnionDecl ||
+                pk == CXCursor_EnumDecl ||
+                pk == CXCursor_ClassTemplate) {
+
+                std::string n = cxToString(clang_getCursorSpelling(p));
+                if (!n.empty()) scopes.push_back(n);
+            }
+
+            p = clang_getCursorSemanticParent(p);
+        }
+
+        std::reverse(scopes.begin(), scopes.end());
+
+        std::string out;
+        for (auto& s : scopes) {
+            out += s;
+            out += "::";
+        }
+        return out;
+    }
+
+    // Qualified name (types: spelling; functions: display name for overload signature)
+    static std::string qualifiedName(CXCursor c, bool preferDisplayName) {
+        std::string leaf = preferDisplayName
+            ? cxToString(clang_getCursorDisplayName(c))
+            : std::string();
+
+        if (leaf.empty())
+            leaf = cxToString(clang_getCursorSpelling(c));
+        if (leaf.empty())
+            return {};
+
+        return scopePrefix(c) + leaf;
+    }
+
+    static bool hasRealSpellingLocation(CXCursor c) {
+        CXSourceLocation loc = clang_getCursorLocation(c);
+        CXFile file = nullptr;
+        unsigned line = 0, col = 0, off = 0;
+        clang_getExpansionLocation(loc, &file, &line, &col, &off);
+        return (file != nullptr && line != 0);
+    }
+
+    // -----------------------------
+    // Visitor context
+    // -----------------------------
+    struct VisitorCtx {
+        CCodeNode::SourceSymbols* out = nullptr;
+
+        // Dedup by USR so overloads/templates/redecls don't spam you.
+        std::unordered_set<std::string> seenUSR;
+    };
+
+    static CXChildVisitResult symbolVisitor(CXCursor c, CXCursor /*parent*/, CXClientData clientData) {
+        auto* ctx = static_cast<VisitorCtx*>(clientData);
+
+        // Only symbols originating from this .cpp (not headers)
+        if (!isInMainFile(c))
+            return CXChildVisit_Recurse;
+
+        // Skip implicit compiler-generated stuff
+        if (hasRealSpellingLocation(c))
+            return CXChildVisit_Recurse;
+
+        const CXCursorKind k = clang_getCursorKind(c);
+
+        auto addUnique = [&](bool isFunc, const std::string& name) {
+            if (name.empty()) return;
+
+            std::string usr = cxToString(clang_getCursorUSR(c));
+            if (!usr.empty()) {
+                if (!ctx->seenUSR.insert(usr).second) return; // already have it
+            }
+            if (isFunc) ctx->out->functions.push_back(name);
+            else        ctx->out->types.push_back(name);
+        };
+
+        // ---- Functions (declared or defined in this file) ----
+        switch (k) {
+            case CXCursor_FunctionDecl:
+            case CXCursor_CXXMethod:
+            case CXCursor_Constructor:
+            case CXCursor_Destructor:
+            case CXCursor_ConversionFunction:
+            case CXCursor_FunctionTemplate: {
+                addUnique(true, qualifiedName(c, /*preferDisplayName=*/true));
+                break;
+            }
+            default: break;
+        }
+
+        // ---- Types defined/declared in this file ----
+        switch (k) {
+            case CXCursor_StructDecl:
+            case CXCursor_ClassDecl:
+            case CXCursor_UnionDecl:
+            case CXCursor_EnumDecl:
+            case CXCursor_ClassTemplate: {
+                // Skip anonymous types (e.g., anonymous structs)
+                std::string n = qualifiedName(c, /*preferDisplayName=*/false);
+                if (!n.empty()) addUnique(false, n);
+                break;
+            }
+            default: break;
+        }
+
+        return CXChildVisit_Recurse;
+    }
+
+    static const char* cxErrorToStr(CXErrorCode e) {
+        switch (e) {
+            case CXError_Success: return "CXError_Success";
+            case CXError_Failure: return "CXError_Failure";
+            case CXError_Crashed: return "CXError_Crashed";
+            case CXError_InvalidArguments: return "CXError_InvalidArguments";
+            case CXError_ASTReadError: return "CXError_ASTReadError";
+            default: return "CXError_Unknown";
+        }
+    }
+
+    static void printTUDiagnostics(CXTranslationUnit tu, const char* headerTag = "libclang") {
+        if (!tu) {
+            std::cout << "[" << headerTag << "] No translation unit; cannot print diagnostics.\n";
+            return;
+        }
+
+        unsigned n = clang_getNumDiagnostics(tu);
+        if (n == 0) {
+            std::cout << "[" << headerTag << "] No diagnostics.\n";
+            return;
+        }
+
+        std::cout << "[" << headerTag << "] Diagnostics (" << n << "):\n";
+        for (unsigned i = 0; i < n; ++i) {
+            CXDiagnostic d = clang_getDiagnostic(tu, i);
+
+            // Format includes file:line:col + severity + message
+            CXString formatted = clang_formatDiagnostic(
+                d, clang_defaultDiagnosticDisplayOptions()
+            );
+
+            std::cout << "  " << cxToString(formatted) << "\n";
+
+            clang_disposeDiagnostic(d);
+        }
+    }
+
+    static void printClangArgs(const std::vector<std::string>& args, const char* headerTag = "libclang") {
+        std::cout << "[" << headerTag << "] clang args (" << args.size() << "):\n";
+        for (const auto& a : args) std::cout << "  " << a << "\n";
+    }
+
+    // -----------------------------
+    // Main API: parse + collect
+    // -----------------------------
+    CCodeNode::SourceSymbols CCodeNode::extractSymbolsFromSource(const CCodeNode::CompilationInfo& ci) {
+        SourceSymbols out;
+
+        // Convert args to const char*
+        std::vector<const char*> cargs;
+        cargs.reserve(ci.clangArgs.size());
+        for (auto& a : ci.clangArgs) cargs.push_back(a.c_str());
+
+        CXIndex index = clang_createIndex(/*excludeDeclsFromPCH*/0, /*displayDiagnostics*/0);
+
+        CXTranslationUnit tu = nullptr;
+        CXErrorCode err = clang_parseTranslationUnit2(
+            index,
+            ci.sourceFile.c_str(),
+            cargs.empty() ? nullptr : cargs.data(),
+            (int)cargs.size(),
+            nullptr, 0,
+            // skip bodies = faster; still finds decls/defs
+            CXTranslationUnit_SkipFunctionBodies,
+            &tu
+        );
+
+        if (err != CXError_Success || !tu) {
+            std::cout << "[libclang] Failed to parse translation unit.\n";
+            std::cout << "[libclang] Source: " << ci.sourceFile << "\n";
+            std::cout << "[libclang] Error: " << cxErrorToStr(err) << " (" << (int)err << ")\n";
+            printClangArgs(ci.clangArgs);
+
+            // Sometimes tu is null; sometimes it exists but has errors.
+            printTUDiagnostics(tu);
+
+            if (tu) clang_disposeTranslationUnit(tu);
+            clang_disposeIndex(index);
+            return out;
+        }
+
+        VisitorCtx ctx;
+        ctx.out = &out;
+
+        CXCursor root = clang_getTranslationUnitCursor(tu);
+        clang_visitChildren(root, symbolVisitor, &ctx);
+
+        clang_disposeTranslationUnit(tu);
+        clang_disposeIndex(index);
+
+        return out;
+    }
+
+    CCodeNode::CompilationInfo CCodeNode::getCompilationInfoForSymbols(const std::string& platform, uint32_t options) const
+    {
+        CCodeProject* proj = (CCodeProject*)Client::getInstance().project();
+
+        std::string buildSourcePath = getNodeBuildSourcePath();
+        std::string buildDir = proj->getProjDir() + "/build";
+        std::string nodeDir = buildDir + "/" + buildSourcePath;
+
+        // source file (exactly like your compileCommand)
+        std::string srcFile = nodeDir + "/";
+        if (options & BUILD_UNIT_TEST) srcFile += "test/main.cpp";
+        else srcFile += m_brief.func_name + ".cpp";
+
+        CompilationInfo ci;
+        ci.sourceFile = srcFile;
+
+        auto& a = ci.clangArgs;
+        a = {
+            "-std=c++17",
+            "-arch", "arm64",
+            "-Werror=format",
+            "-fno-diagnostics-show-note-include-stack",
+            "-c",
+            "-I" + buildDir,
+            "-I" + (buildDir + "/" + buildSourcePath),
+        };
+
+        if (options & BUILD_DEBUG) {
+            a.push_back("-fsanitize=address,undefined");
+            a.push_back("-fno-sanitize-recover=undefined");
+            a.push_back("-fno-omit-frame-pointer");
+            a.push_back("-g");
+            a.push_back("-O0");
+            a.push_back("-fno-inline-functions");
+            a.push_back("-fno-optimize-sibling-calls");
+        }
+
+        std::string pchFile = buildDir + "/common.pch";
+        /*if (boost_fs::exists(pchFile)) {
+            a.push_back("-include-pch");
+            a.push_back(pchFile);
+        } else*/
+        {
+            a.push_back("-include");
+            a.push_back("common.h");
+        }
+
+        if (options & BUILD_PRINT_TEST) {
+            a.push_back("-DCOMPILE_TEST");
+        }
+
+        return ci;
+    }
+
+    std::string CCodeNode::validateUnitTestSource()
+    {
+        CCodeProject* proj = (CCodeProject*)Client::getInstance().project();
+        
+        std::string feedback;
+        std::string usedFunctions;
+        std::string usedTypes;
+        
+        CompilationInfo ci = getCompilationInfoForSymbols(
+                                  getPlatform(), BUILD_PRINT_TEST|BUILD_UNIT_TEST|BUILD_DEBUG);
+        
+        SourceSymbols symbols = CCodeNode::extractSymbolsFromSource(ci);
+        
+        for(auto func : symbols.functions)
+        {
+            if(proj->nodeMap().find(func) != proj->nodeMap().end())
+            {
+                usedFunctions += func + " ";
+            }
+        }
+        
+        for(auto type : symbols.types)
+        {
+            std::string owningPath;
+            if(proj->findData(type, owningPath))
+            {
+                usedTypes += type + " ";
+            }
+        }
+        
+        if(!usedFunctions.empty() || !usedTypes.empty())
+        {
+            feedback += "Here is also a feedback on the usage of application defined functions and types in the test\n\n";
+        }
+        
+        if(!usedFunctions.empty())
+        {
+            feedback += "The test declares or defines functions that are already defined in the application source:\n";
+            feedback += usedFunctions + "\n";
+            feedback += "Remove the above function declarations/definitions from the test.\n";
+        }
+        
+        if(!usedTypes.empty())
+        {
+            feedback += "The test declares or defines data types that are already defined in the application source:\n";
+            feedback += usedFunctions + "\n";
+            feedback += "Remove the above function data declarations/definitions from the test.\n";
+        }
+        
+        if(!usedFunctions.empty() || !usedTypes.empty())
+        {
+            feedback += "It is not allowed to declare or define functions and data types that are already defined in the application\n\n";
+        }
+        
+        return feedback;
+    }
+
     bool CCodeNode::compileUnitTestSource()
     {
         CCodeProject* proj = (CCodeProject*)Client::getInstance().project();
@@ -4689,13 +5027,18 @@ namespace stdrave {
         std::string output = exec(compileCL, testDir, "CompileTest");
         int compileAttempt = 0;
         
-        while (!unitTestObjectExists() && compileAttempt++ < 3) {
+        std::string feedback = validateUnitTestSource();
+        
+        while ((!unitTestObjectExists() || !feedback.empty())
+               && compileAttempt++ < 3)
+        {
             //Let the human know!
             std::cout << "Test compilation error: " << output << std::endl;
             std::cout << "Command: " << compileCL << std::endl;
             std::cout << output << std::endl;
         
-            reviewUnitTest(compileCL, output);
+            reviewUnitTest(compileCL, feedback, output);
+            feedback = validateUnitTestSource();
         }
         
         if(compileAttempt >= 3)
@@ -4772,7 +5115,9 @@ namespace stdrave {
         std::string linkOutput = exec(linkCL, testDir, "LinkTest");
         int linkAttempt = 0;
         
-        while (!unitTestExists() && linkAttempt < 3) {
+        std::string feedback = validateUnitTestSource();
+        while ((!unitTestExists() || !feedback.empty())
+               && linkAttempt < 3) {
             //Let human know!
             std::cout << "Test link error: " << buildSourcePath << std::endl;
             std::cout << "Command: " << linkCL << std::endl;
@@ -4783,7 +5128,7 @@ namespace stdrave {
             {
                 flags |= BUILD_PRINT_TEST|BUILD_UNIT_TEST;
                 std::string compileCL = compileCommand(platform, flags);
-                reviewUnitTest(compileCL, linkOutput);
+                reviewUnitTest(compileCL, feedback, linkOutput);
             }
             else
             {
@@ -4801,6 +5146,7 @@ namespace stdrave {
             
             //Recompile the updated sources
             linkOutput += exec(linkCL, testDir, "LinkTest");
+            feedback = validateUnitTestSource();
             
             linkAttempt++;
         }
@@ -4928,6 +5274,7 @@ namespace stdrave {
         
         std::string pretestLog;
         bool pretestOK = true;
+        uint32_t fixPretestAttempts = 0;
         do
         {
             generateUnitTestInputFiles();
@@ -4957,12 +5304,15 @@ namespace stdrave {
                     defineTestMsg += pretestLog + "\n\n";
                     defineTestMsg += "Consider to fix and redefine the unit test to avoid this! ";
                     defineTestMsg += "Then, if necessary, we can reimplement the test's main.cpp and the input files (if any)\n";
+                    defineTestMsg += "Reminder that the test steps (pretest, test, posttest) must not generate, compile and list as input/outut file ";
+                    defineTestMsg += "the test driver (main.cpp). The build system will generate and compile that file implicitly.\n";
                     defineTestMsg += "Note: I'm not asking here for the content of the test main.cpp or any of the input files. ";
-                    defineTestMsg += "You can specify the test, describe the test cases and the required input files ";
+                    defineTestMsg += "In the test description, you can specify the test, describe the test cases and the required input files ";
                     defineTestMsg += "(if any, excluding the test driver main.cpp) as explained in the test framework manual. ";
-                    defineTestMsg += "Then, based on the test description, in a next step, we will define the content of the main.cpp and any input files\n\n";
+                    defineTestMsg += "Then, based on the test description, in a next phase, we will define the content of the main.cpp and any input files\n\n";
                     
                     inferenceUnitTestDef(defineTestMsg);
+                    fixPretestAttempts++;
                     
                     //==========================
                     popContext();//Pop the last unit test definition
@@ -4971,7 +5321,13 @@ namespace stdrave {
                 }
             }
         }
-        while(!pretestOK);
+        while(!pretestOK && fixPretestAttempts < 5);
+        
+        if(fixPretestAttempts >= 5)
+        {
+            std::cout << "Unable to verify the pretest step for the unit test for function: " << getName() << std::endl << std::endl;
+            return;
+        }
         
         linkUnitTest(true);
         
@@ -5106,7 +5462,7 @@ namespace stdrave {
         int attempt = 0;
         bool failure = false;
         do {
-            std::string testCL = *m_unitTest.definition.test.commands[0];
+            std::string testCL = m_unitTest.definition.test.command;
             if(testCL == "none" || testCL == m_brief.func_name || testCL.empty())
             {
                 testCL = "./" + m_brief.func_name;
@@ -6439,7 +6795,7 @@ namespace stdrave {
         return message;
     }
 
-    bool CCodeNode::unitTestIsBroken(const std::string& prevTestTrajectory, const std::string& fullTestDesc)
+    bool CCodeNode::unitTestIsBroken(const std::string& prevTestTrajectory, const std::string& fullTestDesc, const std::string& testExecLog)
     {
         CCodeProject* proj = (CCodeProject*)Client::getInstance().project();
         
@@ -6455,7 +6811,8 @@ namespace stdrave {
             { "trajectory", prevTestTrajectory },
             { "old_test", oldTest },
             { "old_test_name", m_unitTest.definition.name },
-            { "full_test", fullTestDesc}
+            { "full_test", fullTestDesc},
+            { "test_exec_log", testExecLog}
         });
         
         Cache cache;

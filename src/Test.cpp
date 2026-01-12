@@ -9,6 +9,11 @@ DEFINE_ARRAY_FIELD(TestStep, commands)
 DEFINE_ARRAY_FIELD(TestStep, input_files)
 DEFINE_ARRAY_FIELD(TestStep, output_files)
 
+DEFINE_TYPE(TestCommand)
+DEFINE_FIELD(TestCommand, command)
+DEFINE_ARRAY_FIELD(TestCommand, input_files)
+DEFINE_ARRAY_FIELD(TestCommand, output_files)
+
 DEFINE_TYPE(TestConfig)
 DEFINE_ARRAY_FIELD(TestConfig, ramp)
 DEFINE_FIELD(TestConfig, current)
@@ -31,6 +36,13 @@ DEFINE_ARRAY_FIELD(UnitTest, input_files)
 void TestStep::clear()
 {
     commands.clear();
+    input_files.clear();
+    output_files.clear();
+}
+
+void TestCommand::clear()
+{
+    command.clear();
     input_files.clear();
     output_files.clear();
 }
@@ -74,7 +86,7 @@ std::set<std::string> TestDef::getRegressionFiles() const
 }
 
 //TODO: One day we can add images
-std::set<std::string> TestDef::getRewardHackingTestFiles() const
+std::set<std::string> TestDef::getRewardHackingTestFiles(const std::string& workingDirectory) const
 {
     std::set<std::string> files;
     
@@ -82,9 +94,21 @@ std::set<std::string> TestDef::getRewardHackingTestFiles() const
         return boost_fs::path(p).filename().string();
     };
     
+    const auto& testFiles = getInputFiles();
+    
+    for (const auto& file : testFiles) {
+        
+        std::string filePaht = workingDirectory + "/" + baseName(file);
+        if(isTextFileAsciiOrUtf8(filePaht))
+        {
+            files.insert(baseName(file));
+        }
+    }
+    
     for (const auto& file : test.output_files) {
         
-        if(isTextFileAsciiOrUtf8(*file))
+        std::string filePaht = workingDirectory + "/" + baseName(*file);
+        if(isTextFileAsciiOrUtf8(filePaht))
         {
             files.insert(baseName(*file));
         }
@@ -92,7 +116,8 @@ std::set<std::string> TestDef::getRewardHackingTestFiles() const
     
     for (const auto& file : posttest.output_files) {
         
-        if(isTextFileAsciiOrUtf8(*file))
+        std::string filePaht = workingDirectory + "/" + baseName(*file);
+        if(isTextFileAsciiOrUtf8(filePaht))
         {
             files.insert(baseName(*file));
         }
@@ -127,6 +152,34 @@ std::set<std::string> TestDef::getCommandLineFiles() const
     return files;
 }
 
+std::string TestDef::validateCommands()
+{
+    bool hasLongCommands = false;
+
+    forAllSteps([&](const TestStep& step) {
+        
+        for (const auto& command: step.commands) {
+            if(command->size() > 512)
+            {
+                hasLongCommands = true;
+            }
+        }
+        
+    });
+    
+    if(hasLongCommands)
+    {
+        std::string feedback = "Some commands exceed 512 characters. ";
+        feedback += "Avoid embedding test content directly in commands (e.g., via cat or echo). ";
+        feedback += "Instead, declare input files in the input_files list, reference them in your commands, ";
+        feedback += "and concisely describe their purpose in the test description. ";
+        feedback += "File contents will be generated in a separate step.";
+        return feedback;
+    }
+    
+    return std::string();
+}
+
 std::string TestDef::validateIOFiles()
 {
     std::string feedback;
@@ -140,6 +193,7 @@ std::string TestDef::validateIOFiles()
     };
 
     forAllSteps([&](const TestStep& step) {
+        
         for (const auto& file : step.input_files) {
             
             if(disabledNames.find(baseName(*file)) != disabledNames.end())
@@ -175,27 +229,97 @@ std::string TestDef::validate(bool isPrivate)
         feedback += "The 'name' must not be empty\n";
     }
     
-    if(test.commands.size() > 1)
+    if(test.command.empty())
     {
-        feedback += "More than one commands in the 'test.commands' section\n";
+        feedback += "Requires command in 'test.command'\n";
     }
-    
-    if(test.commands.size() < 1)
+    else if(startsWithIgnoreCase(test.command, "./"))
     {
-        feedback += "Requires command in 'test.commands'\n";
-    }
-    else if(startsWithIgnoreCase(*test.commands[0], "./"))
-    {
-        boost_fs::path arg1AsPath(*test.commands[0]);
+        boost_fs::path arg1AsPath(test.command);
         if(!arg1AsPath.has_extension())
         {
-            feedback += "'test.commands[0]' starts with executable. Executable for the main test will be implicitly provided\n";
+            feedback += "'test.command' starts with executable. Executable for the main test will be implicitly provided\n";
         }
     }
     
-    if(test.commands.size() >= 1)
+    bool emptyCommands = false;
+    for(auto cmd : pretest.commands)
     {
-        std::string rawCmd = *test.commands[0];
+        std::string rawCmd = *cmd;
+        
+        std::string cmdOnly = rawCmd;
+        std::string expectedResult;
+        std::string stdoutRegex;
+        bool debug = false;
+        bool finalResult = false;
+        parsePrefixFlags(rawCmd, debug, finalResult, expectedResult, stdoutRegex, cmdOnly);
+        
+        auto args = stdrave::parseCommandLine(cmdOnly);
+        
+        if(args.empty())
+        {
+            feedback += "Command in the 'pretest' step has empty command line: " + rawCmd + "\n";
+            emptyCommands = true;
+        }
+        
+        //TODO: Signal here if pretest commands check the result
+        if(finalResult)
+        {
+            feedback += "Command in a 'pretest' step uses 'result' or 'stdout' attributes. ";
+            feedback += "The idea of the 'pretest' step is only to prepare files consumed by the 'test' step. ";
+            feedback += "The commands in the 'pretest' step must not check the result with 'result' or 'stdout' attributes. ";
+            feedback += "However, each command line is expected to exit successfuly when executed in the shell.\n";
+        }
+    }
+    
+    int postIndex = 0;
+    for(auto cmd : posttest.commands)
+    {
+        std::string rawCmd = *cmd;
+        
+        std::string cmdOnly = rawCmd;
+        std::string expectedResult;
+        std::string stdoutRegex;
+        bool debug = false;
+        bool finalResult = false;
+        parsePrefixFlags(rawCmd, debug, finalResult, expectedResult, stdoutRegex, cmdOnly);
+        
+        auto args = stdrave::parseCommandLine(cmdOnly);
+        
+        if(args.empty())
+        {
+            feedback += "Command in the 'posttest' step has empty command line: " + rawCmd + "\n";
+            emptyCommands = true;
+        }
+        
+        postIndex++;
+        
+        if(postIndex == posttest.commands.size())
+        {
+            if(!finalResult)
+            {
+                feedback += "The last command in the 'posttest' step doesn't check the result via the 'result' or 'stdout' attributes. ";
+                feedback += "The idea of the 'posttest' step is to post process and check the outcome from the 'test' step. ";
+                feedback += "If 'posttest' step lists any commands, only the last command has to use either 'result' or 'stdout' attributes to check the test success\n";
+            }
+        }
+        else if(finalResult)
+        {
+            feedback += "Command that is not the last in the 'posttest' step uses 'result' or 'stdout' attributes. ";
+            feedback += "The idea of the 'posttest' step is to post process and check the outcome from the 'test' step. ";
+            feedback += "If 'posttest' step has any commands, only the last command has to use either 'result' or 'stdout' attributes to check the test success\n";
+        }
+    }
+    
+    if(emptyCommands)
+    {
+        feedback += "\n\nCommands in the pretest and posttest steps must specify executable\n\n";
+    }
+    
+    //if(test.commands.size() >= 1)
+    if(!test.command.empty())
+    {
+        std::string rawCmd = test.command;
         std::string cmd = rawCmd;
         std::string expectedResult;
         std::string stdoutRegex;
@@ -205,13 +329,57 @@ std::string TestDef::validate(bool isPrivate)
         
         if(startsWithIgnoreCase(cmd, "./"))
         {
-            feedback += "'test.commands[0]' appears to contain an executable name as the first argument. Reminder: the executable for the main 'test' step is provided implicitly.\n";
+            feedback += "'test.command' appears to contain an executable name as the first argument. Reminder: the executable for the main 'test' step is provided implicitly.\n";
         }
         
         if(stdoutRegex.empty() && expectedResult.empty() && posttest.commands.empty())
         {
-            feedback += "'test.commands[0]' does not check stdout or the exit code, and posttest.commands is empty. ";
+            feedback += "'test.command' does not check stdout or the exit code, and posttest.commands is empty. ";
             feedback += "Ensure a mechanism is in place to verify the tested behavior.\n";
+        }
+    }
+    
+    for(auto outFile : pretest.output_files)
+    {
+        std::string outFilename = boost_fs::path(*outFile).filename().string();
+        bool consumed = false;
+    
+        for(auto inFile : test.input_files)
+        {
+            if(outFilename == boost_fs::path(*inFile).filename().string())
+            {
+                consumed = true;
+                break;
+            }
+        }
+        
+        if(!consumed)
+        {
+            feedback += "File '" + outFilename + "' listed as output from the pretest step. ";
+            feedback += "is not consumed by the test step. ";
+            feedback += "All listed output files in the pretest step must be consumed by the test step\n";
+        }
+    }
+    
+    for(auto outFile : test.output_files)
+    {
+        std::string outFilename = boost_fs::path(*outFile).filename().string();
+        bool consumed = false;
+    
+        for(auto inFile : posttest.input_files)
+        {
+            if(outFilename == boost_fs::path(*inFile).filename().string())
+            {
+                consumed = true;
+                break;
+            }
+        }
+        
+        if(!consumed)
+        {
+            feedback += "File '" + outFilename + "' listed as output from the test step. ";
+            feedback += "is not consumed by the posttest step. ";
+            feedback += "All listed output files in the test step must be consumed by the posttest step\n";
         }
     }
     
@@ -238,6 +406,7 @@ std::string TestDef::validate(bool isPrivate)
     }
     
     feedback += validateIOFiles();
+    feedback += validateCommands();
     
     return feedback;
 }

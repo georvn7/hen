@@ -2364,13 +2364,31 @@ boost_fs::path findDirectoryByName(const boost_fs::path& root,
     return found;
 }
 
-bool fullRegexMatch(const std::string& logRaw,
-                            const std::string& pattern,
-                            std::string& err)
+static std::string normalizeNewlines(std::string s)
 {
-    // Normalize trailing newlines that many programs print
-    auto log = logRaw;
-    while (!log.empty() && (log.back() == '\n' || log.back() == '\r')) log.pop_back();
+    // Convert CRLF -> LF
+    // Convert lone CR -> LF
+    std::string out;
+    out.reserve(s.size());
+
+    for (size_t i = 0; i < s.size(); ++i) {
+        char c = s[i];
+        if (c == '\r') {
+            // If this is CRLF, skip the LF
+            if (i + 1 < s.size() && s[i + 1] == '\n') ++i;
+            out.push_back('\n');
+        } else {
+            out.push_back(c);
+        }
+    }
+    return out;
+}
+
+bool fullRegexMatch(const std::string& logRaw,
+                    const std::string& pattern,
+                    std::string& err)
+{
+    const std::string log = normalizeNewlines(logRaw);
 
     try {
         std::regex re(pattern, std::regex::ECMAScript);

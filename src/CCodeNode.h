@@ -278,6 +278,19 @@ public:
         COUNT
     };
     
+    struct SourceSymbols {
+        std::vector<std::string> functions; // qualified + signature where possible
+        std::vector<std::string> types;     // qualified
+    };
+
+    struct CompilationInfo {
+        std::string sourceFile;                 // absolute/relative is fine; must match the TU main file
+        std::vector<std::string> clangArgs;     // flags only (NO "clang++", NO source file)
+    };
+    
+    SourceSymbols extractSymbolsFromSource(const CompilationInfo& ci);
+    CompilationInfo getCompilationInfoForSymbols(const std::string& platform, uint32_t options) const;
+    
     void createAndDecomposeChild(const std::string& child);
     bool compileSource(const std::string& compileCL, std::string& output) const;
     bool updateSource(CodeType type, CCodeNode* parent, const std::string& message, const std::string& compileCL, std::string& output, bool forceRefactoring);
@@ -321,10 +334,11 @@ public:
     void pushUnitTestDef();
     void defineUnitTest(const std::string& fullTestPath, const std::string& prevFullTestPath, const std::string& recommendation);
     void generateUnitTestInputFiles();
-    bool reviewUnitTest(const std::string& compileCL, std::string& output);
+    bool reviewUnitTest(const std::string& compileCL, const std::string& feedback, std::string& output);
     bool compileUnitTest();
     bool unitTestExists();
     bool unitTestObjectExists();
+    std::string validateUnitTestSource();
     bool compileUnitTestSource();
     std::string getUnitTestHeaders();
     void generateUnitTestSource();
@@ -417,7 +431,7 @@ public:
     std::string printCallsInfo();
     std::string generateReport();
     bool improveUnitTest();
-    bool unitTestIsBroken(const std::string& prevTestTrajectory, const std::string& fullTestDesc);
+    bool unitTestIsBroken(const std::string& prevTestTrajectory, const std::string& fullTestDesc, const std::string& testExecLog);
 };
 
 }

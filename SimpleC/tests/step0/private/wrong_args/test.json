@@ -9,15 +9,12 @@
     "output_files": ["s0_pre.c"]
   },
   "test": {
-    "commands": [
-      "[[result=0]]-v -o ./s0.s ./s0_pre.c"
-    ],
+    "command": "[[result=0]]-v -o ./s0.s ./s0_pre.c",
     "input_files": ["s0_pre.c"],
     "output_files": ["s0.s"]
   },
   "posttest": {
     "commands": [
-      "test -f ./s0.s || (echo '_DEBUG_COMMAND_RESULT=65535' && exit 1)",
       "clang --target=aarch64-apple-darwin -c ./s0.s -o ./s0.o",
       "clang --target=aarch64-apple-darwin ./s0.o -o ./s0",
       "[[debug,result=255]]./s0"

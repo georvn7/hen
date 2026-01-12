@@ -312,7 +312,6 @@ public:
         return stackFrames;
     }
     
-    //https://chatgpt.com/c/684115db-cf8c-8013-953b-b007c7e0a51d
     bool loadStackFrame(const std::string& fullFrame,
                         const std::string& function,
                         int invocation)

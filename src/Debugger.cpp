@@ -997,6 +997,13 @@ void Debugger::inferenceRunAnalysis(CCodeProject* project, const std::string& pr
     {
         analysis.debug_notes = debugTitle + analysis.debug_notes;
     }
+    else if(startsWithIgnoreCase(analysis.debug_notes, "PASS"))
+    {
+        //We won't be here if the test passes
+        analysis.debug_notes += "\n\n(Feedback from the agent's algorithm: You suggested that all tests pass, but unfortunately ";
+        analysis.debug_notes += "outcomes from the test commands in the last run do not support this. ";
+        analysis.debug_notes += "For more info, have a look at the section 'INFORMATION FROM THE LAST RUN STEP')\n";
+    }
     
     DebugStep thisStep;
     thisStep.m_logSummary = analysis.log_summary;
@@ -1465,7 +1472,7 @@ void Debugger::analysisTrace(CCodeProject* project,
     std::string application = project->getProjectName();
     std::string trajectory = getTrajectory(0, -1, true, true);
     
-    std::string progress = getRunAnalysisProgress();
+    //std::string progress = getRunAnalysisProgress();
     
     std::string traceDescStr = "\n\nFormats of the trace and log are specified in 'TRACE DESCRIPTION' and 'LOG DESCRIPTION' sections\n\n";
     
@@ -1486,9 +1493,9 @@ void Debugger::analysisTrace(CCodeProject* project,
     analysis = fullTraceAnalysis;
 }
 
-std::set<std::string> Debugger::getTestTextFiles(CCodeProject* project, const TestDef& test)
+std::set<std::string> Debugger::getTestTextFiles(CCodeProject* project, const TestDef& test, const std::string& workingDirectory)
 {
-    return test.getRewardHackingTestFiles();
+    return test.getRewardHackingTestFiles(workingDirectory);
 }
 
 bool Debugger::rewardHackingAnalysis(CCodeProject* project,
@@ -1496,7 +1503,7 @@ bool Debugger::rewardHackingAnalysis(CCodeProject* project,
                                      std::string& review,
                                      std::string& hint)
 {
-    std::set<std::string> testFiles = getTestTextFiles(project, test);
+    std::set<std::string> testFiles = getTestTextFiles(project, test, m_workingDirectory);
     
     std::string outputFilesContent;
     
@@ -2000,7 +2007,6 @@ std::string Debugger::getTestDescription(CCodeProject* project, const TestDef& t
         regressionTest.from_json(regressionTestJson);
         
         const auto& regressionInputFiles = regressionTest.getInputFiles();
-        
         for(auto file : regressionInputFiles)
         {
             std::string fileContent = getFileContent(regressionTestPath + "/public/" + file);
@@ -2041,8 +2047,6 @@ std::string Debugger::getTestDescription(CCodeProject* project, const TestDef& t
         m_unitTestSource += "\n```cpp\n";
         m_unitTestSource += printLineNumbers(getFileContent(unitTestFile), 0);
         m_unitTestSource += "\n```\n\n";
-        
-        
     }
     else
     {
@@ -2065,7 +2069,7 @@ std::string Debugger::getTestDescription(CCodeProject* project, const TestDef& t
     std::string projDir = project->getProjDir();
     //std::string execPath = projDir + "/build/" + getPlatform() + "_test/main";
     
-    std::string testRawCmd = *test.test.commands[0];
+    std::string testRawCmd = test.test.command;
     std::string testCmd = testRawCmd;
     std::string testResultStr;
     bool testDebug = false;
@@ -2135,10 +2139,15 @@ std::string Debugger::getTestDescription(CCodeProject* project, const TestDef& t
     return commands.str();
 }
 
-void Debugger::checkTestStepInput(std::ostream& log, CCodeProject* project, const TestStep& step, const std::string& stepName, bool deleteOutput)
+void Debugger::checkTestStepInput(std::ostream& log,
+                        CCodeProject* project,
+                        const std::vector<std::shared_ptr<std::string>>& input_files,
+                        const std::vector<std::shared_ptr<std::string>>& output_files,
+                        const std::string& stepName,
+                                  bool deleteOutput)
 {
     std::string missingInputFiles;
-    for(auto file : step.input_files)
+    for(auto file : input_files)
     {
         if(!boost_fs::exists(m_workingDirectory + "/" + *file))
         {
@@ -2158,7 +2167,7 @@ void Debugger::checkTestStepInput(std::ostream& log, CCodeProject* project, cons
     //Delete all files that this step has to generate
     if(deleteOutput)
     {
-        for(auto file : step.output_files)
+        for(auto file : output_files)
         {
             std::string filePath = m_workingDirectory + "/" + *file;
             if(boost_fs::exists(filePath))
@@ -2169,10 +2178,18 @@ void Debugger::checkTestStepInput(std::ostream& log, CCodeProject* project, cons
     }
 }
 
-void Debugger::checkTestStepOutput(std::ostream& log, CCodeProject* project, const TestStep& step, const std::string& stepName)
+void Debugger::checkTestStepInput(std::ostream& log, CCodeProject* project, const TestStep& step, const std::string& stepName, bool deleteOutput)
+{
+    checkTestStepInput(log, project, step.input_files, step.output_files, stepName, deleteOutput);
+}
+
+void Debugger::checkTestStepOutput(std::ostream& log,
+                         CCodeProject* project,
+                         const std::vector<std::shared_ptr<std::string>>& output_files,
+                         const std::string& stepName)
 {
     std::string missingOutputFiles;
-    for(auto file : step.output_files)
+    for(auto file : output_files)
     {
         if(!boost_fs::exists(m_workingDirectory + "/" + *file))
         {
@@ -2188,6 +2205,11 @@ void Debugger::checkTestStepOutput(std::ostream& log, CCodeProject* project, con
         log << "Missing files that should have been produced by the " << stepName << " step: " << std::endl;
         log << missingOutputFiles << std::endl << std::endl;
     }
+}
+
+void Debugger::checkTestStepOutput(std::ostream& log, CCodeProject* project, const TestStep& step, const std::string& stepName)
+{
+    checkTestStepOutput(log, project, step.output_files, stepName);
 }
 
 bool Debugger::executeTestStep(std::ostream& log, CCodeProject* project, const TestStep& step, const std::string& stepName, bool enforceResult0)
@@ -2269,16 +2291,17 @@ bool Debugger::executeTestStep(std::ostream& log, CCodeProject* project, const T
             
             std::string resultStr = getTestResult(result);
             
-            log << "output " << i << ":" << std::endl;
+            log << "stdout " << i << ":" << std::endl;
             if(!result.empty())
             {
                 std::string resultLimited = result.length() > 2048 ? result.substr(0, 2048) + "...[[truncated]]" : result;
                 
-                log << resultLimited << std::endl << std::endl;
+                log << "```stdout\n";
+                log << resultLimited << std::endl << "```" << std::endl;
             }
             else
             {
-                log << "Empty output string" << std::endl << std::endl;
+                log << "Empty stdout string" << std::endl << std::endl;
             }
             
             if(finalResult && !expectedResult.empty() && resultStr != expectedResult)
@@ -2299,6 +2322,7 @@ bool Debugger::executeTestStep(std::ostream& log, CCodeProject* project, const T
                         std::cout << "ERROR: invalid stdout regex: " << regexErr << "\n";
                     } else {
                         log << "stdout doesn't fully match the expected regex pattern: " << stdoutRegex << "\n";
+                        log << "Note that PRINT_TEST doesn't print to the stdout, only std::cout does.\n";
                         stepResults = false;
                     }
                 }
@@ -2321,7 +2345,7 @@ bool Debugger::execTestScript(CCodeProject* project,
                               bool instrument)
 {
     std::stringstream debugLogTest;
-    if(test.test.commands.empty())
+    if(test.test.command.empty())
     {
         std::cout << "ERROR: Empty test command!" << std::endl;
         debugLogTest << "ERROR: Empty test command!" << std::endl;
@@ -2342,7 +2366,7 @@ bool Debugger::execTestScript(CCodeProject* project,
     bool testDebug = false;
     bool testResult = false;
     
-    std::string rawCmd = *test.test.commands[0];
+    std::string rawCmd = test.test.command;
     std::string cmd = rawCmd;
     std::string expectedResult;
     std::string stdoutRegex;
@@ -2351,7 +2375,7 @@ bool Debugger::execTestScript(CCodeProject* project,
     debugLogTest << "Test command:" << std::endl << std::endl;
     debugLogTest << "main " << cmd << std::endl << std::endl;
     
-    checkTestStepInput(debugLogTest, project, test.test, "test", true);
+    checkTestStepInput(debugLogTest, project, test.test.input_files, test.test.output_files, "test", true);
     
     int returnCode;
     auto logs = runTest(traceOnlyLog, project, execPath, cmd, m_workingDirectory, 10, instrument, returnCode);
@@ -2359,15 +2383,16 @@ bool Debugger::execTestScript(CCodeProject* project,
     
     std::string consoleLog = logs.second;//getFileContent(m_workingDirectory + "/console.log");
     
-    debugLogTest << "Test command output:\n";
+    debugLogTest << "Test command stdout:\n";
     if(!consoleLog.empty())
     {
         std::string consoleLogLimited = consoleLog.length() > 2048 ? consoleLog.substr(0, 2048) + "...[[truncated]]" : consoleLog;
-        debugLogTest << consoleLogLimited + "\n\n";
+        debugLogTest << "```stdout\n";
+        debugLogTest << consoleLogLimited + "\n```\n";
     }
     else
     {
-        debugLogTest << "Empty output string\n\n";
+        debugLogTest << "Empty stdout string\n\n";
     }
     
     auto line = getFirstLine(m_workingDirectory + "/memo.txt");
@@ -2397,12 +2422,13 @@ bool Debugger::execTestScript(CCodeProject* project,
                 std::cout << "ERROR: invalid stdout regex: " << regexErr << "\n";
             } else {
                 debugLogTest << "stdout doesn't match the expected regex pattern: " << stdoutRegex << "\n";
+                debugLogTest << "Note that PRINT_TEST doesn't print to the stdout, only std::cout does.\n";
                 mainTestPass = false;
             }
         }
     }
     
-    checkTestStepOutput(debugLogTest, project, test.test, "test");
+    checkTestStepOutput(debugLogTest, project, test.test.output_files, "test");
     
     if(!debugAppLog.empty())
     {
@@ -2552,6 +2578,13 @@ void Debugger::runAnalysis(CCodeProject* project, const TestDef& test, RunAnalys
         m_rewardHackingReview.clear();
     }
     
+    if(startsWithIgnoreCase(analysis.debug_notes, "PASS"))
+    {
+        analysis.debug_notes += "\n\n(Feedback from the agent's algorithm: You suggested that all tests pass, but unfortunately ";
+        analysis.debug_notes += "outcomes from the test commands in the last run do not support this. ";
+        analysis.debug_notes += "For more info, have a look at the section 'INFORMATION FROM THE LAST RUN STEP')\n";
+    }
+    
     m_runAnalysisSteps.clear();
     m_runAnalysisStep = 0;
     
@@ -2564,7 +2597,6 @@ void Debugger::runAnalysis(CCodeProject* project, const TestDef& test, RunAnalys
     {
         analysisTrace(project, debugLogTestStr, lldbOnlyLog, analysis, test);
     }
-    
     
     std::string stepProgress = getRunAnalysisProgress();
     analysis.debug_notes = stepProgress;
@@ -4108,7 +4140,7 @@ std::pair<std::string, std::string> Debugger::debugFunction2(CCodeProject* proje
     // Build the executable path and run the LLDB batch
     std::string projDir = project->getProjDir();
     std::string execPath = projDir + "/build/" + getPlatform() + "_test/main";
-    std::string commandLine = buildPrompt(*test.test.commands[0], {{"exec", execPath}});
+    std::string commandLine = buildPrompt(test.test.command, {{"exec", execPath}});
     
     //std::string printEndCmd = "print \\\"[[lldb setup end: " + functionName + "]]\\\"";
     
@@ -4765,7 +4797,7 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
             feedback += "Consult with the source and continue the debugging with another action\n";
         }
         else if(m_nextStep.action_type == "file_info" &&
-                boost_fs::path(m_nextStep.action_subject).filename().string() == "main.cpp")
+                boost_fs::path(m_nextStep.action_subject).stem().string() == "main")
         {
             feedback += "We are currently debugging the unit test for function '" + m_system + "'\n";
             feedback += "The source of the test main function (full main.cpp file) should be available in the 'TEST DESCRIPTION' section. ";
@@ -4778,6 +4810,15 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
             feedback += "When debugging unit tests it is not possible to debug the test main function. ";
             feedback += "Consult with the source and continue the debugging with another action\n";
         }
+    }
+    
+    if((m_nextStep.action_type == "function_info" && m_nextStep.action_subject == "PRINT_TEST") ||
+        (m_nextStep.action_type == "file_info" && boost_fs::path(m_nextStep.action_subject).stem().string() == "PRINT_TEST"))
+    {
+        feedback += "PRINT_TEST is a system-level macro and we can't inspect its source or edit it. ";
+        feedback += "It prints verbose information for the purpose of unit tests and debugging. ";
+        feedback += "It doesn't print to stdout, only to the debug log - the one that can be explored with the 'log_info' action. ";
+        feedback += "For the purpose of regex matching required by the test framwork success checks std::cout has to be used.";
     }
     
     Client::getInstance().selectLLM(InferenceIntent::DEBUG_ANALYSIS);
@@ -4999,7 +5040,7 @@ std::string Debugger::loadTestLogFromStep(CCodeProject* project, const TestDef& 
         bool debug = false;
         bool testResult = false;
         
-        std::string rawCmd = *test.test.commands[0];
+        std::string rawCmd = test.test.command;
         std::string cmd = rawCmd;
         std::string expectedResult;
         std::string stdoutRegex;
@@ -5011,7 +5052,7 @@ std::string Debugger::loadTestLogFromStep(CCodeProject* project, const TestDef& 
         
         std::string consoleLog = getFileContent(m_workingDirectory + "/console.log");
         
-        log += "Test command output:\n";
+        log += "Test command stdout:\n";
         if(!consoleLog.empty())
         {
             std::string consoleLogLimited = consoleLog.length() > 2048 ? consoleLog.substr(0, 2048) + "...[[truncated]]": consoleLog;
@@ -5024,7 +5065,7 @@ std::string Debugger::loadTestLogFromStep(CCodeProject* project, const TestDef& 
         
         
         std::stringstream ssTestInput;
-        checkTestStepInput(ssTestInput, project, test.test, "test", false);
+        checkTestStepInput(ssTestInput, project, test.test.input_files, test.test.output_files, "test", false);
         
         int returnCode = 65535;
         
@@ -5043,7 +5084,7 @@ std::string Debugger::loadTestLogFromStep(CCodeProject* project, const TestDef& 
         }
         
         std::stringstream ssTestOutput;
-        checkTestStepOutput(ssTestOutput, project, test.test, "test");
+        checkTestStepOutput(ssTestOutput, project, test.test.output_files, "test");
         
         std::string returnCodeStr = std::to_string(returnCode);
         bool mainTestPass = true;
@@ -5064,6 +5105,7 @@ std::string Debugger::loadTestLogFromStep(CCodeProject* project, const TestDef& 
                     std::cout << "ERROR: invalid stdout regex: " << regexErr << "\n";
                 } else {
                     log += "stdout doesn't fully match the expected regex pattern: " + stdoutRegex + "\n";
+                    log += "Note that PRINT_TEST doesn't print to the stdout, only std::cout does.\n";
                     mainTestPass = false;
                 }
             }
@@ -5155,6 +5197,7 @@ std::string Debugger::loadTestLogForStep(CCodeProject* project, const TestDef& t
                         std::cout << "ERROR: invalid stdout regex: " << regexErr << "\n";
                     } else {
                         log += "stdout doesn't fully match the expected regex pattern: " + stdoutRegex + "\n";
+                        log += "Note that PRINT_TEST doesn't print to the stdout, only std::cout does.\n";
                         stepResults = false;
                     }
                 }
@@ -6068,18 +6111,17 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         std::string traceLogPath;
         std::string execPath;
         
+        stdoutLogPath = m_workingDirectory + "/stdout.log";
+        traceLogPath = m_workingDirectory + "/trace.txt";
+        
         if(m_system == "main")
         {
-            stdoutLogPath = m_workingDirectory + "/stdout.log";
-            traceLogPath = m_workingDirectory + "/trace.txt";
             execPath = project->getProjDir() + "/build/" + getPlatform() + "_test/main";
         }
         else
         {
             //Unit test
             std::string testWD = project->getProjDir() + "/build_instrumented/source/" + m_system + "/test";
-            stdoutLogPath = testWD + "/stdout.log";
-            traceLogPath = testWD + "/trace.txt";
             execPath = testWD + "/main";
         }
         
@@ -6594,7 +6636,7 @@ bool Debugger::deployToWorkingDirectory(CCodeProject* project, const std::string
     }
 }
 
-bool Debugger::debug(CCodeProject* project,
+std::pair<bool, std::string> Debugger::debug(CCodeProject* project,
                      int stepsCount,
                      const std::string& system,
                      const std::string& testJsonPath,
@@ -6611,7 +6653,7 @@ bool Debugger::debug(CCodeProject* project,
     TestDef test;
     if(deployToWorkingDirectory(project, testJsonPath, true, test))
     {
-        return false;
+        return std::make_pair(false, std::string());
     }
     
     m_sdkPath = stdrave::getSysRoot();
@@ -6688,6 +6730,11 @@ bool Debugger::debug(CCodeProject* project,
     while(debugging && m_step < stepsCount)
     {
         debugging = executeNextStep(project, test);
+        if(m_nextStep.action_type == "stop_unit_test")
+        {
+            break;
+        }
+        
         optimizeTrajectory(project, test);
         saveTrajectory(project, test);
         m_step++;
@@ -6704,7 +6751,7 @@ bool Debugger::debug(CCodeProject* project,
     
     resetTest();
     
-    return result;
+    return std::make_pair(result, m_lastRunTestLog);
 }
 
 bool Debugger::debugPretest(CCodeProject* project,
@@ -7282,7 +7329,6 @@ static bool starts_with(const char* s, const char* prefix) {
     return s && prefix && std::strncmp(s, prefix, std::strlen(prefix)) == 0;
 }
 
-//https://chatgpt.com/c/6948ee3c-f630-8329-96e1-80d392cec8d3
 static std::string getReturnExpression(CXCursor retStmt)
 {
     CXTranslationUnit tu = clang_Cursor_getTranslationUnit(retStmt);

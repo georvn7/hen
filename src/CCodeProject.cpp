@@ -1129,7 +1129,6 @@ namespace stdrave {
             });
     }
 
-    //https://chatgpt.com/c/684df0a6-d9ec-8013-b9a2-a6e4b85af7e9
     std::pair<std::string, std::vector<std::string>>
     CCodeProject::generateTestScript(const std::string& testJsonPath)
     {
@@ -1152,7 +1151,13 @@ namespace stdrave {
             for (auto f : step.input_files)  inputSet.insert(*f);
             for (auto f : step.output_files) outputSet.insert(*f);
         };
-        collect(test.pretest); collect(test.test); collect(test.posttest);
+        
+        collect(test.pretest);
+        
+        for (auto f : test.test.input_files)  inputSet.insert(*f);
+        for (auto f : test.test.output_files) outputSet.insert(*f);
+        
+        collect(test.posttest);
 
         //------------------------------------------------------------------
         // 2.  Compute read-only files = input − output
@@ -1179,6 +1184,35 @@ namespace stdrave {
         }
         sh << "# ------------------------------------------------------------\n\n";
 
+        auto appendCommand = [&](const std::string& tag, const std::string& command)
+        {
+            bool debug = false;
+            bool finalResult = false;
+            std::string strippedCmd = command;
+            std::string expectedResult;
+            std::string stdoutRegex;
+            parsePrefixFlags(command, debug, finalResult, expectedResult, stdoutRegex, strippedCmd);
+            
+            if(finalResult)
+            {
+                strippedCmd += " && printf 'RESULT %d\n' 0 || printf 'RESULT %d\n' \"$?\"";
+            }
+            
+            //copies everything except the exact pattern \"
+            std::string fixed = std::regex_replace(strippedCmd, std::regex(R"(\\")"), "\"");
+            sh << fixed << '\n';
+            
+            if (finalResult && !expectedResult.empty())
+            {
+                sh << "echo \"EXPECTED_RESULT=\\\"" << expectedResult << "\\\"\"\n";
+            }
+            
+            //TODO: Do the actual test and print whether it matches
+            if(finalResult && !stdoutRegex.empty())
+            {
+                sh << "echo \"EXPECTED_STDOUT_MATCH=\\\"" << stdoutRegex << "\\\"\"\n";
+            }
+        };
         // -----------------------------------------------------------------
         // 3a.  SELF-EXTRACTION  (works with the awk bundled on macOS)
         // -----------------------------------------------------------------
@@ -1207,6 +1241,7 @@ namespace stdrave {
             {
                 if (!cmd->empty())
                 {
+#if 0
                     bool debug = false;
                     bool finalResult = false;
                     std::string strippedCmd = *cmd;
@@ -1233,13 +1268,17 @@ namespace stdrave {
                     {
                         sh << "echo \"EXPECTED_STDOUT_MATCH=\\\"" << stdoutRegex << "\\\"\"\n";
                     }
+#else
+                    appendCommand(tag, *cmd);
+#endif
                 }
             }
             sh << '\n';
         };
 
         appendBlock("PRETEST",  test.pretest);
-        appendBlock("TEST",     test.test);
+        //appendBlock("TEST",     test.test);
+        appendCommand("TEST", test.test.command);
         appendBlock("POSTTEST", test.posttest);
 
         return { sh.str(), std::move(readonly) };
@@ -1834,9 +1873,9 @@ namespace stdrave {
                         saveJson(config.to_json(), testDirecotry + "/config.json");
                         
                         bool uintTestPass = false;
-                        bool resetOnce = false;
-                        int stepsCount = 100; //Should be enough for the first unit test smoke test
-                        for(int j=0; j<2; ++j)
+                        bool hasBeenReset = false;
+                        int j=0;
+                        while(j<3)
                         {
                             CCodeNode* ccNode = (CCodeNode*)getNodeByName(test.second);
                             if(!ccNode->unitTestExists())
@@ -1847,13 +1886,15 @@ namespace stdrave {
                             
                             ccNode->storeUnitTestContent();
                             
-                            uintTestPass = Debugger::getInstance().debug(this,
-                                                                         stepsCount,
+                            auto dbgResult = Debugger::getInstance().debug(this,
+                                                                         100,
                                                                          test.second,
                                                                          unitTestPath,
                                                                          std::string(),
                                                                          std::string(),
                                                                          Client::getInstance().getDebugPort());
+                            
+                            uintTestPass = dbgResult.first;
                             
                             if(uintTestPass)
                             {
@@ -1863,13 +1904,7 @@ namespace stdrave {
                             }
                             else
                             {
-                                if(resetOnce)
-                                {
-                                    //This means we skip the unit test :(
-                                    break;
-                                }
                                 //Check if the unit test needs improvements
-                                
                                 Distillery::getInstance().clear();
                                 Distillery::getInstance().loadTrajectory(this, unitTestPath, 0 , -1);
                                 std::string trajectory = Distillery::getInstance().printTrajectory();
@@ -1880,14 +1915,16 @@ namespace stdrave {
                                 std::string fullTestDesc = fullTest.getDescription(publicTestPath);
                                 
                                 captureContext("");
-                                //TODO: THIS REQUIRES SERIOUS TESTING
-                                if(ccNode->unitTestIsBroken(trajectory, fullTestDesc))
+                                
+                                bool isBroken = ccNode->unitTestIsBroken(trajectory, fullTestDesc, dbgResult.second);
+                                bool stopTest = false;
+                                if(isBroken && !hasBeenReset && j < 2)
                                 {
                                     //Destructive hard reset
                                     std::string revertToCommit = resetBranchToBranchedFromCommit(getProjDir() + "/dag", branchName);
                                     assert(revertToCommit == beforeTheUTest);
                                     j=0;
-                                    resetOnce = true;
+                                    hasBeenReset = true;
                                     
                                     //Get pointer to the new node after reload
                                     ccNode = getNodeByName(test.second);
@@ -1896,12 +1933,16 @@ namespace stdrave {
                                     //Directly delete the trajectory as it is unusable
                                     boost_fs::remove_all(trajectoryDir);
                                 }
+                                else
+                                {
+                                    j++;
+                                    stopTest = isBroken;
+                                }
                                 
                                 popContext();
+                                
+                                if(stopTest) break;
                             }
-                            
-                            //After the first unit test smoke test, let's reset to the default steps count
-                            stepsCount = -1;
                         }
                         
                         if(!uintTestPass)
@@ -1916,13 +1957,14 @@ namespace stdrave {
                     std::string trajectoryDirFullTest;
                     archiveTest(publicTestPath, trajectoryDirFullTest);
                     
-                    bool testPass = Debugger::getInstance().debug(this, -1,
+                    auto dbgResult = Debugger::getInstance().debug(this, -1,
                                                                   "main",
                                                                   publicTestPath,
                                                                   privateTestPath,
                                                                   regressionTestPath,
                                                                   Client::getInstance().getDebugPort());
                     
+                    bool testPass = dbgResult.first;
                     if(testPass)
                     {
                         //Distillery::getInstance().distillTrajectory(this, publicTestPath, 0 , -1);

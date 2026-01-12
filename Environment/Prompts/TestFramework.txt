@@ -8,9 +8,13 @@ description - Brief summary of what the test verifies and which parts of the app
 
 pretest - Commands run before application. Typically used to prepare input files or other artifacts consumed by the main test.
 
-test - Main test step, exactly one command (only test.commands[0] will be executed); usually a single invocation of application with the desired command-line arguments.
+test - Main test step, exactly one command, usually a single invocation of application with the desired command-line arguments.
 
 posttest - Commands run after the main test (for example, validation or extra checks).
+
+Each of the test steps (pretest, test, posttest) also has lists with input_files and output_files for that phase. Those files are consumed or produced by the commands in the phase.
+
+The test steps (pretest, test, posttest) must not generate or compile the test driver (main.cpp) the build system will do that implicitly.
 
 Execution order and failure handling
 All commands within pretest and posttest are executed sequentially, in the order they appear in the .json file.
@@ -23,15 +27,20 @@ io_hint - For public tests should be 'none'. For private tests - Short hint show
 
 Each of the commands is described by the following syntax:
 
-For pretest and posttest: [[attributes]] executable arguments
+For pretest and posttest: [[attributes]] executable arguments (the executable is explicit, must be provided)
 
 For test: [[attributes]] arguments (the executable is implicit, must not be included, only arguments, if any, should be provided)
 
 Command attributes are:
+
 result - specifies the expected result. If omitted, exit code is still reported but does not affect pass/fail.
+
 debug - if this flag is present, the executable will be run under lldb, and if it crashes or hangs the resulting logs are captured for debugging.
-stdout - ECMAScript regex to FULLY match expected output. If omitted, output is still captured but does not affect pass/fail.
-Note: Only std::cout is captured for stdout matching. Use PRINT_TEST for diagnostic output—it is stripped from release builds and does not affect test results.
+
+stdout - ECMAScript regex pattern used with std::regex_match to FULLY match expected output. CRLF (\r\n) is normalized to \n. Any \r (without a following \n) is converted to \n. If the attribute is omitted, output is still captured but does not affect pass/fail.
+Note: Only std::cout is captured for stdout matching don't use PRINT_TEST for matcing. Use PRINT_TEST for diagnostic output in the debug log—it is stripped from release builds and does not affect test results.
+Note: The regex in use is ECMAScript with std::regex_match (FULL string) after normalizing newlines to \n; . does not match \n, so .* won’t cross lines or consume a trailing newline—use [\s\S]* (or \n? at the end).
+Example: log "SUCCESS\n" → use ^.*SUCCESS.*\n?$ (not ^.*SUCCESS.*$).
 
 A command is considered failed if any of the following conditions occur:
 - the process exit code does not match the declared result attribute
