@@ -4970,18 +4970,10 @@ bool Debugger::saveTrajectory(CCodeProject* project, const TestDef& test)
     uint32_t allSteps = m_previousSteps + (uint32_t)m_trajectory.size();
     trajectoryCfg.as_object()[U("allSteps")] = json::value::number(allSteps);
     
-    //if(m_nextStep.isInformationRequest())
-    if(m_nextStep.action_type != "run_test")
+    if (m_nextStep.action_type != "run_test" && !m_trajectory.empty() &&
+        m_trajectory.back().m_action == "run_test")
     {
-        //if(!NextDebugStep::isInformationRequest(m_trajectory.back().m_action))
-        if(m_trajectory.back().m_action == "run_test")
-        {
-            m_infoStepsStart = stepIndex;
-        }
-    }
-    else
-    {
-        m_infoStepsStart = -1;
+        m_infoStepsStart = stepIndex + 1;
     }
     
     //Save only the last step from the debug trajectory
@@ -5007,12 +4999,10 @@ bool Debugger::saveTrajectory(CCodeProject* project, const TestDef& test)
             }
         }
         
-        //lastDbgStep.m_infoStepsStart = m_infoStepsStart;
         lastDbgStep.save(dbgStepPath);
     }
     
-    int32_t infoStepsStart = m_infoStepsStart >= 0 ? m_infoStepsStart + 1 : m_infoStepsStart;
-    trajectoryCfg.as_object()[U("infoStepsStart")] = json::value::number(infoStepsStart);
+    trajectoryCfg.as_object()[U("infoStepsStart")] = json::value::number(m_infoStepsStart);
     trajectoryCfg.as_object()[U("lastRunStep")] = json::value::number(m_lastRunStep);
     
     stdrave::saveJson(trajectoryCfg, tracjectoryFile);
@@ -5261,6 +5251,7 @@ bool Debugger::loadTrajectory(CCodeProject* project, const TestDef& test)
     
     //Load trajectory
     uint32_t startStep = m_previousSteps;
+    
     if(m_infoStepsStart > 0 && startStep > m_infoStepsStart) {
         startStep = uint32_t(m_infoStepsStart - 1);
     }
@@ -6621,7 +6612,10 @@ bool Debugger::deployToWorkingDirectory(CCodeProject* project, const std::string
     for(auto file : inputFiles)
     {
         std::string fileName = boost_fs::path(file).filename().string();
-        boost_fs::copy(testJsonDir + "/" + fileName, m_workingDirectory + "/" + fileName);
+        if(boost_fs::exists(testJsonDir + "/" + fileName))
+        {
+            boost_fs::copy(testJsonDir + "/" + fileName, m_workingDirectory + "/" + fileName);
+        }
     }
     
     if(m_system != "main") //Are we in unit test
@@ -9094,7 +9088,7 @@ void Debugger::resetTest()
     m_hasValidBuild = false;
     
     m_actionFeedback.clear();
-    m_infoStepsStart = 0;
+    m_infoStepsStart = -1;
     m_lastRunStep = 0;
     
     m_testFunctionalityDelta.clear();

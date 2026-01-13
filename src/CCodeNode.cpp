@@ -6854,6 +6854,8 @@ namespace stdrave {
         
         inferenceUnitTestDef(improve.str());
         
+        generateUnitTestInputFiles();
+        
         generateUnitTestSource();
         
         compileUnitTestSource();
