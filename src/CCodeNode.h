@@ -332,7 +332,8 @@ public:
     bool compile(int attempts = -1);
 
     void pushUnitTestDef();
-    void defineUnitTest(const std::string& fullTestPath, const std::string& prevFullTestPath, const std::string& recommendation);
+    //void defineUnitTest(const std::string& fullTestPath, const std::string& prevFullTestPath, const std::string& recommendation);
+    void defineUnitTest2(const std::string& fullTestPath, const std::string& prevFullTestPath, const std::string& recommendation);
     void generateUnitTestInputFiles();
     bool reviewUnitTest(const std::string& compileCL, const std::string& feedback, std::string& output);
     bool compileUnitTest();
@@ -340,11 +341,14 @@ public:
     bool unitTestObjectExists();
     std::string validateUnitTestSource();
     bool compileUnitTestSource();
+    bool validateUnitTestRegexContract();
     std::string getUnitTestHeaders();
     void generateUnitTestSource();
     bool linkUnitTest(bool enableSanitizer);
     bool rebuildUnitTest(bool enableSanitizer);
     void buildUnitTest(const std::string& fullTestPath, const std::string& prevFullTestPath, const std::string& recommendation);
+    
+    void implementUnitTest();
     void inferenceUnitTestDef(const std::string& message);
     bool reviewTestResult(const std::string& testCL, const std::string& output);
     void deleteUnitTest();

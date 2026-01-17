@@ -1012,6 +1012,38 @@ bool startsWithIgnoreCase(const std::string &s1, const std::string &s2) {
     return lowerS1.find(lowerS2) == 0;
 }
 
+// Removes: [leading ws] + word + [ws after word]
+// Only if `word` is the first token (after leading whitespace).
+std::string removeFirstWord(const std::string& from, const std::string& word)
+{
+    const auto is_ws = [](char c) -> bool {
+        return std::isspace(static_cast<unsigned char>(c)) != 0;
+    };
+
+    if (word.empty()) return from;
+
+    const std::size_t n = from.size();
+
+    // 1) Skip leading whitespace
+    std::size_t i = 0;
+    while (i < n && is_ws(from[i])) ++i;
+
+    // 2) Must match `word` at the first token position
+    if (i + word.size() > n) return from;
+    if (from.compare(i, word.size(), word) != 0) return from;
+
+    // 3) Ensure token boundary (end or whitespace)
+    const std::size_t k = i + word.size();
+    if (k < n && !is_ws(from[k])) return from;
+
+    // 4) Skip whitespace after the word
+    std::size_t j = k;
+    while (j < n && is_ws(from[j])) ++j;
+
+    return from.substr(j);
+}
+
+
 void setupEnv()
 {
 #if defined(__APPLE__)

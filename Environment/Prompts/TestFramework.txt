@@ -27,9 +27,9 @@ io_hint - For public tests should be 'none'. For private tests - Short hint show
 
 Each of the commands is described by the following syntax:
 
-For pretest and posttest: [[attributes]] executable arguments (the executable is explicit, must be provided)
+For pretest and posttest: [[attributes]] executable arguments
 
-For test: [[attributes]] arguments (the executable is implicit, must not be included, only arguments, if any, should be provided)
+For test: [[attributes]] main arguments (the name of the executable is always 'main', this is the application/unit test being tested)
 
 Command attributes are:
 

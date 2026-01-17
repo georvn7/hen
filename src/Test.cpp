@@ -14,6 +14,16 @@ DEFINE_FIELD(TestCommand, command)
 DEFINE_ARRAY_FIELD(TestCommand, input_files)
 DEFINE_ARRAY_FIELD(TestCommand, output_files)
 
+DEFINE_TYPE(CommandRegex)
+DEFINE_FIELD(CommandRegex, test_step)
+DEFINE_FIELD(CommandRegex, command_index)
+DEFINE_FIELD(CommandRegex, regex_pattern)
+DEFINE_FIELD(CommandRegex, example)
+
+DEFINE_TYPE(TestRegexContract)
+DEFINE_FIELD(TestRegexContract, note)
+DEFINE_ARRAY_FIELD(TestRegexContract, regex_patterns)
+
 DEFINE_TYPE(TestConfig)
 DEFINE_ARRAY_FIELD(TestConfig, ramp)
 DEFINE_FIELD(TestConfig, current)
@@ -47,6 +57,30 @@ void TestCommand::clear()
     output_files.clear();
 }
 
+std::string TestRegexContract::verify()
+{
+    std::string feedback;
+    
+    for(const auto pattern : regex_patterns)
+    {
+        std::string regexErr;
+        if(!fullRegexMatch(pattern->example, pattern->regex_pattern, regexErr))
+        {
+            if (!regexErr.empty()) {
+                //We must not be here
+                feedback += "ERROR: invalid stdout regex: " + regexErr + "\n";
+            }
+            else
+            {
+                feedback += "Unable to fully match regex pattern:\n" + pattern->regex_pattern;
+                feedback += "\nwith example:\n" + pattern->example + "\n\n";
+            }
+        }
+    }
+    
+    return feedback;
+}
+
 std::pair<std::set<std::string>, std::set<std::string>> TestDef::getIOFiles() const
 {
     std::set<std::string> inputFiles;
@@ -66,6 +100,33 @@ std::pair<std::set<std::string>, std::set<std::string>> TestDef::getIOFiles() co
     });
 
     return { std::move(inputFiles), std::move(outputFiles) };
+}
+
+bool TestDef::hasRegexChecks() const
+{
+    bool result = false;
+    
+    forAllSteps([&](const TestStep& step) {
+        for (const auto& cmd : step.commands) {
+            if (!cmd || cmd->empty())
+                continue;
+
+            bool debug = false;
+            bool finalResult = false;
+            
+            std::string rawCmd = *cmd;
+            std::string cmdLn = rawCmd;
+            std::string expectedResult;
+            std::string stdoutRegex;
+            parsePrefixFlags(rawCmd, debug, finalResult, expectedResult, stdoutRegex, cmdLn);
+            if(!stdoutRegex.empty())
+            {
+                result = true;
+            }
+        }
+    });
+    
+    return result;
 }
 
 std::set<std::string> TestDef::getInputFiles() const
@@ -316,7 +377,6 @@ std::string TestDef::validate(bool isPrivate)
         feedback += "\n\nCommands in the pretest and posttest steps must specify executable\n\n";
     }
     
-    //if(test.commands.size() >= 1)
     if(!test.command.empty())
     {
         std::string rawCmd = test.command;
@@ -327,9 +387,9 @@ std::string TestDef::validate(bool isPrivate)
         bool finalResult = false;
         parsePrefixFlags(rawCmd, debug, finalResult, expectedResult, stdoutRegex, cmd);
         
-        if(startsWithIgnoreCase(cmd, "./"))
+        if(!startsWithIgnoreCase(cmd, "main"))
         {
-            feedback += "'test.command' appears to contain an executable name as the first argument. Reminder: the executable for the main 'test' step is provided implicitly.\n";
+            feedback += "For test.command the name of the executable must be 'main'.\n";
         }
         
         if(stdoutRegex.empty() && expectedResult.empty() && posttest.commands.empty())
@@ -337,6 +397,10 @@ std::string TestDef::validate(bool isPrivate)
             feedback += "'test.command' does not check stdout or the exit code, and posttest.commands is empty. ";
             feedback += "Ensure a mechanism is in place to verify the tested behavior.\n";
         }
+    }
+    else
+    {
+        feedback += "test.command can't be an emtpy string, at least the name of the executable must be 'main'.\n";
     }
     
     for(auto outFile : pretest.output_files)

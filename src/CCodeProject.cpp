@@ -1191,7 +1191,13 @@ namespace stdrave {
             std::string strippedCmd = command;
             std::string expectedResult;
             std::string stdoutRegex;
+            
             parsePrefixFlags(command, debug, finalResult, expectedResult, stdoutRegex, strippedCmd);
+            
+            if (tag == "TEST")
+            {
+                strippedCmd = removeFirstWord(strippedCmd, "main");
+            }
             
             if(finalResult)
             {

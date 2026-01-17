@@ -4341,9 +4341,10 @@ namespace stdrave {
         sout << "\n```" << std::endl;
         
         std::string summary = sout.str();
-        proj->pushMessage(summary, "user", true);
+        proj->pushMessage(summary, "assistant", true);
     }
 
+#if 0
     void CCodeNode::defineUnitTest(const std::string& fullTestPath, const std::string& prevFullTestPath, const std::string& recommendation)
     {
         TestDef fullTestDef;
@@ -4463,6 +4464,7 @@ namespace stdrave {
         captureContext();
         pushUnitTestDef();
     }
+#endif
 
     void CCodeNode::generateUnitTestInputFiles()
     {
@@ -4617,11 +4619,23 @@ namespace stdrave {
             otherNotes += "Use PRINT_TEST for diagnostic output during debugging—it does not appear in stdout.\n";
         }
         
+        std::string regexContractJson;
+        if(m_unitTest.definition.hasRegexChecks())
+        {
+            regexContractJson += "\n\nTEST REGEX CONTRACT DEFINITION\n";
+            regexContractJson += "\n```json\n";
+            regexContractJson += utility::conversions::to_utf8string(m_unitTest.regex_contract.to_json().serialize());
+            regexContractJson += "\n```\n\n";
+            regexContractJson += "Sometimes the regex patterns from the contract could be different from the patterns from the test. ";
+            regexContractJson += "If so, use the patterns from the contract as they have been tested to fully match the provided examples in the contract\n\n";
+        }
+        
         std::set<std::string> referencedNodes;
         std::string dataDef = getDataTypes(false, referencedNodes);
         std::string implement_test = proj->implement_test.prompt({
             {"function", m_brief.func_name},
-            {"other_notes", otherNotes}
+            {"other_notes", otherNotes},
+            {"regex_contract", regexContractJson},
         });
         
         std::string source = "cpp";
@@ -5012,6 +5026,106 @@ namespace stdrave {
         return feedback;
     }
 
+    bool CCodeNode::validateUnitTestRegexContract()
+    {
+        if(!m_unitTest.definition.hasRegexChecks())
+        {
+            return false;
+        }
+        
+        CCodeProject* proj = (CCodeProject*)Client::getInstance().project();
+        
+        Prompt contract("RegexContractDefinition.txt", {
+            //TODO: bind strings here
+        });
+        
+        std::string cache = "";
+        
+        std::string prompt = contract.str();
+        
+        captureContext();
+        
+        captureContext();
+        inference(cache, prompt, &m_unitTest.regex_contract);
+        popContext();
+        
+        pushMessage(prompt, "user");
+        
+        prompt = m_unitTest.regex_contract.verify();
+        
+        uint32_t attempts = 0;
+        while(!prompt.empty() && attempts < 5)
+        {
+            captureContext();
+            
+            std::string regexContractJson = "```json\n";
+            regexContractJson += utility::conversions::to_utf8string(m_unitTest.regex_contract.to_json().serialize());
+            regexContractJson += "\n```\n";
+            pushMessage(regexContractJson, "assistant");
+         
+            prompt += "\n\nProvide updated version of the regex contract addressing the mentioned problems!\n\n";
+            inference(cache, prompt, &m_unitTest.regex_contract);
+            prompt = m_unitTest.regex_contract.verify();
+            
+            popContext();
+            
+            attempts++;
+        }
+        
+        popContext();
+        
+#if 0
+        bool fullyMatch = true;
+        
+        TestDef oldDef = m_unitTest.definition;
+        if(attempts <= 5)
+        {
+            for(auto pattern : m_unitTest.regex_contract.regex_patterns)
+            {
+                //pattern->command_index
+                if(pattern->test_step == "pretest")
+                {
+                    if(m_unitTest.definition.pretest.commands.size() < pattern->command_index)
+                    {
+                        std::string rawCmd = *m_unitTest.definition.pretest.commands[pattern->command_index];
+                        
+                        bool debug = false;
+                        bool finalResult = false;
+                        
+                        std::string cmd = rawCmd;
+                        std::string expectedResult;
+                        std::string stdoutRegex;
+                        parsePrefixFlags(rawCmd, debug, finalResult, expectedResult, stdoutRegex, cmd);
+                        
+                        if(stdoutRegex.empty())
+                        {
+                            fullyMatch = false;
+                            break;
+                        }
+                        
+                        m_unitTest.regex_contract.pa
+                    }
+                }
+                else if(pattern->test_step == "test")
+                {
+                    
+                }
+                else if(pattern->test_step == "posttest")
+                {
+                    
+                }
+                else
+                {
+                    fullyMatch = false;
+                    break;
+                }
+            }
+        }
+#endif
+        
+        return true;
+    }
+
     bool CCodeNode::compileUnitTestSource()
     {
         CCodeProject* proj = (CCodeProject*)Client::getInstance().project();
@@ -5241,6 +5355,181 @@ namespace stdrave {
         if(!wasOnAuto) Client::getInstance().stop();
     }
 
+    void CCodeNode::defineUnitTest2(const std::string& fullTestPath, const std::string& prevFullTestPath, const std::string& recommendation)
+    {
+        TestDef fullTestDef;
+        fullTestDef.load(fullTestPath + "/test.json");
+        
+        Client& client = Client::getInstance();
+        CCodeProject* proj = (CCodeProject*)client.project();
+        
+        Client::getInstance().selectLLM(InferenceIntent::DEBUG_ANALYSIS);
+        
+        captureContext();
+        
+        std::string buildSourcePath = getNodeBuildSourcePath();
+        std::string buildDir = proj->getProjDir() + "/build";
+        std::string nodeDir = buildDir + "/" + buildSourcePath;
+        std::string testDir = nodeDir + "/test";
+        std::string platform = getPlatform() + "_test";
+        
+        CCodeNode* parent = nullptr;
+        std::string parentCtx;
+        std::set<std::string> referencedNodes;
+        if(m_this->m_parent)
+        {
+            parent = (CCodeNode*)m_this->m_parent->m_data;
+            assert(parent);
+            
+            parentCtx = "\nAlso, this function will be called by the '";
+            parentCtx += parent->m_brief.func_name;
+            parentCtx += "' and here is more information about that function:\n";
+            parentCtx += parent->getContexInfo(true, true, false, referencedNodes);
+        }
+        
+        std::string functionCtx = getContexInfo(true, false, false, referencedNodes);
+        
+        std::string testFrameworkMan = getFileContent(client.getEnvironmentDir() + "/Prompts/TestFramework.txt");
+        
+        std::string systemData = proj->getHighLevelAppInfo("main", 3, 3);
+        
+        systemData += "\n\nSome of the above functions are designated as subsystems and as such ";
+        systemData += "require a precise contract defining dataflow, ownership, and initialization\n\n";
+        
+        std::string fullTest = fullTestDef.getDescription(fullTestPath);
+        std::string prevFullTest;
+        std::string prevFullTestNote;
+        if(!prevFullTestPath.empty())
+        {
+            TestDef prevFullTestDef;
+            prevFullTestDef.load(prevFullTestPath + "/test.json");
+            
+            prevFullTest += "\n\nPREVIOUS FULL APPLICATION TEST (SUCCEEDED)\n\n";
+            prevFullTest += prevFullTestDef.getDescription(prevFullTestPath) + "\n\n";
+
+            prevFullTestNote += "\n\nNote - the previous full test passed. When generating this unit test, ";
+            prevFullTestNote += "consider which features—both existing and newly added—are relevant to its scope. ";
+            prevFullTestNote += "Among relevant features, prioritize coverage of new additions; ";
+            prevFullTestNote += "they are the most likely source of issues, though regressions remain possible.\n\n";
+        }
+        
+        std::string recoNote;
+        if(!recommendation.empty())
+        {
+            recoNote = "\n\nAnalysis form the most recent session debugging the test '" + fullTestDef.name + "' is provided above. ";
+            recoNote += "Consult the analysis and recommendations and, if it makes sense, ";
+            recoNote += "prioritize unit testing the features currently blocking the full application test from passing.\n";
+            recoNote += "The recommendation and analysis might sound more general-purpose or to suggest a specific unsupported workflow ";
+            recoNote += "but you need to adapt them to our unit tests specification (see the manual)\n\n";
+        }
+        
+        std::string unitTestName = fullTestDef.name + "_" + getName();
+        std::string defineTest = proj->define_test.prompt({
+            {"function", m_brief.func_name},
+            {"function_ctx", functionCtx},
+            {"full_test", fullTest},
+            {"prev_full_test", prevFullTest},
+            {"prev_full_test_note", prevFullTestNote},
+            {"recommendation", recommendation},
+            {"recommendation_note", recoNote},
+            {"system_data", systemData},
+            {"test_framework_manual", testFrameworkMan},
+            {"parent_ctx", parentCtx},
+            {"test_name", unitTestName}
+        });
+        
+        inferenceUnitTestDef(defineTest);
+        
+        popContext();
+        
+        proj->pushMessage(defineTest, "user", true);
+    }
+
+    void CCodeNode::implementUnitTest()
+    {
+        CCodeProject* proj = (CCodeProject*)Client::getInstance().project();
+        
+        std::string buildSourcePath = getNodeBuildSourcePath();
+        std::string buildDir = proj->getProjDir() + "/build";
+        std::string nodeDir = buildDir + "/" + buildSourcePath;
+        std::string testDir = nodeDir + "/test";
+        std::string platform = getPlatform() + "_test";
+        
+        //If we have parent, that means we need to build special unit test executable
+        //If there is no parent, that means we are building the 'main' exectuable
+        //and we are going only to generate test description and input files
+        CCodeNode* parent = nullptr;
+        if(m_this->m_parent)
+        {
+            parent = (CCodeNode*)m_this->m_parent->m_data;
+            assert(parent);
+        }
+        
+        std::string pretestLog;
+        bool pretestOK = true;
+        uint32_t fixPretestAttempts = 0;
+        
+        std::string defineTestMsg;
+        
+        do
+        {
+            captureContext();
+            
+            pushUnitTestDef();
+            
+            validateUnitTestRegexContract();
+            
+            generateUnitTestInputFiles();
+            
+            if(parent) //parent == nullptr means compiling the main
+            {
+                if(!compileUnitTest())
+                {
+                    std::cout << "Unable to compile unit test for function: " << getName() << std::endl << std::endl;
+                }
+            }
+            
+            if(m_unitTest.definition.pretest.commands.size() > 0)
+            {
+                storeUnitTestContent();
+                
+                pretestOK = Debugger::getInstance().debugPretest(proj, getName(), testDir, pretestLog);
+                if(!pretestOK)
+                {
+                    std::string defineTestMsg = "Execution of the pretest step for unit test '" + m_unitTest.definition.name + "' exits with error:\n\n";
+                    defineTestMsg += pretestLog + "\n\n";
+                    defineTestMsg += "Consider to fix and redefine the unit test to avoid this! ";
+                    defineTestMsg += "Then, if necessary, we can reimplement the test's main.cpp and the input files (if any)\n";
+                    defineTestMsg += "Reminder that the test steps (pretest, test, posttest) must not generate, compile and list as input/outut file ";
+                    defineTestMsg += "the test driver (main.cpp). The build system will generate and compile that file implicitly.\n";
+                    defineTestMsg += "Note: I'm not asking here for the content of the test main.cpp or any of the input files. ";
+                    defineTestMsg += "In the test description, you can specify the test, describe the test cases and the required input files ";
+                    defineTestMsg += "(if any, excluding the test driver main.cpp) as explained in the test framework manual. ";
+                    defineTestMsg += "Then, based on the test description, in a next phase, we will define the content of the main.cpp and any input files\n\n";
+                    
+                    
+                    fixPretestAttempts++;
+                    
+                    captureContext();
+                    inferenceUnitTestDef(defineTestMsg);
+                    popContext();
+                }
+            }
+            
+            popContext();
+        }
+        while(!pretestOK && fixPretestAttempts < 5);
+        
+        if(fixPretestAttempts >= 5)
+        {
+            std::cout << "Unable to verify the pretest step for the unit test for function: " << getName() << std::endl << std::endl;
+        }
+        
+        pushUnitTestDef();
+        
+        linkUnitTest(true);
+    }
+
     void CCodeNode::buildUnitTest(const std::string& fullTestPath, const std::string& prevFullTestPath, const std::string& recommendation)
     {
         CCodeProject* proj = (CCodeProject*)Client::getInstance().project();
@@ -5266,12 +5555,16 @@ namespace stdrave {
         
         proj->generateDataHeader();
 
-        captureContext();//Start unit test definition
+        captureContext();
         
         boost_fs::create_directories(testDir);
         
-        defineUnitTest(fullTestPath, prevFullTestPath, recommendation);
+        defineUnitTest2(fullTestPath, prevFullTestPath, recommendation);
         
+#if 1
+        implementUnitTest();
+        popContext();
+#else
         std::string pretestLog;
         bool pretestOK = true;
         uint32_t fixPretestAttempts = 0;
@@ -5333,6 +5626,7 @@ namespace stdrave {
         
         popContext(); //Pop the last unit test definition
         popContext(); //Pop back to "Start unit test definition"
+#endif
         
         saveJson(m_unitTest.definition.to_json(), testDir + "/test.json");
         
@@ -6852,8 +7146,14 @@ namespace stdrave {
         
         deleteUnitTest(); //Ensure we first delete the old one
         
+        captureContext();
         inferenceUnitTestDef(improve.str());
+        popContext();
         
+        pushMessage(improve.str(), "user");
+#if 1
+        implementUnitTest();
+#else
         generateUnitTestInputFiles();
         
         generateUnitTestSource();
@@ -6861,6 +7161,7 @@ namespace stdrave {
         compileUnitTestSource();
         
         linkUnitTest(true);
+#endif
     
         return true;
     }

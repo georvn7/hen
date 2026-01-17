@@ -22,11 +22,31 @@ class TestCommand : public Reflection<TestCommand>
 {
 public:
     DECLARE_TYPE(TestCommand, "Description")
-    DECLARE_FIELD(std::string, command, "Command to execute, only command arguments, without executable")
+    DECLARE_FIELD(std::string, command, "Command to execute, the name of the executable must be 'main'.")
     DECLARE_ARRAY_FIELD(std::string, input_files, "Read-only, input files used as command line arguments for this command")
     DECLARE_ARRAY_FIELD(std::string, output_files, "Files produced by the command")
     
     void clear();
+};
+
+class CommandRegex : public Reflection<CommandRegex>
+{
+public:
+    DECLARE_TYPE(CommandRegex, "Regex contract for a single command from the test")
+    DECLARE_ENUM_FIELD(test_step, "\"pretest\",\"test\",\"posttest\"","For which test step is this regex pattern")
+    DECLARE_FIELD(uint32_t, command_index, "For which command int the test step is this regex pattern.")
+    DECLARE_FIELD(std::string, regex_pattern, "The ECMAScript regex pattern that will be fully matched with the command stdout")
+    DECLARE_FIELD(std::string, example, "Verification example that matches with the regex pattern")
+};
+
+class TestRegexContract : public Reflection<TestRegexContract>
+{
+public:
+    DECLARE_TYPE(TestRegexContract, "Regex contract all commands in the test")
+    DECLARE_FIELD(std::string, note, "Concise one or two sentences note about kind of gotchas related to the regex pattern the agent need to be careful when implementing and debugging the test")
+    DECLARE_ARRAY_FIELD(CommandRegex, regex_patterns, "For all commands with regex match check.")
+    
+    std::string verify();
 };
 
 class TestDef : public Reflection<TestDef>
@@ -88,6 +108,7 @@ public:
     std::string m_lastResult;
     
     bool load(const std::string& jsonPath);
+    bool hasRegexChecks() const;
 };
 
 class TestConfig : public Reflection<TestConfig>
@@ -108,6 +129,7 @@ public:
     DECLARE_FIELD(TestDef, definition, "Fully describes the unit test, its behavior, whether it needs command line arguments and input files");
     DECLARE_FIELD(std::string, implementation, "Description")
     DECLARE_ARRAY_FIELD(File, input_files, "Description")
+    DECLARE_FIELD(TestRegexContract, regex_contract, "Regex contract for this unit test")
     
     void clear();
     std::string getDescription();

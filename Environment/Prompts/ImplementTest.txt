@@ -9,6 +9,7 @@ In the source of unit test implementation you must not include any header files.
 - Assume function declaration and data definitions required by '[[function]]' are included with the headers. No need to declare the function '[[function]]' or define any data types this function use
 - Do not define or declare functions and data types defined by the application in the test source
 [[other_notes]]
+[[regex_contract]]
 
 Provide the code in your response in markdown syntax. Prefix the C++ source code with ```cpp and postfix the code in your response with ```
 

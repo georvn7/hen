@@ -1,0 +1,27 @@
+REGEX CONTRACT DEFINITION
+
+Before implementing any test with stdout regex matching, define a TestRegexContract. The example string will be validated against the pattern using std::regex_match. If validation fails, you must revise until it passes.
+
+How Matching Works:
+
+Newlines are normalized before matching: CRLF and lone CR become \n. Your patterns should only use \n, never \r.
+
+Matching uses std::regex_match (ECMAScript). This is FULL STRING match: the entire output must be consumed. Pattern "OK" will NOT match output "OK\n".
+
+Critical Gotchas:
+
+The . metacharacter does not match \n. This means .* stops at newlines and cannot consume a trailing \n. Use [\s\S]* to match across lines, or end patterns with \n? to absorb an optional final newline.
+
+Escape metacharacters when matching literals: . ( ) [ ] + * ? become . ( ) [ ] + * ?
+
+JSON escaping: regex \n is written \n in JSON. Literal backslash \ becomes \\ in JSON.
+
+Empty stdout: use ^$ or empty pattern.
+
+The note field must concisely reference only the gotchas present in your patterns.
+
+Example:
+For stdout "Result: 42\nDone\n":
+regex_pattern: Result: \d+\nDone\n?
+example: Result: 42\nDone\n
+note: \n? for optional trailing newline; \d+ matches any integer

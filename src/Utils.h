@@ -968,6 +968,7 @@ namespace stdrave {
     std::string getLANIP();
     web::json::value findInJson(const web::json::value& object, const std::string& propertyPath);
     bool startsWithIgnoreCase(const std::string &s1, const std::string &s2);
+    std::string removeFirstWord(const std::string& from, const std::string& word);
     void setupEnv();
     std::string buildPrompt(const std::string& content, const std::map<std::string, std::string>& params);
     bool addToSet(std::vector<std::shared_ptr<std::string>>& vset, const std::string& element);

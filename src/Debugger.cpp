@@ -2047,6 +2047,19 @@ std::string Debugger::getTestDescription(CCodeProject* project, const TestDef& t
         m_unitTestSource += "\n```cpp\n";
         m_unitTestSource += printLineNumbers(getFileContent(unitTestFile), 0);
         m_unitTestSource += "\n```\n\n";
+        
+        if(test.hasRegexChecks())
+        {
+            CCodeNode* testedNode = project->getNodeByName(m_system);
+            std::string regexContract = utility::conversions::to_utf8string(testedNode->m_unitTest.regex_contract.to_json().serialize());
+            m_unitTestSource += "Some of the commands in the test use regex patterns to FULLY match the stdout. ";
+            m_unitTestSource += "Here is the regex contract with tested examples\n\n";
+            m_unitTestSource += "\n```json\n";
+            m_unitTestSource += regexContract;
+            m_unitTestSource += "\n```\n";
+            m_unitTestSource += "Sometimes the regex patterns from the contract contract could be different from the patterns from the test. ";
+            m_unitTestSource += "If so, use the patterns from the contract as the have been tested to fully match the provided examples in the contract\n\n";
+        }
     }
     else
     {
@@ -2378,7 +2391,9 @@ bool Debugger::execTestScript(CCodeProject* project,
     checkTestStepInput(debugLogTest, project, test.test.input_files, test.test.output_files, "test", true);
     
     int returnCode;
-    auto logs = runTest(traceOnlyLog, project, execPath, cmd, m_workingDirectory, 10, instrument, returnCode);
+    
+    std::string cmdArgsOnly = removeFirstWord(cmd, "main");
+    auto logs = runTest(traceOnlyLog, project, execPath, cmdArgsOnly, m_workingDirectory, 10, instrument, returnCode);
     debugAppLog = logs.first;
     
     std::string consoleLog = logs.second;//getFileContent(m_workingDirectory + "/console.log");
