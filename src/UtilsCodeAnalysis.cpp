@@ -563,6 +563,84 @@ uint32_t findSharedPointersInType(const std::string& dataType)
     return (uint32_t)occurences.size();
 }
 
+bool hasSharedPtrToStdNamespace(const std::string& typeStr)
+{
+    const auto toks = formatCppNamespaces(typeStr);
+
+    for (size_t i = 0; i < toks.size(); ++i)
+    {
+        if (toks[i] != "shared_ptr")
+            continue;
+
+        size_t j = i + 1;
+
+        // Require at least one '|' right after shared_ptr (this corresponds to '<' in normal C++)
+        bool sawPipe = false;
+        while (j < toks.size() && toks[j] == "|") {
+            sawPipe = true;
+            ++j;
+        }
+        if (!sawPipe)
+            continue;
+
+        // Now the pointee must begin with std::
+        if (j + 1 < toks.size() && toks[j] == "std" && toks[j + 1] == "::")
+            return true;
+    }
+
+    return false;
+}
+
+bool hasSharedPtrToListedStdType(const std::string& typeStr,
+                                 const std::unordered_set<std::string>& stlTypesNoStd,
+                                 std::string* matchedType /*= nullptr*/)
+{
+    const auto toks = formatCppNamespaces(typeStr);
+
+    const auto isQualifierTok = [](const std::string& t) -> bool {
+        // Keep this small; extend if needed.
+        return t == "const" || t == "volatile" || t == "struct" || t == "class" ||
+               t == "typename" || t == "signed" || t == "unsigned";
+    };
+
+    for (size_t i = 0; i < toks.size(); ++i)
+    {
+        if (toks[i] != "shared_ptr")
+            continue;
+
+        size_t j = i + 1;
+
+        // Require at least one pipe (your '<' becomes '|')
+        bool sawPipe = false;
+        while (j < toks.size() && toks[j] == "|") { sawPipe = true; ++j; }
+        if (!sawPipe) continue;
+
+        // Skip qualifiers like const/volatile after '<'
+        while (j < toks.size() && isQualifierTok(toks[j])) ++j;
+
+        // Allow optional leading global scope "::"
+        if (j < toks.size() && toks[j] == "::") ++j;
+
+        // Need "std" "::"
+        if (j + 1 >= toks.size()) continue;
+        if (toks[j] != "std" || toks[j + 1] != "::") continue;
+
+        // Next token is the std type name (e.g. vector, string, optional, etc.)
+        const size_t k = j + 2;
+        if (k >= toks.size()) continue;
+
+        const auto& typeName = toks[k];
+        if (stlTypesNoStd.find(typeName) != stlTypesNoStd.end())
+        {
+            if (matchedType) *matchedType = typeName;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
 std::vector<std::string> splitArguments(const std::string& args) {
     std::vector<std::string> result;
     std::string current;

@@ -2196,6 +2196,59 @@ void CCodeNode::reflectFunction()
         m_stats.m_containerWithValuesReportsCount++;
     }
     
+    {
+        std::set<std::string> typesWithSmartPointersFromSTDtypes;
+        std::set<std::string> typesWithMoreSmartPointers;
+        
+        if(findSharedPointersInType(m_prototype.m_signature.returnType) > 1)
+        {
+            typesWithMoreSmartPointers.insert(m_prototype.m_signature.returnType);
+        }
+        
+        if(hasSharedPtrToListedStdType(m_prototype.m_signature.returnType, CCodeProject::getStdContainers()))
+        {
+            typesWithSmartPointersFromSTDtypes.insert(m_prototype.m_signature.returnType);
+        }
+        
+        for(auto arg : m_prototype.m_signature.argumentTypes)
+        {
+            if(findSharedPointersInType(arg) > 1)
+            {
+                typesWithMoreSmartPointers.insert(arg);
+            }
+            
+            if(hasSharedPtrToListedStdType(arg, CCodeProject::getStdContainers()))
+            {
+                typesWithSmartPointersFromSTDtypes.insert(arg);
+            }
+        }
+        
+        if(!typesWithSmartPointersFromSTDtypes.empty())
+        {
+            m_codeReview << "The following types have STD containers that are accessed with std::shared_ptr:\n";
+            m_codeReview << getAsCsv(typesWithSmartPointersFromSTDtypes) + "\n";
+            m_codeReview << defineStructMembersHint;
+            m_codeReview << "Please consider the above requirements when deciding how to define function argument for '";
+            m_codeReview << m_brief.func_name << "' ";
+            m_codeReview << "STL containers shouldn't be accessed with smart pointers" << std::endl;
+            
+            needNewSignature = true;
+            defineStructMembersHint = defineStructMembersHintRef;
+        }
+        
+        if(typesWithMoreSmartPointers.empty())
+        {
+            m_codeReview << "The following types have more than one std::shared_ptr:\n";
+            m_codeReview << getAsCsv(typesWithMoreSmartPointers);
+            m_codeReview << defineStructMembersHint;
+            m_codeReview << "Please consider the above requirements when deciding how to define function argument for '";
+            m_codeReview << m_brief.func_name << "' ";
+            m_codeReview << "Types shouldn't have more than one std::shared_ptr" << std::endl;
+            needNewSignature = true;
+            defineStructMembersHint = defineStructMembersHintRef;
+        }
+    }
+    
 #ifdef RESTRICT_STL_TYPES
     if(!restrictedSTDTypes.empty())
     {
@@ -2960,6 +3013,14 @@ void CCodeNode::reviewData(const std::string& source, const std::string& typeNam
                     if(findSharedPointersInType(member.second) > 1)
                     {
                         typesWithMorePointers.insert(member.second);
+                    }
+                    
+                    if(hasSharedPtrToListedStdType(member.second, CCodeProject::getStdContainers()))
+                    {
+                        std::string stdTypeWithPointer = member.second + " ";
+                        stdTypeWithPointer += member.first + ";";
+                        
+                        stdTypesWithPointers.insert(stdTypeWithPointer);
                     }
                     
                     for(auto appTypeInMemeber : memberTypes)

@@ -28,6 +28,10 @@ bool isContainerWithAppValues(const std::string& dataType);
 bool isIteratorWithAppValues(const std::string& dataType);
 std::vector<std::pair<uint32_t, std::string>> findAllOccurrences(const std::string& str, const std::string& regexPattern);
 uint32_t findSharedPointersInType(const std::string& dataType);
+bool hasSharedPtrToStdNamespace(const std::string& typeStr);
+bool hasSharedPtrToListedStdType(const std::string& typeStr,
+                                 const std::unordered_set<std::string>& stlTypesNoStd,
+                                 std::string* matchedType = nullptr);
 
 std::set<std::string> getFullSTDTypesForFunction(const ParsedFunction& signature);
     
