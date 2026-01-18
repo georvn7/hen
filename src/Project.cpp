@@ -273,16 +273,15 @@ namespace stdrave {
 
     void Project::clear()
     {
-        pools.clear();
+        // Drop graph links and owned DAG nodes first
+        m_dag.clear();
+
+        // Drop node index
         m_nodeMap.clear();
-        
-        if(m_dag.m_root)
-        {
-            //This should delete all nodes recursively
-            delete m_dag.m_root;
-        }
-        m_dag.m_root = nullptr;
-        
+
+        // Now it’s safe to drop pooled allocations (Nodes / FunctionItem / etc.)
+        pools.clear();
+
         m_stats = web::json::value();
     }
 

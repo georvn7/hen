@@ -24,7 +24,11 @@ T* Project::shareNode(const std::string& name, const Node* parent)
             newDAGNode->m_enalbedForTraversal = false;
         }
         
-        return static_cast<T*>(it->second);
+        //return static_cast<T*>(it->second);
+        
+        T* typed = dynamic_cast<T*>(it->second);
+        if (!typed) throw std::runtime_error("shareNode type mismatch for: " + name);
+        return typed;
     }
     else
     {

@@ -6819,7 +6819,7 @@ namespace stdrave {
                 return true; // keep path intact on success
 
             // Traverse outgoing call edges.
-            for (auto call : node->m_calls.items) {
+            for (const auto& call : node->m_calls.items) {
                 if (!call) continue;
 
                 const stdrave::CCodeNode* next = resolve(call->func_name);

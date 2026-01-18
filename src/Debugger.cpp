@@ -6640,6 +6640,8 @@ bool Debugger::deployToWorkingDirectory(CCodeProject* project, const std::string
             return false;
         }
         
+        boost_fs::remove(m_workingDirectory + "/main.cpp");
+        
         //Copy the main.cpp for the unit test
         boost_fs::copy(testJsonDir + "/main.cpp", m_workingDirectory + "/main.cpp");
     }

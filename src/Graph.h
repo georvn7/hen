@@ -13,85 +13,76 @@ namespace stdrave {
     class DAGNode {
     public:
         T m_data;
-        DAGNode<T>* m_parent;
-        std::vector< DAGNode<T>* > m_children;
-        bool m_enalbedForTraversal;
+        DAGNode<T>* m_parent = nullptr;
+        std::vector<DAGNode<T>*> m_children;
+        bool m_enalbedForTraversal = true;
 
-        DAGNode(const T& data) :
-        m_data(data),
-        m_parent(nullptr),
-        m_enalbedForTraversal(true) {}
-        ~DAGNode()
-        {
-            for(auto child : m_children)
-            {
-                delete child;
-            }
-            m_children.clear();
-        }
+        explicit DAGNode(const T& data) : m_data(data) {}
+
+        // IMPORTANT: DAGraph owns nodes; DAGNode must NOT delete children
+        ~DAGNode() = default;
 
         void addChild(DAGNode<T>* child) {
             m_children.push_back(child);
             child->m_parent = this;
         }
-        
-        void removeChild(DAGNode<T>* child)
-        {
-            // Find the child in the m_children vector
+
+        void removeChild(DAGNode<T>* child) {
             auto it = std::find(m_children.begin(), m_children.end(), child);
-            if (it != m_children.end())
-            {
-                // Remove the child from the vector
+            if (it != m_children.end()) {
                 m_children.erase(it);
                 child->m_parent = nullptr;
-                delete child;
+                // DO NOT delete child (DAGraph owns it)
             }
         }
-        
+
         DAGNode<T>* getNextChild(std::set<DAGNode<T>*>& visited);
-        
-        DAGNode<T>* getChild(const std::string& name)
-        {
-            //TODO: Rethink the node:name association. Consider mapping names to nodes
-            for(auto child : m_children)
-            {
-                if(child->m_data->getName() == name)
-                {
+        DAGNode<T>* getChild(const std::string& name) {
+            for (auto* child : m_children) {
+                if (child && child->m_data && child->m_data->getName() == name)
                     return child;
-                }
             }
-            
             return nullptr;
         }
     };
 
     template<typename T>
-    class DAGraph 
-    {
+    class DAGraph {
     public:
-    
+        using NodeT = DAGNode<T>;
 
-    public:
-        DAGNode<T>* m_root;
-
-        DAGraph() : m_root(nullptr) {}
-
-        void depthFirstTraversal(DAGNode<T>* node, std::function<void(DAGNode<T>*, DAGraph<T>&)> visitCallback,
-            std::function<void(DAGNode<T>*)> postVisitCallback);
-        void depthFirstTraversal(DAGNode<T>* node, std::function<void(DAGNode<T>*, DAGraph<T>&)> visitCallback);
-        
-        void depthFirstTraversalWithRefs(DAGNode<T>* node, std::function<void(DAGNode<T>*, DAGraph<T>&)> visitCallback,
-            std::function<void(DAGNode<T>*)> postVisitCallback);
-        void depthFirstTraversalWithRefs(DAGNode<T>* node, std::function<void(DAGNode<T>*, DAGraph<T>&)> visitCallback);
-
-        DAGNode<T>* newNode(DAGNode<T>* parentNode, const T& data) {
-            DAGNode<T>* newNode = new DAGNode<T>(data);
-            if (parentNode)
-            {
-                parentNode->addChild(newNode);
-            }
-            return newNode;
+        NodeT* newNode(NodeT* parent, const T& data) {
+            owned_.emplace_back(new NodeT(data));
+            NodeT* n = owned_.back().get();
+            if (parent) parent->addChild(n);
+            else m_root = n;
+            return n;
         }
+
+        void clear() {
+            owned_.clear();
+            m_root = nullptr;
+        }
+
+        // NOTE: 3rd arg is ONLY the node (matches your Graph.hpp)
+        void depthFirstTraversal(NodeT* node,
+                                 std::function<void(NodeT*, DAGraph<T>&)> visitCallback,
+                                 std::function<void(NodeT*)> postVisitCallback);
+
+        void depthFirstTraversal(NodeT* node,
+                                 std::function<void(NodeT*, DAGraph<T>&)> visitCallback);
+
+        void depthFirstTraversalWithRefs(NodeT* node,
+                                         std::function<void(NodeT*, DAGraph<T>&)> visitCallback,
+                                         std::function<void(NodeT*)> postVisitCallback);
+
+        void depthFirstTraversalWithRefs(NodeT* node,
+                                         std::function<void(NodeT*, DAGraph<T>&)> visitCallback);
+
+        NodeT* m_root = nullptr;
+
+    private:
+        std::vector<std::unique_ptr<NodeT>> owned_;
     };
 
     class Graph {

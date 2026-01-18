@@ -259,14 +259,14 @@ std::string TestDef::validateIOFiles()
             
             if(disabledNames.find(baseName(*file)) != disabledNames.end())
             {
-                feedback += baseName(*file) + " ";
+                feedback += *file + " ";
             }
         }
         for (const auto& file : step.output_files) {
             
             if(disabledNames.find(baseName(*file)) != disabledNames.end())
             {
-                feedback += baseName(*file) + " ";
+                feedback += *file + " ";
             }
         }
     });

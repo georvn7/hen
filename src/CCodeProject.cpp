@@ -2544,11 +2544,12 @@ namespace stdrave {
     void CCodeProject::reload()
     {
         clear();
-        
+
         CCodeNode* root = shareNode<CCodeNode>(m_description.func_name, nullptr);
-        m_dag.m_root = new DAGNode<Node*>(root);//root;
-        root->m_this = m_dag.m_root;
-        
+
+        // root->m_this already created by shareNode(); ensure root is that
+        m_dag.m_root = root->m_this;
+
         load();
     }
 
