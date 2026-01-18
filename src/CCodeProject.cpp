@@ -1935,9 +1935,6 @@ namespace stdrave {
                                     //Get pointer to the new node after reload
                                     ccNode = getNodeByName(test.second);
                                     ccNode->improveUnitTest();
-                                    
-                                    //Directly delete the trajectory as it is unusable
-                                    boost_fs::remove_all(trajectoryDir);
                                 }
                                 else
                                 {
