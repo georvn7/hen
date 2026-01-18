@@ -1782,6 +1782,12 @@ std::string Debugger::getFileInfo(CCodeProject* project, const std::string& file
         return info;
     }
     
+    if(fileName == "console.log")
+    {
+        info += "\n//File '" + fileName + "' is not accessible. To obtain log informatin from the most recent test run use 'log_info' and 'function_info' actions.\n\n";
+        return info;
+    }
+    
     if(fileName == "trace.txt")
     {
         info += "\n//File '" + fileName + "' is not accessible. To obtain trace informatin from the most recent test run use trace_info and function_info actions.\n\n";
@@ -1794,7 +1800,7 @@ std::string Debugger::getFileInfo(CCodeProject* project, const std::string& file
         return info;
     }
     
-    if(fileName == "main") {
+    if(fileName == "main" || fileName == "main.cpp") {
         info += "\n//File '" + fileName + "' Is the main executable file for the application being debugged. Can't show the content\n\n";
         return info;
     }
