@@ -5962,9 +5962,9 @@ std::string Debugger::stepSearchSource(CCodeProject* project, const std::string&
         std::string searchResult = project->searchSource(pattern);
         
         //Trim to LOG_SECTION_SIZE
-        if(searchResult.length() > LOG_SECTION_SIZE)
+        if(searchResult.length() > SEARCH_TRACE_SIZE)
         {
-            searchResult = searchResult.substr(0, LOG_SECTION_SIZE);
+            searchResult = searchResult.substr(0, SEARCH_TRACE_SIZE);
             searchResult += "\nThe search result has been trimmed due to size limitations\n";
         }
         else if(searchResult.empty())

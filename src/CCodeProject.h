@@ -323,8 +323,9 @@ namespace stdrave {
         const std::string& getBuildCacheDir() const {return m_buildCacheDir;}
         size_t getCachedNodeHash(const std::string& nodeName);
         std::string searchSource(const std::regex& pattern,
-                     std::size_t maxMatchesPerFunction=0,
-                                 std::size_t maxMatchesPerType=0) const;
+                                 std::size_t maxMatchesPerFunction=3,
+                                 std::size_t maxMatchesPerType=3,
+                                 std::size_t maxTotalMatchedLines=100) const;
         
         std::set<std::string> getConflictsWithData(const std::set<std::string>& calledFunctions);
         std::set<std::string> getConflictsWithFunctions(const std::set<std::string>& dataDefinitions);

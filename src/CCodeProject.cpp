@@ -3838,10 +3838,11 @@ namespace stdrave {
 
     static MatchSnippets extractMatchingLinesLimited(const std::string& src,
                                                     const std::regex& pattern,
-                                                    std::size_t maxMatches) // 0 => unlimited
+                                                    std::size_t maxMatchesPerScope,     // 0 => unlimited for this scope
+                                                    std::size_t* remainingTotal)        // null => no global limit
     {
         MatchSnippets r;
-        const bool unlimited = (maxMatches == 0);
+        const bool unlimitedScope = (maxMatchesPerScope == 0);
 
         std::istringstream iss(src);
         std::string line;
@@ -3849,11 +3850,24 @@ namespace stdrave {
         {
             if (!line.empty() && line.back() == '\r') line.pop_back();
 
+            // If we have a global budget and it's exhausted, stop scanning this src.
+            if (remainingTotal && *remainingTotal == 0)
+                break;
+
             if (std::regex_search(line, pattern))
             {
                 ++r.totalMatches;
-                if (unlimited || r.lines.size() < maxMatches)
+
+                const bool canStoreByScope = unlimitedScope || (r.lines.size() < maxMatchesPerScope);
+                const bool canStoreByTotal = (!remainingTotal || *remainingTotal > 0);
+
+                if (canStoreByScope && canStoreByTotal)
+                {
+                    line = trimLeadingWhitespace(line);
                     r.lines.push_back(line);
+
+                    if (remainingTotal) --(*remainingTotal);
+                }
             }
         }
         return r;
@@ -3897,21 +3911,27 @@ namespace stdrave {
     }
 
     std::string CCodeProject::searchSource(const std::regex& pattern,
-                                           std::size_t maxMatchesPerFunction /*=3*/,
-                                           std::size_t maxMatchesPerType /*=3*/) const
+                                           std::size_t maxMatchesPerFunction,
+                                           std::size_t maxMatchesPerType,
+                                           std::size_t maxTotalMatchedLines) const
     {
         std::string result;
+
+        std::size_t remaining = maxTotalMatchedLines;          // only used if maxTotalMatchedLines != 0
+        std::size_t* remainingPtr = (maxTotalMatchedLines == 0) ? nullptr : &remaining;
 
         // --- Data types ---
         bool dataFound = false;
         for (const auto& type : m_objectTypes)
         {
-            std::string dataType =
+            if (remainingPtr && *remainingPtr == 0) break;
+
+            const std::string dataType =
                 (type.second.m_typeDef.m_type == TypeDefinition::STRUCT) ? "struct" : "enum";
 
             const std::string& src = type.second.m_typeDef.m_definition;
 
-            auto m = extractMatchingLinesLimited(src, pattern, maxMatchesPerType);
+            auto m = extractMatchingLinesLimited(src, pattern, maxMatchesPerType, remainingPtr);
 
             appendGroupedBlock(
                 result,
@@ -3926,10 +3946,12 @@ namespace stdrave {
         bool functionsFound = false;
         for (const auto& node : m_nodeMap)
         {
+            if (remainingPtr && *remainingPtr == 0) break;
+
             const auto* ccNode = static_cast<const CCodeNode*>(node.second);
             const std::string& src = ccNode->m_implementation.definition;
 
-            auto m = extractMatchingLinesLimited(src, pattern, maxMatchesPerFunction);
+            auto m = extractMatchingLinesLimited(src, pattern, maxMatchesPerFunction, remainingPtr);
 
             appendGroupedBlock(
                 result,
