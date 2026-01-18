@@ -6557,7 +6557,7 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         
         int validationAttempt = 1;
         std::string feedback = validateStep(project, test, validationAttempt);
-        while(!feedback.empty())
+        while(!feedback.empty() && validationAttempt < 8)
         {
             object = web::json::value();
             project->inference(cache, feedback, schema, object);
@@ -6581,6 +6581,14 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             
             validationAttempt++;
             feedback = validateStep(project, test, validationAttempt);
+        }
+        
+        if(!feedback.empty()) //Probably the LLM insists for something
+        {
+            //Let's inject ground-truth signal from the test execution
+            m_nextStep.clear();
+            m_nextStep.action_type = "run_test";
+            m_nextStep.motivation = "Run the test to inspect the results and perform post-execution system analysis.";
         }
         
         project->popContext();
