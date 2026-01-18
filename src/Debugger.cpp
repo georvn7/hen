@@ -8524,7 +8524,8 @@ bool Debugger::compileFunction(CCodeProject* project, const std::string& functio
         return false;
     }
     
-    if(node->objectIsValid())
+    //Enforce compilation for the tested/debugged/fixed function
+    if(m_nextStep.action_subject != functionName && node->objectIsValid())
     {
         node->restoreCachedObject();
         return true;
