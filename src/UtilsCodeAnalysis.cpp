@@ -2047,115 +2047,143 @@ bool contains_project_identifier(const std::string& message, const std::set<std:
     return false;
 }
 
-// Function to trim whitespace from both ends of a string.
-// This ensures that leading and trailing spaces or tabs do not interfere with regex matching.
-std::string trim(const std::string& s) {
-    auto start = s.begin();
-    while (start != s.end() && std::isspace(static_cast<unsigned char>(*start))) {
-        start++;
-    }
+// Safer trim: no UB on empty/all-whitespace strings.
+static inline std::string trim(const std::string& s) {
+    size_t b = 0;
+    while (b < s.size() && std::isspace(static_cast<unsigned char>(s[b]))) b++;
 
-    auto end = s.end();
-    do {
-        end--;
-    } while (std::distance(start, end) > 0 && std::isspace(static_cast<unsigned char>(*end)));
+    size_t e = s.size();
+    while (e > b && std::isspace(static_cast<unsigned char>(s[e - 1]))) e--;
 
-    return std::string(start, end + 1);
+    return s.substr(b, e - b);
 }
 
-// Function to process a single line of the compiler output.
-// It uses regular expressions to identify errors, warnings, notes, and code snippets.
-// It writes relevant information to the output stream.
-void process_line(const std::vector<std::string>& lines, size_t& index,
-                  const std::set<std::string>& project_identifiers, std::ostream& output,
-                  bool& is_first_error, bool onlyErrors) {
-    // Regular expressions to match different parts of the compiler output.
-    static std::regex message_regex(R"(^(.*?):(\d+):(\d+):\s*(error|warning|note):\s*(.*))");
-    static std::regex code_snippet_regex(R"(^\s*(\d+\s*\|.*)|(\s*\^+.*))");
-    static std::regex error_count_regex(R"(^(\d+)\s+(error|errors|warning|warnings) generated\.)");
+// process_line(...) that captures clang snippets robustly.
+// - Does NOT require indentation.
+// - Captures "N | ..." source line plus subsequent "| ..." caret/fix-it lines.
+// - Bounded capture so it stays compact.
+// - Keeps your identifier filtering for warnings/notes and extra lines.
 
-    // Trim the current line to remove leading/trailing whitespace.
-    std::string line = trim(lines[index]);
+static void process_line(const std::vector<std::string>& lines, size_t& index,
+                         const std::set<std::string>& project_identifiers, std::ostream& output,
+                         bool& is_first_error, bool onlyErrors)
+{
+    // Diagnostic line: file:line:col: (fatal )?(error|warning|note|remark): message
+    static const std::regex message_regex(
+        R"(^(.*?):(\d+):(\d+):\s*(fatal error|error|warning|note|remark):\s*(.*)$)");
+
+    // Clang pretty-printed snippet lines:
+    //   "  42 | foo(bar)"
+    static const std::regex code_line_regex(
+        R"(^\s*\d+\s*\|.*$)");
+
+    // Caret / range / fix-it lines:
+    //   "     |     ^~~"
+    //   "     |     something"
+    static const std::regex pipe_line_regex(
+        R"(^\s*\|\s*.*$)");
+
+    static const std::regex error_count_regex(
+        R"(^(\d+)\s+(error|errors|warning|warnings) generated\.)");
+
+    const std::string line = trim(lines[index]);
     std::smatch match;
 
-    // Check if the line matches an error, warning, or note message.
     if (std::regex_match(line, match, message_regex)) {
-        // Extract information from the matched line.
-        std::string file_path = match[1];
-        std::string line_number = match[2];
-        std::string column_number = match[3];
-        std::string message_type = match[4];
-        std::string message = match[5];
+        const std::string file_path    = match[1];
+        const std::string line_number  = match[2];
+        const std::string column_number= match[3];
+        const std::string message_type = match[4];
+        const std::string message      = match[5];
 
-        // Get the filename by stripping the directory path.
-        std::string file_name = strip_project_dir(file_path);
+        const std::string file_name = strip_project_dir(file_path);
 
         bool include_line = false;
 
-        // Determine whether to include this message based on its type and content.
-        if (message_type == "error") {
-            // Always include error messages.
+        if (message_type == "error" || message_type == "fatal error") {
             include_line = true;
-        } else if (!onlyErrors && (message_type == "warning" || message_type == "note")) {
-            // Include warnings and notes if onlyErrors is false and they contain project identifiers.
+        } else if (!onlyErrors && (message_type == "warning" || message_type == "note" || message_type == "remark")) {
             if (contains_project_identifier(message, project_identifiers)) {
                 include_line = true;
             }
         }
 
-        if (include_line) {
-            // Insert an empty line before new errors (except the first one) to separate individual errors.
-            if (message_type == "error") {
-                if (!is_first_error) {
-                    output << std::endl;
-                }
-                is_first_error = false;
-            }
+        if (!include_line) return;
 
-            // Write the error or note message to the output stream.
-            output << file_name << ":" << line_number << ":" << column_number << ": " << message_type << ": " << message << std::endl;
-
-            // Include any following code snippets that are relevant.
-            // These are typically indented lines or lines starting with certain markers.
-            size_t i = index + 1;
-            while (i < lines.size()) {
-                std::string next_line = lines[i];
-                if (next_line.empty() || std::isspace(static_cast<unsigned char>(next_line[0]))) {
-                    // Check if the line contains project identifiers or matches code snippet patterns.
-                    if (contains_project_identifier(next_line, project_identifiers) || std::regex_match(next_line, code_snippet_regex)) {
-                        // Write the code snippet to the output stream.
-                        output << next_line << std::endl;
-                    }
-                    i++;
-                } else {
-                    // Stop if the next line is not part of the code snippet.
-                    break;
-                }
-            }
-            // Adjust the index to skip the processed lines.
-            index = i - 1;
+        if ((message_type == "error" || message_type == "fatal error") && !is_first_error) {
+            output << "\n";
         }
+        if (message_type == "error" || message_type == "fatal error") {
+            is_first_error = false;
+        }
+
+        output << file_name << ":" << line_number << ":" << column_number
+               << ": " << message_type << ": " << message << "\n";
+
+        // Capture following clang snippet lines (bounded).
+        size_t i = index + 1;
+        int budget = 12;                 // hard cap: keep output compact
+        bool sawCodeLine = false;
+
+        while (i < lines.size() && budget-- > 0) {
+            const std::string& raw = lines[i];
+            const std::string t = trim(raw);
+
+            if (t.empty()) { i++; continue; }
+
+            // Stop if we hit another diagnostic or the final summary line.
+            if (std::regex_match(t, message_regex) || std::regex_match(t, error_count_regex)) {
+                break;
+            }
+
+            const bool isCodeLine = std::regex_match(raw, code_line_regex);
+            const bool isPipeLine = std::regex_match(raw, pipe_line_regex);
+
+            if (isCodeLine) {
+                output << raw << "\n";
+                sawCodeLine = true;
+                i++;
+                continue;
+            }
+
+            // After we see "N | ...", include subsequent "| ..." lines (caret/ranges/fix-its)
+            if (sawCodeLine && isPipeLine) {
+                output << raw << "\n";
+                i++;
+                continue;
+            }
+
+            // Keep your original behavior: include extra relevant lines if they contain identifiers.
+            if (contains_project_identifier(raw, project_identifiers)) {
+                output << raw << "\n";
+                i++;
+                continue;
+            }
+
+            // If we already started a snippet and now we're off it, stop early.
+            if (sawCodeLine) break;
+
+            // Otherwise skip stray unrelated lines.
+            i++;
+        }
+
+        index = i - 1;
+        return;
     }
-    // Check if the line matches the final error/warning count.
-    else if (std::regex_match(line, match, error_count_regex)) {
-        // Always include the final error count.
+
+    // Final "X errors generated." line handling (keep mostly as you had it).
+    if (std::regex_match(line, match, error_count_regex)) {
         if (onlyErrors) {
-            // Modify the error count line to only include errors.
-            int count = std::stoi(match[1]);
-            std::string type = match[2];
+            const std::string type = match[2];
             if (type == "error" || type == "errors") {
-                // Output the line as-is.
-                output << line << std::endl;
-            } else {
-                // Do not include warning counts if onlyErrors is true.
+                output << line << "\n";
             }
         } else {
-            // Output the error/warning count line as-is.
-            output << line << std::endl;
+            output << line << "\n";
         }
     }
-    // Other lines are ignored to keep the output concise.
 }
+
 
 // The main function that cleans the Clang compiler output.
 // It filters the output to include only relevant error messages and code snippets.
