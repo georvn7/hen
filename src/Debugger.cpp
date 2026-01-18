@@ -2656,7 +2656,7 @@ std::string Debugger::getSubSystemsData(CCodeProject* project, std::set<std::str
 
         if(logSection.second > 0)
         {
-            ss << std::endl << "Logged messages from the unit test source:\n\n";
+            ss << std::endl << "Logged messages from the unit test source (debug log, not stdout):\n\n";
             ss << logSection.first << std::endl << std::endl;
         }
     }
