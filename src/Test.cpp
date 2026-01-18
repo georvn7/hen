@@ -252,6 +252,8 @@ std::string TestDef::validateIOFiles()
     auto baseName = [](const std::string& p) {
         return boost_fs::path(p).stem().string();
     };
+    
+    bool mainAsIO = false;
 
     forAllSteps([&](const TestStep& step) {
         
@@ -261,12 +263,22 @@ std::string TestDef::validateIOFiles()
             {
                 feedback += *file + " ";
             }
+            
+            if(baseName(*file) == "main")
+            {
+                mainAsIO = true;
+            }
         }
         for (const auto& file : step.output_files) {
             
             if(disabledNames.find(baseName(*file)) != disabledNames.end())
             {
                 feedback += *file + " ";
+            }
+            
+            if(baseName(*file) == "main")
+            {
+                mainAsIO = true;
             }
         }
     });
@@ -276,6 +288,11 @@ std::string TestDef::validateIOFiles()
         std::string message = "\nThe following file names are reserved for files managed by the build system ";
         message += "and must not be used to name files produced or consumed by the test:\n";
         feedback = message + feedback + "\n";
+        if(mainAsIO)
+        {
+            feedback += "Note that the test driver (main.cpp) will be implemented in a spearate step later ";
+            feedback += "and must not be listed in the input/otput files.\n";
+        }
     }
     
     return feedback;
