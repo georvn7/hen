@@ -2648,5 +2648,27 @@ std::size_t nextIndex(const boost_fs::path& dir,
     return maxN + 1; // if none found => 1
 }
 
+// Extracts the first non-whitespace token from a shell-like command line.
+// Examples:
+//   "./feature_test arithmetic:5,2" -> "./feature_test"
+//   "   /usr/bin/python3   script.py" -> "/usr/bin/python3"
+// Note: does not try to parse quotes/escapes; it just returns the first token.
+std::string extractExecutablePath(const std::string& cmdLine)
+{
+    std::size_t i = 0;
+    const std::size_t n = cmdLine.size();
+
+    // skip leading whitespace
+    while (i < n && std::isspace(static_cast<unsigned char>(cmdLine[i]))) ++i;
+    if (i == n) return "";
+
+    // read until next whitespace
+    const std::size_t start = i;
+    while (i < n && !std::isspace(static_cast<unsigned char>(cmdLine[i]))) ++i;
+
+    return cmdLine.substr(start, i - start);
+}
+
+
 
 }

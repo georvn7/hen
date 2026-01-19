@@ -2260,6 +2260,17 @@ bool Debugger::executeTestStep(std::ostream& log, CCodeProject* project, const T
             std::string instrumentedCmd;
             if(debug)
             {
+#if defined(__APPLE__)
+                //We are going to debug this executable with lldb (/lldb_cmds.txt),
+                //we need to codesign with entitlement:
+                //codesign -s - --entitlements ./debug.entitlements ./feature_test
+                std::string entitlementPath = Client::getInstance().getEnvironmentDir();
+                entitlementPath += "/debug.entitlements";
+                std::string execPath = m_workingDirectory + "/" + extractExecutablePath(cmd);
+                std::string codesignCmd = "codesign -s - --entitlements " + entitlementPath + " " + execPath;
+                stdrave::exec(codesignCmd, m_workingDirectory, "Codesign", true);
+#endif
+                
                 instrumentedCmd += "lldb --batch";
                 std::string lldbCommandsFile = Client::getInstance().getEnvironmentDir() + "/Debugger/Scripts/lldb_cmds.txt";
                 std::string lldbCommandsStr = getFileContent(lldbCommandsFile);
@@ -2399,6 +2410,16 @@ bool Debugger::execTestScript(CCodeProject* project,
     int returnCode;
     
     std::string cmdArgsOnly = removeFirstWord(cmd, "main");
+    
+#if defined(__APPLE__)
+    //Codesign with debug entitlements
+    //codesign -s - --entitlements ./debug.entitlements ./feature_test
+    std::string entitlementPath = Client::getInstance().getEnvironmentDir();
+    entitlementPath += "/debug.entitlements";
+    std::string codesignCmd = "codesign -s - --entitlements " + entitlementPath + " " + execPath;
+    stdrave::exec(codesignCmd, m_workingDirectory, "Codesign", true);
+#endif
+    
     auto logs = runTest(traceOnlyLog, project, execPath, cmdArgsOnly, m_workingDirectory, 10, instrument, returnCode);
     debugAppLog = logs.first;
     

@@ -1056,6 +1056,7 @@ namespace stdrave {
 
     void alternateRoles(web::json::value& body);
     std::set<std::string> extractFilesFromCommandLine(const std::string& commandLine);
+    std::string extractExecutablePath(const std::string& cmdLine);
 
     std::size_t nextIndex(const boost_fs::path& dir, const std::string& prefix);
 }
