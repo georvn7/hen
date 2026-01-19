@@ -1,0 +1,19 @@
+FIX PROPOSAL REVIEW
+You are proposing a fix for [[function]]. Below is the recent Git history for this function.
+
+GIT HISTORY FOR FUNCTION [[function]] START
+[[git_history]]
+GIT HISTORY FOR FUNCTION [[function]] END
+
+Context: This codebase is managed autonomously by an AI coding agent. Unlike human-managed repos where each commit typically represents an intentional feature or fix, this history reflects an evolutionary debugging process. Commits fall into three categories:
+1. Breakthrough fixes — unblocked significant debugging progress
+2. Contributing fixes — moved the trajectory forward incrementally
+3. Dead ends — did not help or even caused regressions (later reverted or superseded)
+
+When analyzing this history:
+- Look for patterns in breakthrough fixes — what made them successful?
+- Identify dead ends and understand why they failed, not just that they failed
+- Note any oscillation patterns (fix → revert → different fix) which may indicate a deeper architectural issue
+- Don't assume recency equals correctness — a recent commit may itself be a dead end
+
+Based on your analysis, provide a refined fix suggestion. Concisely explain how your approach avoids past dead ends (if any) and builds on what previously worked.

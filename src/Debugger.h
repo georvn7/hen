@@ -239,6 +239,7 @@ namespace stdrave {
         std::string             m_lastRunTestLog;
         std::string             m_testFunctionalityDelta;
         std::string             m_unitTestSource;
+        std::string             m_commitMessage;
         
         std::string             m_sdkPath;
         
@@ -481,6 +482,8 @@ namespace stdrave {
         std::string generateConfig();
         
         bool deployToWorkingDirectory(CCodeProject* project, const std::string& testJsonDir, bool isPublic, TestDef& test);
+        
+        void reviewGiHistoryForFix(CCodeProject* project);
         
 	public:
         std::pair<bool, std::string> debug(CCodeProject* project,

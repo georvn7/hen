@@ -6176,6 +6176,17 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             m_hasValidBuild = true;
         }
         
+        std::string commitHash;
+        if(!m_commitMessage.empty())
+        {
+            m_commitMessage += "STEP: " + stepIndexStr + " run test '" + m_nextStep.action_subject + "'\n\n";
+            m_commitMessage += analysis.debug_notes;
+            
+            commitHash = project->commit(m_commitMessage);
+        }
+        
+        m_commitMessage.clear();
+        
         bool done = analysis.debug_notes == "PASS";
         if(done)
         {
@@ -6185,6 +6196,7 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             stepInfo.m_action = m_nextStep.action_type;
             stepInfo.m_subject = m_nextStep.action_subject;
             stepInfo.m_motivation = m_nextStep.motivation;
+            stepInfo.m_commitHash = commitHash;
             m_trajectory.push_back(stepInfo);
             
             m_lastRunInfo = stepInfo.fullInfo();
@@ -6210,6 +6222,7 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         stepInfo.m_action = "run_test";
         stepInfo.m_motivation = m_nextStep.motivation;
         stepInfo.m_subject = m_nextStep.action_subject;
+        stepInfo.m_commitHash = commitHash;
         
         m_lastRunInfo = stepInfo.fullInfo();
         m_lastRunStep = stepIndex;
@@ -6332,7 +6345,9 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
                 std::string message = "STEP: " + stepIndexStr + " fix function '" + functionName + "'\n\n";
                 message += m_nextStep.motivation;
                 
-                commitHash = project->commit(message);
+                m_commitMessage = message;
+                
+                //commitHash = project->commit(m_commitMessage);
                 
                 debugNotes += "The function '" + functionName + "' has been fixed and the fix has been applied to the code base. ";
                 //TODO: this needs testing, how much context window space it takes
@@ -6568,6 +6583,8 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
     }
     else
     {
+        m_commitMessage.clear();
+        
         Prompt promptNextStep("NextStep.txt",{
                             {"app_info", m_appInfo},
                             {"application", application},
@@ -6629,6 +6646,11 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             m_nextStep.motivation = "Run the test to inspect the results and perform post-execution system analysis.";
         }
         
+        if(m_nextStep.action_type == "fix_function")
+        {
+            reviewGiHistoryForFix(project);
+        }
+        
         project->popContext();
     }
     
@@ -6643,6 +6665,52 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
     }
     
     return true;
+}
+
+void Debugger::reviewGiHistoryForFix(CCodeProject* project)
+{
+    if(m_nextStep.action_type != "fix_function")
+    {
+        return;
+    }
+    
+    std::string functionName = m_nextStep.action_subject;
+    
+    CCodeNode* ccNode = project->getNodeByName(functionName);
+    
+    if(!ccNode)
+    {
+        //This is serious issue, we must not be here!
+        std::cout << "reviewGiHistoryForFix: function '" << functionName << "' desn't exist\n";
+        return;
+    }
+    
+    std::string repoFolder = project->getProjDir() + "/dag";
+    
+    std::string functionSrcFile = ccNode->getNodeDirectory();
+    functionSrcFile += "/implementation.json";
+    
+    std::string gitHistory = project->getGitHistory(repoFolder, functionSrcFile, 10);
+    
+    web::json::value object;
+    
+    web::json::value schema;
+    setupSchema<NextDebugStep>(schema);
+    
+    Cache cache;
+    project->captureContext(std::string());
+
+    Prompt reviewFixStep("ReviewFixStep.txt",{
+                        {"function", functionName},
+                        {"git_history", gitHistory}
+    });
+    
+    project->inference(cache, reviewFixStep, schema, object);
+    
+    m_nextStep.clear();
+    m_nextStep.from_json(object);
+    
+    project->popContext();
 }
 
 bool Debugger::deployToWorkingDirectory(CCodeProject* project, const std::string& testJsonDir, bool isPublic, TestDef& test)
@@ -9154,6 +9222,8 @@ void Debugger::resetTest()
     m_actionFeedback.clear();
     m_infoStepsStart = -1;
     m_lastRunStep = 0;
+    m_lastRunInfo.clear();
+    m_commitMessage.clear();
     
     m_testFunctionalityDelta.clear();
     m_unitTestSource.clear();

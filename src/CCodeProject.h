@@ -335,6 +335,11 @@ namespace stdrave {
         std::string revert(const std::string& folder);
         std::string revert();
         
+        std::string getGitHistory(const std::string& folder,
+                                                   const std::string& filePath,
+                                                   std::size_t maxCommits,
+                                                   bool followRenames = true);
+        
         std::string revertToCommit(const std::string& folder, const std::string& commitish);
         std::string revertToCommit(const std::string& commitish);
         

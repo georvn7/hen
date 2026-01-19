@@ -4145,6 +4145,74 @@ namespace stdrave {
     }
 
     /**
+     * Return the last `maxCommits` commits that touched `filePath`, including:
+     * - full commit message (subject + body)
+     * - patch/diff for THAT file only
+     *
+     * Notes:
+     * - Uses `git log -p -- <file>` so the patch is restricted to the file.
+     * - If `followRenames` is true, history follows renames (git --follow).
+     * - Returns "" if repo doesn't exist or the file has no history.
+     */
+    std::string CCodeProject::getGitHistory(const std::string& folder,
+                                                             const std::string& filePath,
+                                                             std::size_t maxCommits,
+                                                             bool followRenames /*=true*/)
+    {
+        const boost_fs::path repo = boost_fs::absolute(folder);
+
+        if (!boost_fs::exists(repo) || !boost_fs::is_directory(repo)) {
+            throw std::runtime_error("getGitHistory(): folder does not exist or is not a directory: " + repo.string());
+        }
+
+        if (!boost_fs::exists(repo / ".git")) {
+            return std::string(); // not a git repo
+        }
+
+        const std::string repoQ = shQuote(repo.string());
+
+        // Make a repo-relative path for git (best-effort).
+        boost_fs::path p(filePath);
+        boost_fs::path absFile = p.is_absolute() ? boost_fs::absolute(p) : boost_fs::absolute(repo / p);
+
+        boost_fs::path rel = p;
+        try {
+            rel = boost_fs::relative(absFile, repo);
+        } catch (...) {
+            // If relative() fails, fall back to the original input.
+            rel = p;
+        }
+
+        // Git prefers forward slashes; generic_string() does that.
+        const std::string relS  = rel.generic_string();
+        const std::string fileQ = shQuote(relS);
+
+        const std::string nPart      = (maxCommits > 0) ? (" -n " + std::to_string(maxCommits)) : "";
+        const std::string followPart = followRenames ? " --follow" : "";
+
+        // Pretty header + full commit message (%B) + patch (-p), restricted to the pathspec after `--`.
+        // `core.quotepath=false` keeps paths readable (no octal escapes).
+        const std::string cmd =
+            "git -C " + repoQ +
+            " -c core.quotepath=false"
+            " log" + nPart + followPart +
+            " --no-color --date=iso-strict"
+            " --pretty=format:'===%ncommit %H%nDate: %ad%n%n%B%n'"
+            " -p -- " + fileQ;
+
+        std::string out;
+        try {
+            out = exec(cmd, repo.string(), "gitLogFileWithPatch", /*deleteOutput*/true);
+        } catch (...) {
+            return std::string();
+        }
+
+        // If the file has no history, git log returns empty.
+        if (trim(out).empty()) return std::string();
+        return out;
+    }
+
+    /**
      * Revert working tree + index to a specific commit (hard reset) unconditionally.
      * - Aborts in-progress operations best-effort (merge/rebase/cherry-pick/revert).
      * - Verifies the target resolves to a commit object.
