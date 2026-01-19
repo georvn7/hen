@@ -4750,6 +4750,10 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
             feedback += "You've requested a new test run, but I see no changes to the source code since the last run. ";
             //feedback += "If you just need more information use the appropriate 'Actins for requesting more information' explained in the 'DEBUGGING WORKFLOW' section";
             feedback += "Summary of the last run is available in the context. Check the provided 'INFORMATION FOR THE LAST RUN STEP' ";
+            if(!m_rewardHackingReview.empty())
+            {
+                feedback += " Pay attention to the last reward-hacking review. ";
+            }
             feedback += "If you just need more information use the appropriate 'Actions for requesting more information' explained in the 'DEBUGGING WORKFLOW' section. Both actions 'run_test' and 'debug_function' capture log and trace available for investigation.";
         }
     }
