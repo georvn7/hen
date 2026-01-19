@@ -6108,7 +6108,7 @@ std::string Debugger::compileContext(CCodeProject* project, const TestDef& test,
     return compiledInfo;
 }
 
-//TODO: Move each step in its own function
+//TODO: Move each step action in its own function
 bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
 {
     uint32_t stepIndex = m_previousSteps + uint32_t( m_trajectory.size() ) + 1;
@@ -6611,8 +6611,10 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         m_nextStep.from_json(object);
         
         int validationAttempt = 1;
+        int maxValidationAttempts = m_rewardHackingReview.empty() ? 8 : 3;
+        
         std::string feedback = validateStep(project, test, validationAttempt);
-        while(!feedback.empty() && validationAttempt < 8)
+        while(!feedback.empty() && validationAttempt < maxValidationAttempts)
         {
             object = web::json::value();
             project->inference(cache, feedback, schema, object);
