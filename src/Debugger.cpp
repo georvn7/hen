@@ -942,7 +942,7 @@ std::string Debugger::getRunAnalysisProgress()
     if(progress.empty()) {
         progress = "No previous steps\n";
     } else {
-        progress = "Log analysis with summary and debug notes for each step of the analysis\n\n" + progress;
+        progress = "Analysis with summary and debug notes\n\n" + progress;
     }
     
     return progress;

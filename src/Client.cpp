@@ -636,7 +636,7 @@ bool Client::processUserInput()
     
     if(m_auto)
     {
-        return 1;
+        return true;
     }
 
 	//Wait for the next user command
