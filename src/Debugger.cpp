@@ -4762,6 +4762,7 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
         }
         else
         {
+            //TODO: Do we need this any longer?
             int sameFunctionFixed = 0;
             int functionsFixed = 0;
             
@@ -4787,6 +4788,16 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
             if(sameFunctionFixed > 0 || functionsFixed > 2) {
                 feedback += "Consider running the test before fixing next function!";
             }
+        }
+    }
+    else if(m_nextStep.action_type == "file_info")
+    {
+        //TODO: I need to keep an eye on this feedback
+        if(!boost_fs::path(m_nextStep.action_subject).parent_path().empty())
+        {
+            feedback += "I see you specify directory part in your file name. ";
+            feedback += "Note that file_info command is only for the files in the test working directory";
+            feedback += " - text files consumed or produced by the test.\n";
         }
     }
     else if(m_nextStep.isInformationRequest())
