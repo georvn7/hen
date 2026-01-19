@@ -2236,7 +2236,7 @@ void CCodeNode::reflectFunction()
             defineStructMembersHint = defineStructMembersHintRef;
         }
         
-        if(typesWithMoreSmartPointers.empty())
+        if(!typesWithMoreSmartPointers.empty())
         {
             m_codeReview << "The following types have more than one std::shared_ptr:\n";
             m_codeReview << getAsCsv(typesWithMoreSmartPointers);
