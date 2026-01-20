@@ -6789,10 +6789,9 @@ namespace stdrave {
         visited.reserve(512);
 
         // Tiny per-thread cache to avoid repeating string -> nodeMap() lookups.
-        struct Cache {
-            std::unordered_map<std::string, const stdrave::CCodeNode*> map;
-        };
-        thread_local Cache cache;
+        struct Cache { std::unordered_map<std::string, const CCodeNode*> map; };
+        Cache cache;
+        cache.map.reserve(4096);
 
         auto resolve = [&](const std::string& name) -> const stdrave::CCodeNode* {
             auto itc = cache.map.find(name);
@@ -6819,7 +6818,8 @@ namespace stdrave {
                 return true; // keep path intact on success
 
             // Traverse outgoing call edges.
-            for (const auto& call : node->m_calls.items) {
+            const auto callsSnapshot = node->m_calls.items;
+            for (const auto& call : callsSnapshot) {
                 if (!call) continue;
 
                 const stdrave::CCodeNode* next = resolve(call->func_name);
