@@ -6671,7 +6671,7 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
 
 void Debugger::reviewGiHistoryForFix(CCodeProject* project)
 {
-    if(m_nextStep.action_type != "fix_function")
+    //if(m_nextStep.action_type != "fix_function")
     {
         return;
     }
