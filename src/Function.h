@@ -118,7 +118,8 @@ namespace stdrave {
                             "used int the declaration of this function")
         DECLARE_ARRAY_FIELD(std::string, dependencies, "Definition path of all functions and data types, from other parts of this software, "\
                             "called in the implementation of this function")
-        DECLARE_FIELD(std::string, definition,"Source code with implementation of the functions. Don't translate this string on a new line with the backslash ASCII character. Don't provide include statements in the 'definition' section. They need to be provided separately as specified in the 'includes' section")
+        //DECLARE_FIELD(std::string, definition,"Source code with implementation of the functions. Don't translate this string on a new line with the backslash ASCII character. Don't provide include statements in the 'definition' section. They need to be provided separately as specified in the 'includes' section")
+        std::string m_source;
     };
 
     class CodeReview : public Reflection<CodeReview>

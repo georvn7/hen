@@ -94,7 +94,7 @@ namespace stdrave {
     DEFINE_TYPE(Code)
     DEFINE_ARRAY_FIELD(Code, externals)
     DEFINE_ARRAY_FIELD(Code, dependencies)
-    DEFINE_FIELD(Code, definition)
+    //DEFINE_FIELD(Code, definition)
 
     DEFINE_TYPE(CodeReview)
     DEFINE_FIELD(CodeReview, review)

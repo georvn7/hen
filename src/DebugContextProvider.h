@@ -877,9 +877,9 @@ public:
                     info += ccNode->m_brief.func_name + ": " + briefStr + "\n\n";
                 }
                 
-                if(!ccNode->m_implementation.definition.empty())
+                if(!ccNode->m_implementation.m_source.empty())
                 {
-                    info += printFunctionSource(project, ccNode->m_brief.func_name, ccNode->m_implementation.definition) + "\n\n";
+                    info += printFunctionSource(project, ccNode->m_brief.func_name, ccNode->m_implementation.m_source) + "\n\n";
                 }
                 
                 CHECK_INFORMATIO_REQUEST_SIZE
@@ -1109,7 +1109,7 @@ public:
                 CCodeNode* ccNodeRef = (CCodeNode*)ref;
                 
                 //We should find this function in the source of the function that references it
-                if(ccNodeRef->m_implementation.definition.find(functionName) != std::string::npos)
+                if(ccNodeRef->m_implementation.m_source.find(functionName) != std::string::npos)
                 {
                     references += ccNodeRef->m_prototype.brief;
                     references += "\n";
@@ -2107,7 +2107,7 @@ public:
                 const CCodeNode* ccNode = project->getNodeByName(func);
                 
                 ss << func << ": " << ccNode->m_brief.brief << std::endl << std::endl;
-                ss << printFunctionSource(project, func, ccNode->m_implementation.definition) + "\n\n";
+                ss << printFunctionSource(project, func, ccNode->m_implementation.m_source) + "\n\n";
                 
                 visibleTraceAndLog(ss, firstInvocation->m_invocation);
             }

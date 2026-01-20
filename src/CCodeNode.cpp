@@ -552,7 +552,7 @@ namespace stdrave {
                 context += proj->getDetachedData();
             }
         }
-        context += m_implementation.definition;
+        context += m_implementation.m_source;
         
         std::string defineDataMessage = proj->define_data.prompt({
             {"struct", typeName},
@@ -675,9 +675,9 @@ namespace stdrave {
             parentPath = parent->getDAGPath("/");
         }
         
-        if(!m_implementation.definition.empty())
+        if(!m_implementation.m_source.empty())
         {
-            context += m_implementation.definition;
+            context += m_implementation.m_source;
             context += "\n\n";
         }
         
@@ -882,7 +882,7 @@ namespace stdrave {
         m_enableDiagnostics = true;
         m_reviewDiagnostics = true;
         
-        std::string source = m_implementation.definition;
+        std::string source = m_implementation.m_source;
         reviewImplementation(source, CodeType::FUNC_IMPL);
         
         m_enableDiagnostics = false;
@@ -1008,7 +1008,7 @@ namespace stdrave {
         
         if(updateSource)
         {
-            m_implementation.definition = sourceToReview;
+            m_implementation.m_source = sourceToReview;
         }
         
         return review;
@@ -1021,12 +1021,12 @@ namespace stdrave {
         bool wasOnAuto = client.run();
         
         auto dataSnapshot = proj->getDataShapshot();
-        std::string savedSource = m_implementation.definition;
+        std::string savedSource = m_implementation.m_source;
         Function savedDefinition = m_prototype;
         
         client.selectLLM(InferenceIntent::REASON_DATA);
         
-        std::string source = m_implementation.definition;
+        std::string source = m_implementation.m_source;
         int attempts = 0;
         
         std::set<std::string> referencedNodes;
@@ -1047,7 +1047,7 @@ namespace stdrave {
                 {
                     //Reset state
                     proj->restoreDataSnapshot(dataSnapshot);
-                    m_implementation.definition = savedSource;
+                    m_implementation.m_source = savedSource;
                     m_prototype = savedDefinition;
                     firstReview = true;
                     
@@ -1057,7 +1057,7 @@ namespace stdrave {
             }
             
             //Reset the source to the initial state
-            source = m_implementation.definition;
+            source = m_implementation.m_source;
             
             std::set<std::string> owners;
             referencedNodes.clear();
@@ -1123,7 +1123,7 @@ namespace stdrave {
             
             //TODO: Restore data and code
             proj->restoreDataSnapshot(dataSnapshot);
-            m_implementation.definition = savedSource;
+            m_implementation.m_source = savedSource;
             m_prototype = savedDefinition;
             
             if(!wasOnAuto) client.stop();
@@ -1158,7 +1158,7 @@ namespace stdrave {
         {
             parent = (CCodeNode*)m_this->m_parent->m_data;
             
-            std::string source = parent->m_implementation.definition;
+            std::string source = parent->m_implementation.m_source;
             std::set<std::string> referencedNodes;
             
             parent->m_stats.reset(); //Ensure the codeAndDataReview starts from clear stats. The same is expected from parentInitialReview
@@ -1316,7 +1316,7 @@ namespace stdrave {
         std::string parentInitialReview;
         if(parent)
         {
-            std::string source = parent->m_implementation.definition;
+            std::string source = parent->m_implementation.m_source;
             std::set<std::string> referencedNodes;
             
             parent->m_stats.reset(); //Ensure the codeAndDataReview starts from clear stats to get proper initial review.
@@ -1788,10 +1788,10 @@ namespace stdrave {
             std::string currentCallstack = getDAGPath(">") + ">" + brief.func_name;
             
             std::string existing_implementation;
-            if(existingFuncNode->m_implementation.definition.size() >= 7)
+            if(existingFuncNode->m_implementation.m_source.size() >= 7)
             {
                 existing_implementation = "Implementation for the existing function: \n";
-                existing_implementation += existingFuncNode->m_implementation.definition;
+                existing_implementation += existingFuncNode->m_implementation.m_source;
                 existing_implementation += "\nNotice, modification on the existing function to satisfy the requirements of the function being defined is possible but the existing functionality must be preserved\n";
             }
             
@@ -2284,7 +2284,7 @@ namespace stdrave {
         }
         
         if(implementation) {
-            sout << m_implementation.definition << std::endl;
+            sout << m_implementation.m_source << std::endl;
         }
         else {
             sout << m_prototype.declaration << std::endl;
@@ -2655,7 +2655,7 @@ namespace stdrave {
         referencedNodes.clear();
         std::string code = getDataApi(true, true, true, referencedNodes);
         code += "\n";
-        code += m_implementation.definition;
+        code += m_implementation.m_source;
         code += "\n";
         
         const auto& errorAnalyzers = proj->getFocusedAnalyzers();
@@ -3172,14 +3172,14 @@ namespace stdrave {
         for(const auto& func : functions)
         {
             if(func.first == m_brief.func_name) {
-                m_implementation.definition = func.second;
+                m_implementation.m_source = func.second;
                 if(updateDeclaration())
                 {
                     updateExternals();
                 }
             }
             else if(parent && func.first == parent->m_brief.func_name) {
-                parent->m_implementation.definition = func.second;
+                parent->m_implementation.m_source = func.second;
                 bool parentDataUpdated = parent->updateDeclaration();
                 if(parentDataUpdated)
                 {
@@ -3235,7 +3235,7 @@ namespace stdrave {
         
         CompilationReview thisReview;
         thisReview.m_compilationOutput = cleanOutput;
-        thisReview.m_initialImplementation = m_implementation.definition;
+        thisReview.m_initialImplementation = m_implementation.m_source;
         
         std::string api = getApiForReview(owners, structs, enums);
         
@@ -3245,7 +3245,7 @@ namespace stdrave {
             context += m_prototype.declaration + "\n\n";
             context += m_prototype.description + "\n\n";
             context += "Function definition:\n";
-            context += m_implementation.definition + "\n";
+            context += m_implementation.m_source + "\n";
         }
         
         std::string selectedFunctions;
@@ -3344,7 +3344,7 @@ namespace stdrave {
         
         bool objectExists = updateSource(CodeType::FUNC_CMPL, parent, fixCompilationMessge, compileCL, output, false);
         
-        thisReview.m_revisedImplementation = m_implementation.definition;
+        thisReview.m_revisedImplementation = m_implementation.m_source;
         m_stats.m_compileProgress.push_back(thisReview);
         
         //if(objectExists)
@@ -3556,7 +3556,7 @@ namespace stdrave {
         std::string binDir = buildDir + "/" + platform;
         
         m_stats.m_compileProgress.clear();
-        m_stats.m_initialImplementation = m_implementation.definition;
+        m_stats.m_initialImplementation = m_implementation.m_source;
         
         //TODO: Implement multithreaded builinding on load with CCodeProject::compileSource
         if(objectIsValid())
@@ -3585,7 +3585,7 @@ namespace stdrave {
         int tryID = 0;
         
         std::map<std::string, DataInfo> dataSnapshot = proj->getDataShapshot();
-        std::string sourceSnapshot = m_implementation.definition;
+        std::string sourceSnapshot = m_implementation.m_source;
         Function definitionSnapshot = m_prototype;
         
         int maxAttempts = (attempts > 0 && attempts < COMPILE_ATTEMPTS_MAX) ? attempts : COMPILE_ATTEMPTS_MAX;
@@ -3632,7 +3632,7 @@ namespace stdrave {
                 if(lastApproach == CompilationReviewType::OPTIMISTIC)
                 {
                     proj->restoreDataSnapshot(dataSnapshot);
-                    m_implementation.definition = sourceSnapshot;
+                    m_implementation.m_source = sourceSnapshot;
                     //TODO: What if there was declaration change?
                     m_prototype = definitionSnapshot;
                 }
@@ -3945,7 +3945,7 @@ namespace stdrave {
         
         printAsComment(m_prototype.description, cpp);
         cpp << std::endl;
-        cpp << m_implementation.definition << std::endl;
+        cpp << m_implementation.m_source << std::endl;
         
         cpp.close();
     }
@@ -4033,7 +4033,7 @@ namespace stdrave {
         
         printAsComment(m_prototype.description, cpp);
         cpp << std::endl;
-        cpp << m_implementation.definition << std::endl;
+        cpp << m_implementation.m_source << std::endl;
         
         header.close();
         cpp.close();
@@ -4285,7 +4285,7 @@ namespace stdrave {
             codeReview(source, CodeType::FUNC_IMPL, tryToRecover);
         }
         
-        m_implementation.definition = source;
+        m_implementation.m_source = source;
         //TODO: need to updateDeclaration here is worth investigating
         if(updateDeclaration())
         {
@@ -5673,7 +5673,7 @@ namespace stdrave {
         else
         {
             std::string implementation = "```cpp\n";
-            implementation += m_implementation.definition;
+            implementation += m_implementation.m_source;
             implementation += "\n```";
             
             std::string checklist = proj->source_checklist.prompt({{"function", m_prototype.declaration}});
@@ -5687,7 +5687,7 @@ namespace stdrave {
             std::string source = "cpp";
             inference(cache, fixSource, source);
             
-            m_implementation.definition = source;
+            m_implementation.m_source = source;
             if(updateDeclaration())
             {
                 updateExternals();
@@ -5820,6 +5820,7 @@ namespace stdrave {
         saveJson(callsJson, directory + "/calls.json");
         saveJson(m_libCalls.to_json(), directory + "/lib_calls.json");
         saveJson(m_implementation.to_json(), directory + "/implementation.json");
+        saveToFile(m_implementation.m_source, directory + "/" + m_brief.func_name + ".cpp");
 
         if(m_dataDef.is_object() && m_dataDef.as_object().size() > 0)
         {
@@ -5883,6 +5884,14 @@ namespace stdrave {
             std::cout << "Unable to open file: " << directory << "/implementation.json" << std::endl;
             missingFiles = true;
         }
+        
+        m_implementation.m_source = getFileContent(directory + "/" + m_brief.func_name + ".cpp");
+        if(m_implementation.m_source.empty())
+        {
+            std::cout << "Unable to open file: " << directory << "/" << m_brief.func_name << ".cpp" << std::endl;
+            missingFiles = true;
+        }
+        
         bool hasData = false;
         if(boost_fs::exists(directory + "/data_def.json"))
         {
@@ -6135,7 +6144,7 @@ namespace stdrave {
         {
             summary += m_prototype.description;
         }
-        bool hasImplementation = m_defined && m_implementation.definition.size();
+        bool hasImplementation = m_defined && m_implementation.m_source.size();
         if(brief || !hasImplementation)
         {
             summary += "\nFunction declaration: ";
@@ -6148,7 +6157,7 @@ namespace stdrave {
             if(hasImplementation)//Implementation is ready
             {
                 summary += "\nFunction implementation: ";
-                summary += m_implementation.definition;
+                summary += m_implementation.m_source;
                 summary += "\n";
             }
             else if(m_calls.items.size())
@@ -6176,7 +6185,7 @@ namespace stdrave {
 
     bool CCodeNode::updateDeclaration()
     {
-        std::string decl = extractFunctionDeclaration(m_implementation.definition);
+        std::string decl = extractFunctionDeclaration(m_implementation.m_source);
         if(decl.length() < 7)
         {
             //No way to be a valid declaration
@@ -6197,7 +6206,7 @@ namespace stdrave {
             std::string reviseFunctionMessage = proj->revise_function.prompt({
                 {"function", m_brief.func_name},
                 {"context", context},
-                {"source", m_implementation.definition}
+                {"source", m_implementation.m_source}
             });
             
             client.selectLLM(InferenceIntent::DEFINE);
@@ -6239,7 +6248,7 @@ namespace stdrave {
         if(m_prototype.declaration.empty())
             return false;
         
-        if(m_implementation.definition.empty())
+        if(m_implementation.m_source.empty())
             return false;
         
         return true;
@@ -6593,9 +6602,9 @@ namespace stdrave {
                 //Doing datasnapshot now, no destructive data changes will be allowed during the verification
                 proj->dataSnapshot();
                 
-                std::string oldSource = m_implementation.definition;
+                std::string oldSource = m_implementation.m_source;
                 std::string oldDecl = m_prototype.declaration;
-                m_implementation.definition = source;
+                m_implementation.m_source = source;
                 
                 if(updateDeclaration())
                 {
@@ -6607,7 +6616,7 @@ namespace stdrave {
                 {
                     //Revert to the old source, the verify() couldn't fix the new one
                     //This will bring us
-                    m_implementation.definition = oldSource;
+                    m_implementation.m_source = oldSource;
                     m_prototype.declaration = oldDecl;
                     refactoringSuccessful = false;
                 }
@@ -6641,7 +6650,7 @@ namespace stdrave {
         {
             
             
-            if(newChild->m_implementation.definition.empty())
+            if(newChild->m_implementation.m_source.empty())
             {
                 if(srcType == CodeType::FUNC_FIX)
                 {
@@ -6984,7 +6993,7 @@ namespace stdrave {
         }
         report << generateDeclarations(/*const std::string& skip*/);
         printAsComment(m_prototype.description, report);
-        report << std::endl << m_implementation.definition << std::endl;
+        report << std::endl << m_implementation.m_source << std::endl;
         report << "```" << std::endl;
         
         return report.str();
@@ -7005,7 +7014,7 @@ namespace stdrave {
         const std::regex re("\\b" + regex_escape(otherFunction) + "\\s*\\(", std::regex::ECMAScript);
         
         std::string comments;
-        std::string code = removeComments(m_implementation.definition, comments);
+        std::string code = removeComments(m_implementation.m_source, comments);
 
         // Keep only the body to avoid matching prototypes
         auto brace = code.find('{');
@@ -7033,11 +7042,11 @@ namespace stdrave {
             for (auto ref : ccCaller->m_referencedBy) {
                 auto* ccRef = dynamic_cast<const CCodeNode*>(ref);
                 if (!ccRef) continue;
-                if (ccRef->m_implementation.definition.empty()) continue;
+                if (ccRef->m_implementation.m_source.empty()) continue;
                 if (ccRef->getName() == c) continue; // ignore self
 
                 std::string comments;
-                std::string code = removeComments(ccRef->m_implementation.definition, comments);
+                std::string code = removeComments(ccRef->m_implementation.m_source, comments);
 
                 // Keep only the body to avoid matching prototypes
                 auto brace = code.find('{');

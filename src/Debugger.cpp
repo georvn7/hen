@@ -1748,9 +1748,9 @@ std::string Debugger::getRequestedInfo(CCodeProject* project, int allFunctions, 
                 info += ccNode->m_brief.func_name + ": " + briefStr + "\n\n";
             }
             
-            if(!ccNode->m_implementation.definition.empty())
+            if(!ccNode->m_implementation.m_source.empty())
             {
-                info += printFunctionSource(project, ccNode->m_brief.func_name, ccNode->m_implementation.definition) + "\n\n";
+                info += printFunctionSource(project, ccNode->m_brief.func_name, ccNode->m_implementation.m_source) + "\n\n";
             }
             
             CHECK_INFORMATIO_REQUEST_SIZE
@@ -2665,7 +2665,7 @@ std::string Debugger::getSubSystemsData(CCodeProject* project, std::set<std::str
             const CCodeNode* ccNode = project->getNodeByName(func);
             
             ss << func << ": " << ccNode->m_brief.brief << std::endl << std::endl;
-            ss << printFunctionSource(project, func, ccNode->m_implementation.definition) + "\n\n";
+            ss << printFunctionSource(project, func, ccNode->m_implementation.m_source) + "\n\n";
             
             visibleTraceAndLog(ss, firstInvocation->m_invocation);
         }
@@ -3076,9 +3076,9 @@ std::string Debugger::getFunctionDetailedInfo(CCodeProject* project, const std::
             info += ccNode->m_brief.func_name + ": " + briefStr + "\n\n";
         }
         
-        if(!ccNode->m_implementation.definition.empty())
+        if(!ccNode->m_implementation.m_source.empty())
         {
-            info += printFunctionSource(project, ccNode->m_brief.func_name, ccNode->m_implementation.definition) + "\n\n";
+            info += printFunctionSource(project, ccNode->m_brief.func_name, ccNode->m_implementation.m_source) + "\n\n";
         }
     }
     
@@ -4489,7 +4489,7 @@ std::string Debugger::fixFunction(CCodeProject* project, const TestDef& test, co
     implementation += "Prioritize suggested solution from the debugging notes if the new implementation requires conceptual changes\n\n";
     implementation += description.str();
     implementation += "\n//Implementation before the fix\n";
-    implementation += printFunctionSource(project, functionName, ccNode->m_implementation.definition);
+    implementation += printFunctionSource(project, functionName, ccNode->m_implementation.m_source);
     before = implementation;
     
     std::string checklist = project->source_checklist.prompt({{"function", ccNode->m_prototype.declaration}});
@@ -4675,7 +4675,7 @@ std::string Debugger::fixFunction(CCodeProject* project, const TestDef& test, co
         
         Client::getInstance().selectLLM(InferenceIntent::DEBUG_ANALYSIS);
         
-        return ccNode->m_implementation.definition;
+        return ccNode->m_implementation.m_source;
     }
     else
     {
@@ -4692,7 +4692,7 @@ std::string Debugger::fixFunction(CCodeProject* project, const TestDef& test, co
             
             CCodeNode* ccNode = (CCodeNode*)it->second;
             
-            return ccNode->m_implementation.definition;
+            return ccNode->m_implementation.m_source;
         }
     }
     
@@ -5614,7 +5614,7 @@ std::string Debugger::stepFunctionInfo(CCodeProject* project, const std::string&
             CCodeNode* ccNodeRef = (CCodeNode*)ref;
             
             //We should find this function in the source of the function that references it
-            if(ccNodeRef->m_implementation.definition.find(functionName) != std::string::npos)
+            if(ccNodeRef->m_implementation.m_source.find(functionName) != std::string::npos)
             {
                 references += ccNodeRef->m_prototype.brief;
                 references += "\n";

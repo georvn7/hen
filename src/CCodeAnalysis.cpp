@@ -2074,7 +2074,7 @@ void CCodeNode::validateFunctionDeclaration()
 
     testCode += proj->getFunctionStubs(calledFunctions);
     
-    testCode += parent->m_implementation.definition;
+    testCode += parent->m_implementation.m_source;
     testCode += "\n\n";
     
     std::string errors = evaluateCodeForErrors(testCode, true);

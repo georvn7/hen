@@ -2184,7 +2184,7 @@ namespace stdrave {
             auto ccNode = (const CCodeNode*)it->second;
             if(ccNode)
             {
-                return ccNode->m_implementation.definition;
+                return ccNode->m_implementation.m_source;
             }
         }
         
@@ -2205,9 +2205,9 @@ namespace stdrave {
                     functionInfo += ccNode->m_prototype.description + "\n\n";
                 }
                 
-                if(!ccNode->m_implementation.definition.empty())
+                if(!ccNode->m_implementation.m_source.empty())
                 {
-                    functionInfo += ccNode->m_implementation.definition + "\n\n";
+                    functionInfo += ccNode->m_implementation.m_source + "\n\n";
                 }
                 
                 return functionInfo;
@@ -2361,9 +2361,9 @@ namespace stdrave {
                 functions += ssDesc.str();
             }
             
-            if(!ccNode->m_implementation.definition.empty())
+            if(!ccNode->m_implementation.m_source.empty())
             {
-                functions += ccNode->m_implementation.definition;
+                functions += ccNode->m_implementation.m_source;
             }
         }
         
@@ -3168,7 +3168,7 @@ namespace stdrave {
         uint32_t oldCompilationStartMessage = ccNode->m_compilationStartMessage;
         if(enableRefactoring)
         {
-            size_t linesCount = countLines(ccNode->m_implementation.definition);
+            size_t linesCount = countLines(ccNode->m_implementation.m_source);
             needsRefactoring = linesCount > MAX_LINES_IN_SOURCE_SNIPPET;
             if(needsRefactoring)
             {
@@ -3646,9 +3646,9 @@ namespace stdrave {
                 
                 CHECK_INFORMATIO_REQUEST_SIZE
                 
-                if(!ccNode->m_implementation.definition.empty())
+                if(!ccNode->m_implementation.m_source.empty())
                 {
-                    functionInfo += ccNode->m_implementation.definition + "\n\n";
+                    functionInfo += ccNode->m_implementation.m_source + "\n\n";
                 }
                 
                 if(functionInfo.empty())
@@ -3946,7 +3946,7 @@ namespace stdrave {
             if (remainingPtr && *remainingPtr == 0) break;
 
             const auto* ccNode = static_cast<const CCodeNode*>(node.second);
-            const std::string& src = ccNode->m_implementation.definition;
+            const std::string& src = ccNode->m_implementation.m_source;
 
             auto m = extractMatchingLinesLimited(src, pattern, maxMatchesPerFunction, remainingPtr);
 
@@ -4002,10 +4002,10 @@ namespace stdrave {
     }
 
     /**
-     * Commit only JSON files recursively in `folder`.
+     * Commit only selected source-like files recursively in `folder`.
      * - Initializes a repo in `folder` if needed.
-     * - Stages and commits only *.json changes (adds/modifies/deletes).
-     * - Returns the new commit hash, or "" if there was nothing to commit.
+     * - Stages and commits only *.json + *.cpp changes (adds/modifies/deletes).
+     * - Returns the new commit hash, or "" if there was nothing to commit and repo had no HEAD.
      */
     std::string CCodeProject::commit(const std::string& folder, const std::string& commitMessage)
     {
@@ -4032,20 +4032,26 @@ namespace stdrave {
             }
         };
 
-        // NEW: record current HEAD (may be empty if repo has no commits yet)
+        // Record current HEAD (may be empty if repo has no commits yet)
         const std::string prevHash = trim(tryGit(
             "git -C " + repoQ + " rev-parse --verify HEAD",
             "gitRevParseHeadPrev"
         ));
 
-        // 2) Stage JSON changes recursively.
-        (void)exec("git -C " + repoQ + " add -A -- ':(glob)**/*.json'",
-                   repo.string(), "gitAddJson", true);
+        // Pathspecs for the ONLY file types we want to stage/commit.
+        // IMPORTANT: keep each spec separately quoted, and place after `--`.
+        const std::string includeSpec =
+            " ':(glob)**/*.json'"
+            " ':(glob)**/*.cpp'";
 
-        // 3) Check if there is anything staged among JSONs
+        // 2) Stage selected changes recursively (adds/modifies/deletes)
+        (void)exec("git -C " + repoQ + " add -A --" + includeSpec,
+                   repo.string(), "gitAddJsonCpp", /*deleteOutput*/true);
+
+        // 3) Check if there is anything staged among the selected file types
         const std::string staged = exec(
-            "git -C " + repoQ + " diff --cached --name-only -- ':(glob)**/*.json'",
-            repo.string(), "gitDiffCachedJson", true
+            "git -C " + repoQ + " diff --cached --name-only --" + includeSpec,
+            repo.string(), "gitDiffCachedJsonCpp", /*deleteOutput*/true
         );
 
         if (trim(staged).empty()) {
@@ -4064,18 +4070,18 @@ namespace stdrave {
         }
         const std::string msgQ = shQuote(msgPath.string());
 
-        // 5) Commit only JSON changes.
+        // 5) Commit only selected changes.
         const std::string commitCmd =
             "git -C " + repoQ +
             " -c user.name='AI Agent' -c user.email='agent@noreply.local' "
-            "commit -F " + msgQ + " --only -- ':(glob)**/*.json'";
+            "commit -F " + msgQ + " --only --" + includeSpec;
 
-        (void)exec(commitCmd, repo.string(), "gitCommitJson", true);
+        (void)exec(commitCmd, repo.string(), "gitCommitJsonCpp", /*deleteOutput*/true);
 
         // 6) Get the resulting commit hash
         const std::string hash = trim(exec(
             "git -C " + repoQ + " rev-parse HEAD",
-            repo.string(), "gitRevParseHead", true
+            repo.string(), "gitRevParseHead", /*deleteOutput*/true
         ));
 
         // 7) Cleanup (best-effort)
