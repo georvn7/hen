@@ -370,6 +370,15 @@ std::pair<std::string, std::string> Debugger::runLLDB(CCodeProject* project, std
         instrumentSource(project, functionToDebug, m_nextStep.breakpoints);
     }
     
+#if defined(__APPLE__)
+    //Codesign with debug entitlements
+    //codesign -s - --entitlements ./debug.entitlements ./feature_test
+    std::string entitlementPath = Client::getInstance().getEnvironmentDir();
+    entitlementPath += "/debug.entitlements";
+    std::string codesignCmd = "codesign -s - --entitlements " + entitlementPath + " " + traceExecutable;
+    stdrave::exec(codesignCmd, m_workingDirectory, "Codesign", true);
+#endif
+    
     namespace bp = boost::process::v2;  // Changed to v2
     namespace asio = boost::asio;
     
@@ -2410,15 +2419,6 @@ bool Debugger::execTestScript(CCodeProject* project,
     int returnCode;
     
     std::string cmdArgsOnly = removeFirstWord(cmd, "main");
-    
-#if defined(__APPLE__)
-    //Codesign with debug entitlements
-    //codesign -s - --entitlements ./debug.entitlements ./feature_test
-    std::string entitlementPath = Client::getInstance().getEnvironmentDir();
-    entitlementPath += "/debug.entitlements";
-    std::string codesignCmd = "codesign -s - --entitlements " + entitlementPath + " " + execPath;
-    stdrave::exec(codesignCmd, m_workingDirectory, "Codesign", true);
-#endif
     
     auto logs = runTest(traceOnlyLog, project, execPath, cmdArgsOnly, m_workingDirectory, 10, instrument, returnCode);
     debugAppLog = logs.first;
