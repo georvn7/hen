@@ -2079,7 +2079,7 @@ namespace stdrave {
             
             client.enableLog(true);
             
-            generateCMakeFile(m_description.name, sourcesDirectory, groups, readme);
+            generateCMakeFile(m_description.name, sourcesDirectory, groups, readme, {}, {});
         }
     }
 

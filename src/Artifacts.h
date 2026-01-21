@@ -7,7 +7,9 @@ namespace stdrave {
 void generateCMakeFile(const std::string& projectName,
                        const std::string& sourcesDirectory,
                        const std::map<std::string, std::vector<std::string>>& groups,
-                       const std::string& readmeContent);
+                       const std::string& readmeContent,
+                       const std::vector<std::string>& testDirectories,
+                       const std::vector<std::string>& unitTestDirectories);
 
 class FilesGroup : public Reflection<FilesGroup>
 {
