@@ -6184,7 +6184,7 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         std::string commitHash;
         if(!m_commitMessage.empty())
         {
-            m_commitMessage += "STEP: " + stepIndexStr + " run test '" + m_nextStep.action_subject + "'\n\n";
+            m_commitMessage += "\n\nSTEP: " + stepIndexStr + " run test '" + m_nextStep.action_subject + "'\n\n";
             m_commitMessage += analysis.debug_notes;
             
             commitHash = project->commit(m_commitMessage);
