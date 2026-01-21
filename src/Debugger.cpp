@@ -4797,7 +4797,8 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
     else if(m_nextStep.action_type == "file_info")
     {
         //TODO: I need to keep an eye on this feedback
-        if(!boost_fs::path(m_nextStep.action_subject).parent_path().empty())
+        std::string direcoty = boost_fs::path(m_nextStep.action_subject).parent_path().string();
+        if(!direcoty.empty() && direcoty != "./")
         {
             feedback += "I see you specify directory part in your file name. ";
             feedback += "Note that file_info command is only for the files in the test working directory";
