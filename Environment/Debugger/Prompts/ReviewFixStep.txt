@@ -5,10 +5,11 @@ GIT HISTORY FOR FUNCTION [[function]] START
 [[git_history]]
 GIT HISTORY FOR FUNCTION [[function]] END
 
-Context: This codebase is managed autonomously by an AI coding agent. Unlike human-managed repos where each commit typically represents an intentional feature or fix, this history reflects an evolutionary debugging process. Commits fall into three categories:
-1. Breakthrough fixes — unblocked significant debugging progress
-2. Contributing fixes — moved the trajectory forward incrementally
-3. Dead ends — did not help or even caused regressions (later reverted or superseded)
+Context: This codebase is managed autonomously by an AI coding agent. Unlike human-managed repos where each commit typically represents an intentional feature or fix, this history reflects an evolutionary debugging process. Commits fall into four categories:
+1. Code generation — initial code generation with function description (the description might be outdated due to subsequent code modifications)
+2. Breakthrough fixes — unblocked significant debugging progress
+3. Contributing fixes — moved the trajectory forward incrementally
+4. Dead ends — did not help or even caused regressions (later reverted or superseded)
 
 When analyzing this history:
 - Look for patterns in breakthrough fixes — what made them successful?
