@@ -4174,10 +4174,6 @@ namespace stdrave {
             srcMessage += "```\n";
             pushMessage(srcMessage, "assistant");
             
-            srcMessage = "```cpp\n";
-            srcMessage += source;
-            srcMessage += "```\n";
-            
             attmpts++;
         }
         
