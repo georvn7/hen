@@ -1744,7 +1744,7 @@ namespace stdrave {
         std::string logsDebugDir = getProjDir() + "/logs/debug/" + unitTestDef.name;
         boost_fs::remove_all(logsDebugDir);
         
-        return archIndex;
+        return archIndex + 1;//Old archives plus the current trajectory
     }
 
     void CCodeProject::debugTests()
@@ -1872,7 +1872,9 @@ namespace stdrave {
                         std::string trajectoryDir;
                         uint32_t utAttempt = archiveTest(unitTestPath, trajectoryDir);
                         
-                        std::string branchName = "before_" + config.current + "_" + test.second + "_" + std::to_string(utAttempt);
+                        std::string branchName = "before_" + config.current + "_" + std::to_string(utAttempt);
+                        
+                        branchName += "_" + test.second + "_" + std::to_string(utAttempt);
                         std::string beforeTheUTest = createBranchFromCurrent(getProjDir() + "/dag", branchName);
                         
                         config.current_unit_test = utKey;
