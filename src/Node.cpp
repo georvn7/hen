@@ -54,13 +54,13 @@ bool Node::inference(std::string& cache, const std::string& message, std::string
     return result;
 }
 
-bool Node::inference(std::string& cache, const std::string& question, bool enforceBinaryResponse)
+bool Node::inference(std::string& cache, const std::string& question, bool enforceBinaryResponse, bool defaultResponse)
 {
     Project* proj = Client::getInstance().project();
     
     Cache _cache(getNodeDirectory(), cache);
     std::string response;
-    bool result = proj->inference(_cache, question, enforceBinaryResponse, response);
+    bool result = proj->inference(_cache, question, enforceBinaryResponse, response, defaultResponse);
     if(!_cache.available())
     {
         cache = "na";

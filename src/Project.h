@@ -171,7 +171,8 @@ namespace stdrave {
         std::string getInstrumentationMessage(web::json::value& schema);
         bool inference(Cache& cache, const std::string& message, web::json::value& schema, web::json::value& object);
         bool inference(Cache& cache, const std::string& message, std::string& source, bool* truncated);
-        bool inference(Cache& cache, const std::string& question, bool enforceBinaryAnswer, std::string& response);
+        
+        bool inference(Cache& cache, const std::string& question, bool enforceBinaryAnswer, std::string& response, bool defaultResponse);
         
         std::set<std::string> getNodeNames() const;
 	};

@@ -52,5 +52,5 @@ How the corrected test should behave differently
 This feedback will be used to regenerate the test from scratch. All debugging progress will be reverted to ensure an optimal trajectory.
 Begin your response with YES: or NO:
 
-YES: The unit test is correct and not responsible for the failure. [Continue debugging]
-NO: The unit test is flawed. [Provide evidence, diagnosis, and correction guidance]
+YES: The unit test is correct and not responsible for the failure. Application behaves incorrectly and needs more debugging.[Continue debugging]
+NO: The unit test itself is flawed. [Provide evidence, diagnosis, and correction guidance]

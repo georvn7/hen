@@ -48,7 +48,7 @@ protected:
     template <typename T>
     bool inference(std::string& cache, const std::string& message, T* object = nullptr);
     bool inference(std::string& cache, const std::string& message, std::string& source, bool* truncated=nullptr);
-    bool inference(std::string& cache, const std::string& question, bool enforceBinaryResponse);
+    bool inference(std::string& cache, const std::string& question, bool enforceBinaryResponse, bool defaultResponse=true);
     
     void cleanDirectory(const std::string& directory);
     bool saveJson(const web::json::value& json, const std::string& path);

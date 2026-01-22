@@ -7119,7 +7119,7 @@ namespace stdrave {
         bool needsImrpovement = false;
         std::string needToImproveMsg = needToImprove.str();
         std::string response;
-        bool result = proj->inference(cache, needToImproveMsg, true, response);
+        bool result = proj->inference(cache, needToImproveMsg, true, response, true);
         
         return !result;
     }

@@ -967,20 +967,31 @@ namespace stdrave {
         return Client::getInstance().processUserInput();
     }
 
-    bool Project::inference(Cache& cache, const std::string& question, bool enforceBinaryAnswer, std::string& response)
+    bool Project::inference(Cache& cache, const std::string& question, bool enforceBinaryAnswer, std::string& response, bool defaultResponse)
     {
         response = "review";
         bool truncated=false;
         inference(cache, question, response, nullptr);
         bool Yes = startsWithIgnoreCase(response, "YES");
         bool No = startsWithIgnoreCase(response, "NO");
-        while(enforceBinaryAnswer && !Yes && !No)
+        
+        int attempt = 1;
+        const int maxAttempts = 5;
+        
+        while(enforceBinaryAnswer && !Yes && !No && attempt < maxAttempts)
         {
             response = "review";
             inference(cache, "You must start your response with YES or NO", response, nullptr);
             
             Yes = startsWithIgnoreCase(response, "YES");
             No = startsWithIgnoreCase(response, "NO");
+            
+            attempt++;
+        }
+        
+        if(enforceBinaryAnswer && !Yes && !No)
+        {
+            return defaultResponse;
         }
         
         return Yes;
