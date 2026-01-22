@@ -57,11 +57,11 @@ class NextDebugStep : public Reflection<NextDebugStep>
 {
     public:
     DECLARE_TYPE(NextDebugStep, "Next step debugging the application")
-    DECLARE_ENUM_FIELD(action_type, "\"log_info\",\"function_info\",\"data_info\",\"file_info\",\"functions_summary\",\"call_graph\",\"step_info\",\"search_source\",\"fix_function\",\"refactor_data\",\"new_data\",\"debug_function\",\"run_test\"",\
+    DECLARE_ENUM_FIELD(action_type, "\"log_info\",\"function_info\",\"data_info\",\"file_info\",\"functions_summary\",\"call_graph\",\"search_source\",\"fix_function\",\"refactor_data\",\"new_data\",\"debug_function\",\"run_test\"",\
                        "Type of the action performed as a next step")
     DECLARE_FIELD(std::string, action_subject, "Could be a function name, a data type name, regex, or a file name. If no subject required for the action must be set to 'none'")
     DECLARE_FIELD(uint32_t, line_number, "Line number to the relevant actions like 'log_info', 'file_info'. If not needed must be 0")
-    DECLARE_FIELD(uint32_t, invocation, "Function invocation to the relevant actions like 'log_info' and 'function_info'. Or step index for the 'step_info' action. If not needed must be 1")
+    DECLARE_FIELD(uint32_t, invocation, "Function invocation to the relevant actions like 'log_info' and 'function_info'. If not needed must be 1")
     DECLARE_ARRAY_FIELD(Breakpoint, breakpoints, "Breakpoints to be set only if the 'action_type' is 'debug_function'. Required field, must be empty array if no need for breakpoints")
     DECLARE_FIELD(std::string, motivation, "Concise explanation of why this action_type and action_subject are selected for the next debug step.")
     uint32_t m_stepId;

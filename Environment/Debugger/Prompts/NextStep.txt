@@ -14,8 +14,6 @@ For log section request, via the 'log_info' action, you can specify the start li
 
 In case you've decided to debug a function, via the 'debug_function' action, consult with 'HOW TO SET BREAKPOINTS' section for how you can set a custom breakpoint. The 'invocation' field will not be considered when the breakpoints are set!
 
-If you request information about previous debugging step, via the 'step_info' action, specify the step index (1-based) in the 'invocation' field.
-
 If you decided to scan in the data type and function source files, via the 'search_source' action, for lines matching a give regex, specify the pattern in the 'action_subject' field.
 
 When investigating an issue and suggesting a fix, considering the tradeoff required "Structural vs. Local" changes based on which is likely to reach a passing test in the fewest steps.

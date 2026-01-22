@@ -6676,7 +6676,7 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
 
 void Debugger::reviewGiHistoryForFix(CCodeProject* project)
 {
-    //if(m_nextStep.action_type != "fix_function")
+    if(m_nextStep.action_type != "fix_function")
     {
         return;
     }
@@ -6695,7 +6695,7 @@ void Debugger::reviewGiHistoryForFix(CCodeProject* project)
     std::string repoFolder = project->getProjDir() + "/dag";
     
     std::string functionSrcFile = ccNode->getNodeDirectory();
-    functionSrcFile += "/implementation.json";
+    functionSrcFile += "/" + ccNode->getName() + ".cpp";
     
     std::string gitHistory = project->getGitHistory(repoFolder, functionSrcFile, 10);
     
