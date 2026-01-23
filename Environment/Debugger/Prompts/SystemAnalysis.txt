@@ -13,7 +13,7 @@ I've executed the '[[application]]' application with debug support to perform te
 
 [[analysis_hint]]
 
-The following functions are classified as sub-systems as they are with call stack depth <= [[max_depth]] and are called just once:
+The following functions (if presented) are classified as sub-systems as they are with call stack depth <= [[max_depth]] and are called just once:
 [[sub_systems]]
 
 I will ask you to review the source, log entries and trace data for each of those functions.

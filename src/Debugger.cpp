@@ -2690,6 +2690,10 @@ void Debugger::systemAnalysis(CCodeProject* project, const std::string& hint, Ru
     std::set<std::string> subSystems;
     std::string systemData = getSubSystemsData(project, subSystems);
     std::string subSystemsStr = getAsCsv(subSystems);
+    if(subSystemsStr.empty())
+    {
+        subSystemsStr = "Unable to identify functions that appear to be sub-systems";
+    }
     
     std::string callTree = project->printGraph(m_system, PRINT_MAX_FUNCTIONS_DEPTH, true);
     std::string application = project->getProjectName();
@@ -6188,6 +6192,13 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             m_commitMessage += analysis.debug_notes;
             
             commitHash = project->commit(m_commitMessage);
+            std::string currentCommit = project->currentCommit();
+            
+            if(currentCommit.empty() || currentCommit != commitHash)
+            {
+                criticalError("Invalid commit!. Investigate\n");
+                return false;
+            }
         }
         
         m_commitMessage.clear();
@@ -6315,6 +6326,11 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             std::set<std::string> funcSnapshotBefore = project->getNodeNames();
             
             std::string commitBeforeTheFix = project->currentCommit();
+            if(commitBeforeTheFix.empty())
+            {
+                criticalError("Emptu current commit for function: " + functionName + "\n\n");
+                return false;
+            }
             
             std::string before;
             std::string implementation = fixFunction(project, test, functionName, before, debugNotes);
@@ -6362,6 +6378,12 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             {
                 debugNotes += "The function '" + functionName + "' couldn't be fixed due to compilation issues. Reverting changest to the previous stable state";
                 project->revertToCommit(commitBeforeTheFix);//how safe is this, we still have the call graph in memomry
+                std::string currentCommit = project->currentCommit();
+                if(currentCommit.empty() || currentCommit != commitBeforeTheFix)
+                {
+                    criticalError("Unable to revert to stable commit. Investigate!\n");
+                    return false;
+                }
                 
                 project->generateSources();
                 compile(project);
@@ -8859,7 +8881,7 @@ bool Debugger::instrumentFunction(CCodeProject* project, const std::string& func
         }
         else
         {
-            retExpr = "_RETURN_" + functionName + ";return;";
+            retExpr = "{_RETURN_" + functionName + ";return;}";
         }
         
         if(!retExpr.empty())

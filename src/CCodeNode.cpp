@@ -5511,6 +5511,10 @@ namespace stdrave {
                     popContext();
                 }
             }
+            else
+            {
+                pretestOK = true;
+            }
             
             popContext();
         }
