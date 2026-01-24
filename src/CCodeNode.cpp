@@ -5314,7 +5314,10 @@ namespace stdrave {
         CCodeProject* proj = (CCodeProject*)Client::getInstance().project();
         
         std::string cache = "";
+        
+        captureContext();
         inference(cache, message, &m_unitTest.definition);
+        popContext();
         
         bool wasOnAuto = Client::getInstance().run();
         
@@ -5322,31 +5325,44 @@ namespace stdrave {
         std::string reviewTestSelf = proj->review_test_self.prompt({
             {"function", m_brief.func_name}});
         
-
-        std::string feedback = reviewTestSelf;
-        std::string review = m_unitTest.definition.validate(false);
-        if(!review.empty())
-        {
-            feedback += "\n\nHere are a few other things that may also require attention, but aren't necessarily a problem: ";
-            feedback += review;
-        }
+        int atttempts = 0;
+        const int maxAttempts = 5;
         
-        while(!inference(cache, feedback, true))
+        bool testIsValid = false;
+        
+        while(!testIsValid && atttempts < maxAttempts)
         {
-            feedback = "\nDo your best effort to fix all this and revise the response!";
+            captureContext();
             
-            inference(cache, feedback, &m_unitTest.definition);
-            feedback.clear();
+            pushMessage(message, "user");
+            std::string testDef = utility::conversions::to_utf8string(m_unitTest.definition.to_json().serialize());
+            pushMessage(testDef, "assistant");
             
-            review = m_unitTest.definition.validate(false);
+            std::string feedback = reviewTestSelf;
+            std::string review = m_unitTest.definition.validate(false);
             if(!review.empty())
             {
-                feedback += "\n\nHere are a few other things that may also require attention, but aren't necessarily a problem: ";
+                feedback += "\n\nHere are a few other things that may also require attention, but aren't necessarily a problem:\n";
                 feedback += review;
             }
+            //else //Only consume attempt if the test passes validation
+            {
+                atttempts++;
+            }
             
-            feedback += "\n\nReview the new version of the test and let me know your assestment by answerign with 'YES/NO' as we discussed";
+            testIsValid = inference(cache, feedback, true);
+            if(!testIsValid)
+            {
+                feedback = "\nDo your best effort to fix all this and revise the response!";
+                inference(cache, feedback, &m_unitTest.definition);
+            }
+            
+            popContext();
         }
+        
+        pushMessage(message, "user");
+        std::string testDef = utility::conversions::to_utf8string(m_unitTest.definition.to_json().serialize());
+        pushMessage(testDef, "assistant");
         
         if(!wasOnAuto) Client::getInstance().stop();
     }
