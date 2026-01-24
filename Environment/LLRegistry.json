@@ -550,7 +550,7 @@
       "provider": "groq",
       "url": "https://api.groq.com/openai/v1/chat/completions",
       "model": "openai/gpt-oss-20b",
-      "reasoning_effort": "na",
+      "reasoning_effort": "high",
       "verbosity": "na",
       "context_size": 128,
       "rate_limit": 4096,
