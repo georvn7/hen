@@ -4297,12 +4297,14 @@ namespace stdrave {
                    repo.string(), "gitCleanFdAfterResetTarget", /*deleteOutput*/true);
 
         // Return resulting HEAD
-        return trim(exec("git -C " + repoQ + " rev-parse HEAD",
+        std::string resultCommitish = trim(exec("git -C " + repoQ + " rev-parse HEAD",
                          repo.string(), "gitRevParseHeadAfterRevertToCommit", /*deleteOutput*/true));
         
         reload();
         Client::getInstance().setRequestId(request_id);
         saveStats();
+        
+        return resultCommitish;
     }
 
     std::string CCodeProject::currentCommit(const std::string& folder)
