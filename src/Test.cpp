@@ -42,6 +42,7 @@ DEFINE_TYPE(UnitTest)
 DEFINE_FIELD(UnitTest, definition)
 DEFINE_FIELD(UnitTest, implementation)
 DEFINE_ARRAY_FIELD(UnitTest, input_files)
+DEFINE_FIELD(UnitTest, regex_contract)
 
 void TestStep::clear()
 {
