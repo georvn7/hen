@@ -1000,8 +1000,8 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
                 requestFromClientBody[U("verbosity")] = json::value::string(utility::conversions::to_string_t(llm->verbosity));
             }
             
-            requestFromClientBody[U("temperature")] = json::value::number(0.2);
-            requestFromClientBody[U("top_p")] = json::value::number(0.95);
+            //requestFromClientBody[U("temperature")] = json::value::number(0.2);
+            //requestFromClientBody[U("top_p")] = json::value::number(0.95);
         }
         else
         {
