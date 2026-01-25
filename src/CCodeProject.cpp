@@ -4198,15 +4198,17 @@ namespace stdrave {
         const std::string nPart      = (maxCommits > 0) ? (" -n " + std::to_string(maxCommits)) : "";
         const std::string followPart = followRenames ? " --follow" : "";
 
-        // Pretty header + full commit message (%B) + patch (-p), restricted to the pathspec after `--`.
-        // `core.quotepath=false` keeps paths readable (no octal escapes).
+        const int contextLines = 1;
+        const int ctx = (contextLines < 0) ? 0 : contextLines; // 0 => no context
+        const std::string uPart = " -U" + std::to_string(ctx);
+
         const std::string cmd =
-            "git -C " + repoQ +
-            " -c core.quotepath=false"
-            " log" + nPart + followPart +
-            " --no-color --date=iso-strict"
-            " --pretty=format:'===%ncommit %H%nDate: %ad%n%n%B%n'"
-            " -p -- " + fileQ;
+        "git -C " + repoQ +
+        " -c core.quotepath=false"
+        " log" + nPart + followPart +
+        " --no-color --date=iso-strict"
+        " --pretty=format:'===%ncommit %H%nDate: %ad%n%n%B%n'"
+        " -p" + uPart + " -- " + fileQ;
 
         std::string out;
         try {
