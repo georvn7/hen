@@ -951,7 +951,14 @@ namespace stdrave {
                         //Let's pop previous message, who knows what's there. We want to save context space
                         popMessages(1);
                         
-                        pushMessage("Unable to extract source or the \"ACTUAL\" hint from the response. Please provide it again!", "user", true);
+                        if(review)
+                        {
+                            pushMessage("Unexpected or missing response. Please provide it again!", "user", true);
+                        }
+                        else
+                        {
+                            pushMessage("Unable to extract source or the \"ACTUAL\" hint from the response. Please provide it again!", "user", true);
+                        }
                         
                         bool loop = Client::getInstance().processUserInput();
                         if(!loop)
