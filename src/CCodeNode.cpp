@@ -4743,6 +4743,10 @@ namespace stdrave {
         return scopePrefix(c) + leaf;
     }
 
+    static std::string leafName(CXCursor c) {
+        return cxToString(clang_getCursorSpelling(c));
+    }
+
     static bool hasRealSpellingLocation(CXCursor c) {
         CXSourceLocation loc = clang_getCursorLocation(c);
         CXFile file = nullptr;
@@ -4766,11 +4770,11 @@ namespace stdrave {
 
         // Only symbols originating from this .cpp (not headers)
         if (!isInMainFile(c))
-            return CXChildVisit_Recurse;
+            return CXChildVisit_Continue;
 
         // Skip implicit compiler-generated stuff
-        if (hasRealSpellingLocation(c))
-            return CXChildVisit_Recurse;
+        if (!hasRealSpellingLocation(c))
+            return CXChildVisit_Continue;
 
         const CXCursorKind k = clang_getCursorKind(c);
 
@@ -4793,7 +4797,7 @@ namespace stdrave {
             case CXCursor_Destructor:
             case CXCursor_ConversionFunction:
             case CXCursor_FunctionTemplate: {
-                addUnique(true, qualifiedName(c, /*preferDisplayName=*/true));
+                addUnique(true, leafName(c));
                 break;
             }
             default: break;
@@ -4807,7 +4811,7 @@ namespace stdrave {
             case CXCursor_EnumDecl:
             case CXCursor_ClassTemplate: {
                 // Skip anonymous types (e.g., anonymous structs)
-                std::string n = qualifiedName(c, /*preferDisplayName=*/false);
+                std::string n = leafName(c);
                 if (!n.empty()) addUnique(false, n);
                 break;
             }
@@ -4980,6 +4984,8 @@ namespace stdrave {
         
         for(auto func : symbols.functions)
         {
+            if(func == "main") continue;
+            
             if(proj->nodeMap().find(func) != proj->nodeMap().end())
             {
                 usedFunctions += func + " ";
@@ -5061,6 +5067,8 @@ namespace stdrave {
          
             prompt += "\n\nProvide updated version of the regex contract addressing the mentioned problems!\n\n";
             inference(cache, prompt, &m_unitTest.regex_contract);
+            
+            auto testJson = m_unitTest.definition.to_json();
             prompt = m_unitTest.regex_contract.verify();
             
             popContext();
