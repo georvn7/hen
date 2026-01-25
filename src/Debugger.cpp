@@ -2640,9 +2640,11 @@ void Debugger::runAnalysis(CCodeProject* project, const TestDef& test, RunAnalys
         analysisTrace(project, debugLogTestStr, lldbOnlyLog, analysis, test);
     }
     
-    std::string stepProgress = getRunAnalysisProgress();
-    analysis.debug_notes = stepProgress;
-    analysis.log_summary.clear(); //debug_info is enough as on the regular steps
+    if(!m_runAnalysisSteps.empty())
+    {
+        analysis.debug_notes = m_runAnalysisSteps[0].m_debugNotes;
+        analysis.log_summary = m_runAnalysisSteps[0].m_logSummary;
+    }
     
     analysis.m_testLog = debugLogTestStr;
 }
