@@ -4556,6 +4556,15 @@ namespace stdrave {
         std::string headers = getUnitTestHeaders();
         //Save source
         std::string cppFile = testDir + "/main.cpp";
+        boost_fs::create_directories(testDir);
+        //boost_fs::create_directories(buildDir + "/" + testDir);
+        //std::string cppFile = buildDir + "/" + testDir + "/main.cpp";
+        
+        /*std::ofstream cpp(cppFile);
+        cpp << headers;
+        cpp << source;
+        cpp.close();*/
+        
         m_unitTest.implementation = headers + source;
         std::ofstream cpp(cppFile);
         cpp << headers;
@@ -4770,13 +4779,15 @@ namespace stdrave {
 
         // Only symbols originating from this .cpp (not headers)
         if (!isInMainFile(c))
-            return CXChildVisit_Continue;
+            return CXChildVisit_Recurse;
 
         // Skip implicit compiler-generated stuff
         if (!hasRealSpellingLocation(c))
-            return CXChildVisit_Continue;
+            return CXChildVisit_Recurse;
 
         const CXCursorKind k = clang_getCursorKind(c);
+        
+        std::cout << "DEBUG: " << getCursorName(c) << " kind=" << clang_getCursorKind(c) << std::endl;
 
         auto addUnique = [&](bool isFunc, const std::string& name) {
             if (name.empty()) return;
@@ -4930,14 +4941,35 @@ namespace stdrave {
 
         CompilationInfo ci;
         ci.sourceFile = srcFile;
+        
+        std::string sysroot = stdrave::getSysRoot();
+        std::string resourceDir = stdrave::getClangResourceDir();
+        std::string cxxInclude  = stdrave::getCppInclude();
+        std::string cxxIncludeOpt = "-I" + cxxInclude;
+         
+         /*const char* clang_args[] = {
+             "-x", "c++",
+             "-std=c++17",
+             "-stdlib=libc++",
+             "-DCOMPILE_TEST",
+             "-Werror=format",
+             "-D_LIBCPP_HAS_NO_WIDE_CHARACTERS",//Without this we get "couldn't find stdarg.h" error
+             "-isysroot", sysroot.c_str(),
+             "-resource-dir", resourceDir.c_str(), // ← critical for stdarg.h, stdint.h, intrinsics, etc.
+             cxxIncludeOpt.c_str(), // ← libc++ headers
+         */
 
         auto& a = ci.clangArgs;
         a = {
+            "-x", "c++",
             "-std=c++17",
             "-arch", "arm64",
             "-Werror=format",
             "-fno-diagnostics-show-note-include-stack",
             "-c",
+            "-isysroot", sysroot.c_str(),
+            "-resource-dir", resourceDir.c_str(), // ← critical for stdarg.h, stdint.h, intrinsics, etc.
+            cxxIncludeOpt.c_str(), // ← libc++ headers
             "-I" + buildDir,
             "-I" + (buildDir + "/" + buildSourcePath),
         };
@@ -5054,6 +5086,7 @@ namespace stdrave {
         pushMessage(prompt, "user");
         
         prompt = m_unitTest.regex_contract.verify();
+        prompt += m_unitTest.definition.validate(m_unitTest.regex_contract);
         
         uint32_t attempts = 0;
         while(!prompt.empty() && attempts < 5)
@@ -5070,6 +5103,7 @@ namespace stdrave {
             
             auto testJson = m_unitTest.definition.to_json();
             prompt = m_unitTest.regex_contract.verify();
+            prompt += m_unitTest.definition.validate(m_unitTest.regex_contract);
             
             popContext();
             
@@ -5078,54 +5112,7 @@ namespace stdrave {
         
         popContext();
         
-#if 0
-        bool fullyMatch = true;
-        
-        TestDef oldDef = m_unitTest.definition;
-        if(attempts <= 5)
-        {
-            for(auto pattern : m_unitTest.regex_contract.regex_patterns)
-            {
-                //pattern->command_index
-                if(pattern->test_step == "pretest")
-                {
-                    if(m_unitTest.definition.pretest.commands.size() < pattern->command_index)
-                    {
-                        std::string rawCmd = *m_unitTest.definition.pretest.commands[pattern->command_index];
-                        
-                        bool debug = false;
-                        bool finalResult = false;
-                        
-                        std::string cmd = rawCmd;
-                        std::string expectedResult;
-                        std::string stdoutRegex;
-                        parsePrefixFlags(rawCmd, debug, finalResult, expectedResult, stdoutRegex, cmd);
-                        
-                        if(stdoutRegex.empty())
-                        {
-                            fullyMatch = false;
-                            break;
-                        }
-                        
-                        m_unitTest.regex_contract.pa
-                    }
-                }
-                else if(pattern->test_step == "test")
-                {
-                    
-                }
-                else if(pattern->test_step == "posttest")
-                {
-                    
-                }
-                else
-                {
-                    fullyMatch = false;
-                    break;
-                }
-            }
-        }
-#endif
+        m_unitTest.definition.swapInvalid(m_unitTest.regex_contract);
         
         return true;
     }
@@ -5554,6 +5541,29 @@ namespace stdrave {
         linkUnitTest(true);
     }
 
+    void CCodeNode::summarizeUnitTestDesc()
+    {
+        CCodeProject* proj = (CCodeProject*)Client::getInstance().project();
+        
+        captureContext();
+        
+        std::string unitTestDesc = "review";
+        bool truncated = false;
+        
+        std::string message = "\nUNIT TEST\n\n";
+        message += m_unitTest.getDescription();
+        message += "Summarize the unit test description in one or two sentences. ";
+        message += "Provide the summary formated as a plain text. No .json or other formatting\n";
+        
+        Cache cache;
+        proj->inference(cache, message, unitTestDesc, &truncated);
+        
+        //TODO: Probably we need verification loop for the size of the summary
+        m_unitTest.definition.description = unitTestDesc;
+        
+        popContext();
+    }
+
     void CCodeNode::buildUnitTest(const std::string& fullTestPath, const std::string& prevFullTestPath, const std::string& recommendation)
     {
         CCodeProject* proj = (CCodeProject*)Client::getInstance().project();
@@ -5651,6 +5661,7 @@ namespace stdrave {
         popContext(); //Pop the last unit test definition
         popContext(); //Pop back to "Start unit test definition"
 #endif
+        summarizeUnitTestDesc();
         
         saveJson(m_unitTest.definition.to_json(), testDir + "/test.json");
         

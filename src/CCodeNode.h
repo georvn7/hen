@@ -353,6 +353,7 @@ public:
     bool reviewTestResult(const std::string& testCL, const std::string& output);
     void deleteUnitTest();
     void storeUnitTestContent();
+    void summarizeUnitTestDesc();
     
     void clang(const std::string& code, CodeType type, CodeInspector codeInspector);
     void validateFunctionDeclaration();

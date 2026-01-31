@@ -55,31 +55,37 @@ private:
     template <typename Fn>
     void forAllSteps(Fn&& fn)
     {
-        fn(pretest);
+        fn(pretest, "pretest");
     
         //TODO: Is there a better way to do that?
         TestStep testStep;
         testStep.input_files = test.input_files;
         testStep.output_files = test.output_files;
         testStep.commands = { std::make_shared<std::string>(test.command) };
-        fn(testStep);
         
-        fn(posttest);
+        fn(testStep, "test");
+        
+        test.input_files = testStep.input_files;
+        test.output_files = testStep.output_files;
+        test.command = *testStep.commands[0];
+        
+        fn(posttest, "posttest");
     }
 
     template <typename Fn>
     void forAllSteps(Fn&& fn) const
     {
-        fn(pretest);
+        fn(pretest, "pretest");
         
         //TODO: Is there a better way to do that?
         TestStep testStep;
         testStep.input_files = test.input_files;
         testStep.output_files = test.output_files;
         testStep.commands = { std::make_shared<std::string>(test.command) };
-        fn(testStep);
         
-        fn(posttest);
+        fn(testStep, "test");
+        
+        fn(posttest, "posttest");
     }
     
     std::string validateIOFiles();
@@ -103,12 +109,15 @@ public:
     std::string getDescription(const std::string& workingDir) const;
     
     std::string validate(bool isPrivate);
+    std::string validate(const TestRegexContract& contract);
+    void swapInvalid(const TestRegexContract& contract);
+    
     void clear();
     std::string checksStdout() const;
     std::string m_lastResult;
     
     bool load(const std::string& jsonPath);
-    bool hasRegexChecks() const;
+    uint32_t hasRegexChecks() const;
 };
 
 class TestConfig : public Reflection<TestConfig>

@@ -5,7 +5,12 @@ GIT HISTORY FOR FUNCTION [[function]] START
 [[git_history]]
 GIT HISTORY FOR FUNCTION [[function]] END
 
-Context: This codebase is managed autonomously by an AI coding agent. Unlike human-managed repos where each commit typically represents an intentional feature or fix, this history reflects an evolutionary debugging process. Commits fall into four categories:
+Context: This codebase is managed autonomously by an AI coding agent. Unlike human-managed repos where each commit typically represents an intentional feature or fix, this history reflects an evolutionary debugging process. 
+- First phase of the process is code generation
+- Then syntactical correctness
+- Finally debugging. During debugging we have multiple sessions, usually for unit and integration tests. Each debug session has it's own steps sequence, so you can see out of order debug steps in the commit history (from different sessions)
+
+Commits fall into four categories:
 1. Code generation — initial code generation with function description (the description might be outdated due to subsequent code modifications)
 2. Breakthrough fixes — unblocked significant debugging progress
 3. Contributing fixes — moved the trajectory forward incrementally

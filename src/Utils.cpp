@@ -2322,6 +2322,49 @@ bool parsePrefixFlags(const std::string& s,
     return true;
 }
 
+std::string makeTestCommand(const std::string& cmd,
+                            bool debug,
+                            bool checkResult,
+                            const std::string& expectedResult,
+                            const std::string& stdoutRegex)
+{
+    std::string newCmd;
+    if(debug || checkResult || !stdoutRegex.empty())
+    {
+        newCmd += "[[";
+        
+        std::string attributes;
+        if(debug)
+        {
+            if(!attributes.empty()) attributes += ", ";
+            attributes += "debug";
+        }
+        
+        if(checkResult)
+        {
+            if(!attributes.empty()) attributes += ", ";
+            attributes += "result=" + expectedResult;
+        }
+        
+        if(!stdoutRegex.empty())
+        {
+            if(!attributes.empty()) attributes += ", ";
+            attributes += "stdout=" + stdoutRegex;
+        }
+        
+        if(!attributes.empty())
+        {
+            newCmd += attributes;
+        }
+        
+        newCmd += "]]";
+    }
+    
+    newCmd += cmd;
+    
+    return newCmd;
+}
+
 bool tryMakeRegex(const std::string& pattern, std::regex& out,
                             std::regex_constants::syntax_option_type flags,
                             std::string* error) noexcept

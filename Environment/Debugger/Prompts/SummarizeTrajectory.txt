@@ -18,7 +18,7 @@ On the next debugging steps, the progress will be presented with the new summary
 [[remaining_trajectory]]
 //REMAINING STEPS end here
 
-Please summarize ONLY the content in the 'STEPS TO SUMMARIZE' section, up to and including the step [[step]]. If this section begins with a previous summary, incorporate it into your new summary.
+Your response must ONLY contain summary of the content in the 'STEPS TO SUMMARIZE' section, up to and including the step [[step]]. If this section begins with a previous summary, incorporate it into your new summary as well. The response must not contain anything from the 'REMAINING STEPS', this section is just for orientation.
 
 On the next debugging steps, the progress will be presented with the new summary followed by the steps in the 'REMAINING STEPS' section
 

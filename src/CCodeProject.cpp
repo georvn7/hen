@@ -3325,9 +3325,7 @@ namespace stdrave {
 
     std::string CCodeProject::getBuildSourcePath() const
     {
-        std::string buildSourcePath;
-        buildSourcePath += "source";
-        return buildSourcePath;
+        return "source";
     }
 
     std::string CCodeProject::listIncludes(std::set<std::string> includes, bool checkIncludes) const

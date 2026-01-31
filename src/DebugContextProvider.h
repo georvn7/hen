@@ -1392,7 +1392,7 @@ public:
         }
         
         infoForCurrentStep += "Providing requested list of all custom function defined in the application '" + application + "' : \n\n";
-        infoForCurrentStep += getRequestedInfo(project, PRINT_MAX_FUNCTIONS_DEPTH, 0, functionName, {}, {}, {});
+        infoForCurrentStep += getRequestedInfo(project, PRINT_MAX_FUNCTIONS_DEPTH, PRINT_MAX_FUNCTIONS_DEPTH, functionName, {}, {}, {});
         
         stepInfo.m_debugNotes = "Provide list of all custom function defined in the application '" + application + "'\n";
         stepInfo.m_action = "functions_summary";

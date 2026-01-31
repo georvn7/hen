@@ -1028,6 +1028,11 @@ namespace stdrave {
                           std::string& expectedResult,
                           std::string& stdOutRegex,
                           std::string& stripped);
+    std::string makeTestCommand(const std::string& cmd,
+                            bool debug,
+                            bool checkResult,
+                            const std::string& expectedResult,
+                                const std::string& stdoutRegex);
 
     bool tryMakeRegex(const std::string& pattern, std::regex& out,
                             std::regex_constants::syntax_option_type flags,

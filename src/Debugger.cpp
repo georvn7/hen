@@ -13,7 +13,7 @@
 //#define TRACE_WITH_LLDB
 
 #define MAX_LOG_SECTIONS_PER_LOCATION 2
-#define MAX_DEBUGGING_STEPS 300
+#define MAX_DEBUGGING_STEPS 400
 
 #define TRACE_MAX_MEMBERS 16
 #define TRACE_MIN_MEMBERS 4
@@ -1525,12 +1525,12 @@ bool Debugger::rewardHackingAnalysis(CCodeProject* project,
     {
         std::string fileName = boost_fs::path(file).filename().string();
         
-        if(!boost_fs::exists(file))
+        if(!boost_fs::exists(m_workingDirectory + "/" + file))
         {
             continue;
         }
         
-        auto fileSize = boost_fs::file_size(file);
+        auto fileSize = boost_fs::file_size(m_workingDirectory + "/" + file);
         if(fileSize > maxInfoSize)
         {
             fitInContext = false;
@@ -1631,6 +1631,9 @@ bool Debugger::rewardHackingAnalysis(CCodeProject* project,
     project->pushMessage(testDescription, "user", true);
     
     std::string appInfo = getHighLevelAppInfo(project, m_system, PRINT_MAX_FUNCTIONS_DEPTH, PRINT_MAX_FUNCTIONS_DEPTH);
+    appInfo += "\n\n";
+    appInfo += m_lastRunTestLog;
+    
     Prompt rewardHacking("RewardHacking.txt",{
                         {"app_info", appInfo},
                         {"private_test", privateTestInfo},
@@ -4934,29 +4937,38 @@ void Debugger::optimizeTrajectory(CCodeProject* project, const TestDef& test)
         Cache cache;
         bool truncated = false;
         std::string summary = "review";
-        project->inference(cache, promptSummarize, summary, &truncated);
         
-        while(summary.length() == 0 || summary.length() > 6144)
+        project->captureContext(std::string());
+        project->inference(cache, promptSummarize, summary, &truncated);
+        project->popContext();
+        
+        project->pushMessage(promptSummarize, "user", true);
+        
+        int attempts = 0;
+        const int maxAttempts = 5;
+        while((summary.length() < 100 || summary.length() > 6144) && attempts++ < maxAttempts)
         {
+            project->captureContext(std::string());
+            project->pushMessage(summary, "assistant", true);
+            
             std::string feedback;
             uint32_t lenght = (uint32_t)summary.length();
-            if(lenght == 0)
+            if(lenght < 100)
             {
                 feedback += "\nUnable to read the summary from the response! Provide it again!\n";
             }
             else if(lenght > 6144)
             {
-                feedback += "\nThe summary is too long. It should be less than 6000 characters. Up to 20 concise sentences!";
+                feedback += "\nThe summary is too long. It should be less than 6000 characters. Up to 20 concise sentences!\n";
             }
+            
+            feedback += "\nPlease in your response summarize ONLY the content in the 'STEPS TO SUMMARIZE' section, check the instruction!\n\n";
             
             summary = "review";
             truncated = false;
             project->inference(cache, feedback, summary, &truncated);
             
-            if(summary.length() > 10 && summary.length() < 6144)
-            {
-                break;
-            }
+            project->popContext();
         }
         
         m_summary = summary;
@@ -5920,7 +5932,7 @@ std::string Debugger::stepFunctionsSummary(CCodeProject* project, const std::str
     }
     
     infoForCurrentStep += "Providing requested list of all custom function defined in the application '" + application + "' : \n\n";
-    infoForCurrentStep += getRequestedInfo(project, PRINT_MAX_FUNCTIONS_DEPTH, 0, functionName, {}, {}, {});
+    infoForCurrentStep += getRequestedInfo(project, PRINT_MAX_FUNCTIONS_DEPTH, PRINT_MAX_FUNCTIONS_DEPTH, functionName, {}, {}, {});
     
     stepInfo.m_debugNotes = "Provide list of all custom function defined in the application '" + application + "'\n";
     stepInfo.m_action = "functions_summary";

@@ -1334,7 +1334,21 @@ public:
             
             CXCursorKind parentKind = clang_getCursorKind(parent);
             
-            if(isExternalVariable(c))
+            const enum CX_StorageClass sc = clang_Cursor_getStorageClass(c);
+            const bool isTopLevel = (parentKind == CXCursor_TranslationUnit || parentKind == CXCursor_Namespace);
+
+            // “Function-scope” includes normal functions + methods + ctors/dtors (also catches lambdas via operator()).
+            const bool isInFunction =
+                hasAncestor(c, CXCursor_FunctionDecl) ||
+                hasAncestor(c, CXCursor_CXXMethod)   ||
+                hasAncestor(c, CXCursor_Constructor) ||
+                hasAncestor(c, CXCursor_Destructor);
+            
+            if (sc == CX_SC_Static && isInFunction && !isTopLevel)
+            {
+                m_globalVariables.insert(stdCursorName);
+            }
+            else if(isExternalVariable(c))
             {
                 m_globalVariables.insert(stdCursorName);
             }
@@ -1690,7 +1704,7 @@ public:
             }
         }
         
-        listOnMessage(review, "Not expected global or external variables", m_globalVariables, "Don't declare external and global variables and data structures! To pass the data to function calls use function parameters. To output form a function call, use the return result and mutable parameters. To declare return type and arguments in a function declaration, use the C++ sytax for function declaration");
+        listOnMessage(review, "Not expected global, static or external variables", m_globalVariables, "Don't declare external, static and global variables and data structures! To pass the data to function calls use function parameters. To output form a function call, use the return result and mutable parameters. To declare return type and arguments in a function declaration, use the C++ sytax for function declaration");
         
         listOnMessage(review, "Not expected namespaces for functions or data types", m_inNamespace,
                       "Refactor the listed functions or data types according to the guidelines for allowed namespaces na STL types in the 'AVAILABLE LIBRARIES' section. Application-defined functions and data types should generally be defined in the global scope rather than within namespaces. Check ");

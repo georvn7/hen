@@ -1017,6 +1017,13 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
         requestFromClientBody[U("options")][U("num_ctx")] = json::value::number(8192);
     }
     
+    //This is for test
+    if(llm->provider == "cerebras")
+    {
+        requestFromClientBody[U("temperature")] = json::value::number(0.7);
+    }
+    
+    
     return projectId;
 }
 

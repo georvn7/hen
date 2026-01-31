@@ -91,7 +91,7 @@ std::pair<std::set<std::string>, std::set<std::string>> TestDef::getIOFiles() co
         return boost_fs::path(p).filename().string();
     };
 
-    forAllSteps([&](const TestStep& step) {
+    forAllSteps([&](const TestStep& step, const std::string& stepName) {
         for (const auto& file : step.input_files) {
             inputFiles.insert(baseName(*file));
         }
@@ -103,11 +103,11 @@ std::pair<std::set<std::string>, std::set<std::string>> TestDef::getIOFiles() co
     return { std::move(inputFiles), std::move(outputFiles) };
 }
 
-bool TestDef::hasRegexChecks() const
+uint32_t TestDef::hasRegexChecks() const
 {
-    bool result = false;
+    uint32_t result = false;
     
-    forAllSteps([&](const TestStep& step) {
+    forAllSteps([&](const TestStep& step, const std::string& stepName) {
         for (const auto& cmd : step.commands) {
             if (!cmd || cmd->empty())
                 continue;
@@ -122,7 +122,7 @@ bool TestDef::hasRegexChecks() const
             parsePrefixFlags(rawCmd, debug, finalResult, expectedResult, stdoutRegex, cmdLn);
             if(!stdoutRegex.empty())
             {
-                result = true;
+                result++;
             }
         }
     });
@@ -192,7 +192,7 @@ std::set<std::string> TestDef::getCommandLineFiles() const
 {
     std::set<std::string> files;
 
-    forAllSteps([&](const TestStep& step) {
+    forAllSteps([&](const TestStep& step, const std::string& stepName) {
         for (const auto& cmd : step.commands) {
             if (!cmd || cmd->empty())
                 continue;
@@ -218,7 +218,7 @@ std::string TestDef::validateCommands()
 {
     bool hasLongCommands = false;
 
-    forAllSteps([&](const TestStep& step) {
+    forAllSteps([&](const TestStep& step, const std::string& stepName) {
         
         for (const auto& command: step.commands) {
             if(command->size() > 512)
@@ -256,7 +256,7 @@ std::string TestDef::validateIOFiles()
     
     bool mainAsIO = false;
 
-    forAllSteps([&](const TestStep& step) {
+    forAllSteps([&](const TestStep& step, const std::string& stepName) {
         
         for (const auto& file : step.input_files) {
             
@@ -493,11 +493,136 @@ std::string TestDef::validate(bool isPrivate)
     return feedback;
 }
 
+std::string TestDef::validate(const TestRegexContract& contract)
+{
+    std::string feedback;
+    
+    uint32_t commandsWithRegex = hasRegexChecks();
+    uint32_t contractRegexPatterns = (uint32_t)contract.regex_patterns.size();
+    
+    if(commandsWithRegex != contractRegexPatterns)
+    {
+        feedback += "The number of commands in the test (";
+        feedback += std::to_string(commandsWithRegex);
+        feedback += ") that check a regex to fully match stdout ";
+        feedback += "doesn't match the number ot entries in the regex contract (";
+        feedback += std::to_string(contractRegexPatterns);
+        feedback += ")\n\n";
+    }
+    
+    forAllSteps([&](const TestStep& step, const std::string& stepName) {
+        
+        uint32_t commandIndex = 0;
+        for (const auto& cmd : step.commands) {
+            
+            if (!cmd || cmd->empty())
+                continue;
+
+            bool debug = false;
+            bool finalResult = false;
+            
+            std::string rawCmd = *cmd;
+            std::string cmdLn = rawCmd;
+            std::string expectedResult;
+            std::string stdoutRegex;
+            parsePrefixFlags(rawCmd, debug, finalResult, expectedResult, stdoutRegex, cmdLn);
+        
+            bool foundInTheContract = false;
+            if(!stdoutRegex.empty())
+            {
+                bool foundInContract = false;
+                for(auto pattern : contract.regex_patterns)
+                {
+                    if(pattern->test_step == stepName &&
+                       pattern->command_index == commandIndex)
+                    {
+                        foundInTheContract = true;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                foundInTheContract = true;
+            }
+            
+            if(!foundInTheContract)
+            {
+                feedback += "Unable to find regext contract entry for the '" + stepName + "' command ";
+                feedback += stepName == "test" ? "" : ("with index " + std::to_string(commandIndex) + " ");
+                feedback += "from the test script\n";
+            }
+            
+            commandIndex++;
+        }
+    });
+    
+    if(!feedback.empty())
+    {
+        feedback += "All commands from the test script that have regex expression to fully match stdout must also have an entry in the test contract\n\n";
+    }
+    
+    return feedback;
+}
+
+void TestDef::swapInvalid(const TestRegexContract& contract)
+{
+    forAllSteps([&](TestStep& step, const std::string& stepName) {
+        
+        uint32_t commandIndex = 0;
+        for (const auto& cmd : step.commands) {
+            
+            if (!cmd || cmd->empty())
+            {
+                commandIndex++;
+                continue;
+            }
+
+            bool debug = false;
+            bool finalResult = false;
+            
+            std::string rawCmd = *cmd;
+            std::string cmdLn = rawCmd;
+            std::string expectedResult;
+            std::string stdoutRegex;
+            parsePrefixFlags(rawCmd, debug, finalResult, expectedResult, stdoutRegex, cmdLn);
+        
+            if(!stdoutRegex.empty())
+            {
+                std::shared_ptr<CommandRegex> fromContract = nullptr;
+                
+                for(auto pattern : contract.regex_patterns)
+                {
+                    //Command vs contract match must have been validated at this point
+                    if(pattern->test_step == stepName &&
+                       pattern->command_index == commandIndex)
+                    {
+                        fromContract = pattern;
+                        break;
+                    }
+                }
+                
+                if(fromContract)
+                {
+                    std::string err;
+                    if(!fullRegexMatch(fromContract->example, stdoutRegex, err))
+                    {
+                        std::string newCommand = makeTestCommand(cmdLn, debug, finalResult, expectedResult, fromContract->regex_pattern);
+                        step.commands[commandIndex] = std::make_shared<std::string>(newCommand);
+                    }
+                }
+            }
+            
+            commandIndex++;
+        }
+    });
+}
+
 std::string TestDef::checksStdout() const
 {
     std::string result;
 
-    forAllSteps([&](const TestStep& step) {
+    forAllSteps([&](const TestStep& step, const std::string& stepName) {
         for (const auto& cmd : step.commands) {
             
             if (!cmd || cmd->empty())
@@ -589,7 +714,8 @@ std::string UnitTest::getDescription()
 {
     std::string desc;
     desc += "\n```json\n";
-    desc += utility::conversions::to_utf8string( definition.to_json().serialize() );
+    std::string testDef = formatJson(utility::conversions::to_utf8string( definition.to_json().serialize() ), "  ");
+    desc += testDef;
     desc += "\n```\n\n";
     
     desc += "Unit test source:\n";
