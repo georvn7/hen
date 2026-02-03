@@ -870,8 +870,7 @@ public:
                     std::string briefStr = ccNode->m_prototype.brief;
                     if(briefStr.length() > BRIEF_MAX_CHARACTERS)
                     {
-                        briefStr = briefStr.substr(0, BRIEF_MAX_CHARACTERS_NOTE);
-                        briefStr += " [[...truncated]]";
+                        briefStr = truncateWithNoteUtf8(briefStr, BRIEF_MAX_CHARACTERS, " [[...truncated]]");
                     }
                     
                     info += ccNode->m_brief.func_name + ": " + briefStr + "\n\n";

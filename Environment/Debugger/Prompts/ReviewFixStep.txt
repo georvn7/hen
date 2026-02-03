@@ -23,3 +23,7 @@ When analyzing this history:
 - Don't assume recency equals correctness — a recent commit may itself be a dead end
 
 Based on your analysis, provide a refined fix suggestion. Concisely explain how your approach avoids past dead ends (if any) and builds on what previously worked.
+
+The information in the new 'motivation' section has to be self contained. It is crucial to summarize all important details as this will be the only information available in the next steps. Preserve all specific details that actually led to this decision. Ensure the exact fix is explained with enough implementation details. You can adjust the motivation base on the Git history but avoid quoting it directly. Use it more like you already have that intuition.
+
+Review the 'PROJECT SOURCE CODE REQUIREMENTS' section since those are hard requirements and will be enforced in the function implementation. Pay attention to the requirements for data flow and variable declarations. If the requirements contradict the suggested fix, consider adjusting the fix strategy or, if that is not possible, selecting a different type of action for the next step.

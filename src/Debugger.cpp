@@ -1744,8 +1744,7 @@ std::string Debugger::getRequestedInfo(CCodeProject* project, int allFunctions, 
                 std::string briefStr = ccNode->m_prototype.brief;
                 if(briefStr.length() > BRIEF_MAX_CHARACTERS)
                 {
-                    briefStr = briefStr.substr(0, BRIEF_MAX_CHARACTERS_NOTE);
-                    briefStr += " [[...truncated]]";
+                    briefStr = truncateWithNoteUtf8(briefStr, BRIEF_MAX_CHARACTERS, " [[...truncated]]");
                 }
                 
                 info += ccNode->m_brief.func_name + ": " + briefStr + "\n\n";
@@ -3078,8 +3077,7 @@ std::string Debugger::getFunctionDetailedInfo(CCodeProject* project, const std::
             std::string briefStr = ccNode->m_prototype.brief;
             if(briefStr.length() > BRIEF_MAX_CHARACTERS)
             {
-                briefStr = briefStr.substr(0, BRIEF_MAX_CHARACTERS_NOTE);
-                briefStr += " [[...truncated]]";
+                briefStr = truncateWithNoteUtf8(briefStr, BRIEF_MAX_CHARACTERS, " [[...truncated]]");
             }
             
             info += ccNode->m_brief.func_name + ": " + briefStr + "\n\n";
@@ -6651,6 +6649,11 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         m_nextStep.clear();
         m_nextStep.from_json(object);
         
+        if(m_nextStep.action_type == "fix_function")
+        {
+            reviewGiHistoryForFix(project);
+        }
+        
         int validationAttempt = 1;
         int maxValidationAttempts = m_rewardHackingReview.empty() ? 8 : 3;
         
@@ -6689,16 +6692,11 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             m_nextStep.motivation = "Run the test to inspect the results and perform post-execution system analysis.";
         }
         
-        if(m_nextStep.action_type == "fix_function")
-        {
-            reviewGiHistoryForFix(project);
-        }
-        
         project->popContext();
     }
     
     m_nextStep.m_stepId = stepIndex + 1;
-    
+     
     setStepHint(test);
     
     if(!m_nextStep.isInformationRequest())
@@ -6865,6 +6863,13 @@ std::pair<bool, std::string> Debugger::debug(CCodeProject* project,
         });
         
         workflowMsg += "\n" + traceDesc.str();
+    }
+    
+    //Add source checklist requirements
+    {
+        workflowMsg += "\nPROJECT SOURCE CODE REQUIREMENTS\n\n";
+        workflowMsg += project->source_checklist.prompt({{"function", "<function_placeholder_name>"}});
+        workflowMsg += "\n";
     }
     
     project->pushMessage(workflowMsg, "user", true);
@@ -8503,15 +8508,25 @@ std::string Debugger::generateTracePoint(CCodeProject* project,
         oss << "    static int tpId = 0;\n";
         oss << "    if (bpFrameId <= " << eventsHitCount << " && tpId++ < " << eventsHitCount << ") {\n";
     } else {
-        oss << "    static int tpId = 0;\n";
-        oss << "    if (tpId++ < " << eventsHitCount << ") {\n";
+        //oss << "    static int tpId = 0;\n";
+        //oss << "    if (tpId++ < " << eventsHitCount << ") {\n";
+        
+        // Attached to breakpoint - BP condition already gates execution
+        oss << "    {\n";
     }
 
     oss << "        trace::log << \"<[PUSH (trace ln " << line << " col " << column
         << "):\" << trace::getStack() << \"]>\" << std::endl;\n";
-    oss << "        trace::log << \"function : '" << functionName
-        << "' at location " << line << ":" << column
-        << " trace point hitCount=\" << tpId << std::endl;\n";
+    
+    if (attachToFunction) {
+        oss << "        trace::log << \"function : '" << functionName
+            << "' at location " << line << ":" << column
+            << " trace point hitCount=\" << tpId << std::endl;\n";
+    } else {
+        oss << "        trace::log << \"function : '" << functionName
+            << "' at location " << line << ":" << column
+            << "\" << std::endl;\n";
+    }
 
     // Use a unique raw-string delimiter to avoid accidental terminators inside frameInfo.
     oss << "        trace::log << R\"" << raw_delim << "(" << frameInfo << ")"
@@ -8527,11 +8542,14 @@ std::string Debugger::generateTracePoint(CCodeProject* project,
         oss << "        trace::log << \"No live variables\" << std::endl;\n";
     }
 
-    oss << "        if (tpId == " << eventsHitCount << ") {\n";
-    oss << "            tpId++;\n"; // ensure the 'max hitCount' message isn't reprinted
-    oss << "            trace::log << \"Reached the maximum hitCount for this trace point. Next occurrences won't be traced\";\n";
-    oss << "            trace::log << std::endl;\n";
-    oss << "        }\n";
+    if(attachToFunction)//Only when attached to a function. BP handles that messaging
+    {
+        oss << "        if (tpId == " << eventsHitCount << ") {\n";
+        oss << "            tpId++;\n"; // ensure the 'max hitCount' message isn't reprinted
+        oss << "            trace::log << \"Reached the maximum hitCount for this trace point. Next occurrences won't be traced\";\n";
+        oss << "            trace::log << std::endl;\n";
+        oss << "        }\n";
+    }
     oss << "        trace::log << \"<[POP]>\" << std::endl;\n";
     oss << "    }\n";
     oss << "}\n\n";
@@ -8830,7 +8848,7 @@ std::string Debugger::assembleBreakpointCode(CCodeProject* project, const std::s
     //The trace point will have its own hitCounter and we can use it for the warning message
     //but we still need to track the hitCount for the overall breakpoint
     std::string hitCountCnd = "[](){static int _i_=0; return _i_++ < " + bpHitCount + ";}()";
-    std::string condition = "(" + hitCountCnd + " && (" + bpCondition + "))";
+    std::string condition = "((" + bpCondition + ") && " + hitCountCnd + ")";
     
     std::string expression = "trace::hitBP(\"" + functionName + "\", " + std::to_string(bp->source_line);
     expression += ", R\"DELIM(" + bp->getConditionCode() + ")DELIM\", R\"DELIM(" + bp->getExpressionCode() + ")DELIM\");";

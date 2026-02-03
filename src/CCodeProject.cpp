@@ -2312,8 +2312,7 @@ namespace stdrave {
                 std::string briefStr = briefInComment ? (ssBrief.str() + '\n') : (n->m_brief.brief + '\n');
                 if(briefStr.length() > BRIEF_MAX_CHARACTERS)
                 {
-                    briefStr = briefStr.substr(0, BRIEF_MAX_CHARACTERS_NOTE);
-                    briefStr += " [[...truncated]]\n";
+                    briefStr = truncateWithNoteUtf8(briefStr, BRIEF_MAX_CHARACTERS, " [[...truncated]]");
                 }
                 functions += briefStr;
             }

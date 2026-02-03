@@ -628,6 +628,11 @@ boost_bst::http::request<boost_bst::http::string_body> Server::prepareBeastReque
         //req.set("User-Agent", "opencode/1.0.0");
         req.set("User-Agent", PRODUCT_NAME);
     }
+    else if (llm->provider == "mistral")
+    {
+        req.set(boost_bst::http::field::authorization, "Bearer " + llm->api_key);
+        req.set("User-Agent", PRODUCT_NAME);
+    }
 
     // Set the body
     req.body() = bodyStr;
@@ -865,7 +870,8 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
        llm->provider == "xAI" ||
        llm->provider == "cerebras" ||
        llm->provider == "zai" ||
-       llm->provider == "minimax")
+       llm->provider == "minimax" ||
+       llm->provider == "mistral")
     {
         bool openai_reasoning = startsWith(llm->model, "o1") ||
                               startsWith(llm->model, "o3") ||
@@ -1058,7 +1064,8 @@ web::json::value Server::updateUsage(web::json::value& usageField,
         llm->provider == "xAI" ||
         llm->provider == "cerebras" ||
         llm->provider == "zai" ||
-        llm->provider == "minimax"
+        llm->provider == "minimax" ||
+        llm->provider == "mistral"
         )
     {
         if (usageField.has_field(U("prompt_tokens"))) {

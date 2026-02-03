@@ -610,6 +610,32 @@
       "roles": "director,expert,developer",
       "input_tokens_price": 1.3,
       "output_tokens_price": 2.20
+    },
+    {
+      "provider": "mistral",
+      "url": "https://api.mistral.ai/v1/chat/completions",
+      "model": "devstral-2512",
+      "reasoning_effort": "na",
+      "verbosity": "na",
+      "context_size": 128,
+      "rate_limit": -1,
+      "rate_limit_rpm": -1,
+      "roles": "director,expert,developer",
+      "input_tokens_price": 1.3,
+      "output_tokens_price": 2.20
+    },
+    {
+      "provider": "mistral",
+      "url": "https://api.mistral.ai/v1/chat/completions",
+      "model": "labs-devstral-small-2512",
+      "reasoning_effort": "na",
+      "verbosity": "na",
+      "context_size": 128,
+      "rate_limit": -1,
+      "rate_limit_rpm": -1,
+      "roles": "director,expert,developer",
+      "input_tokens_price": 1.3,
+      "output_tokens_price": 2.20
     }
   ]
 }

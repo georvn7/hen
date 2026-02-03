@@ -20,7 +20,7 @@ namespace stdrave {
     {
     public:
         DECLARE_TYPE(LLMConfig, "description")
-        DECLARE_ENUM_FIELD(provider, "\"openai\",\"anthropic\",\"google\",\"groq\",\"xAI\",\"cerebras\",\"zai\",\"minimax\",\"ollama\"", "description")
+        DECLARE_ENUM_FIELD(provider, "\"openai\",\"anthropic\",\"google\",\"groq\",\"xAI\",\"cerebras\",\"zai\",\"minimax\",\"mistral\",\"ollama\"", "description")
         DECLARE_FIELD(std::string, url, "description")
         DECLARE_FIELD(std::string, model, "description")
         DECLARE_ENUM_FIELD(reasoning_effort, "\"na\",\"low\",\"medium\",\"high\"", "description")

@@ -4,7 +4,7 @@ Implementation checklist:
 - If it is not possible to implement everything in '[[function]]', instead of adding "TO DO" in the comments, consider calling helper functions and we are going to declare and define them later.
 - Don't provide include statements in the source. I will add them later.
 - Don't provide data structures and enums definitions in the source. I will ask you for the data definitions a bit later.
-- Don't declare extern and global variables and data structures! To pass data to the function use function arguments, to output data from the function use the return result and when necessary function arguments.
+- Don't declare extern, static and global variables and data structures! To pass data to the function use function arguments, to output data from the function use the return result and when necessary function arguments.
 - Provide implementation only for '[[function]]'.
 - Don't declare, define and implement the functions listed it the 'Available functions' section above. Assume they are already declared and the implementation can call them. They will be implemented later.
 - In the implementation, if possible, try to use only the functions listed it the 'Available functions' and functionality from the 'Available Libraries'

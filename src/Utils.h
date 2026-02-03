@@ -1064,4 +1064,7 @@ namespace stdrave {
     std::string extractExecutablePath(const std::string& cmdLine);
 
     std::size_t nextIndex(const boost_fs::path& dir, const std::string& prefix);
+
+    std::string utf8TruncateBytes(const std::string& s, size_t maxBytes);
+    std::string truncateWithNoteUtf8(const std::string& s, size_t maxBytes, const std::string& note);
 }

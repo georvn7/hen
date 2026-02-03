@@ -2712,6 +2712,45 @@ std::string extractExecutablePath(const std::string& cmdLine)
     return cmdLine.substr(start, i - start);
 }
 
+size_t utf8CharLen(unsigned char c) {
+    if ((c & 0x80) == 0x00) return 1;
+    if ((c & 0xE0) == 0xC0) return 2;
+    if ((c & 0xF0) == 0xE0) return 3;
+    if ((c & 0xF8) == 0xF0) return 4;
+    return 0; // invalid lead byte
+}
+
+std::string utf8TruncateBytes(const std::string& s, size_t maxBytes) {
+    if (s.size() <= maxBytes) return s;
+
+    size_t i = 0;
+    size_t lastGood = 0;
+    while (i < s.size()) {
+        unsigned char c = static_cast<unsigned char>(s[i]);
+        size_t len = utf8CharLen(c);
+        if (len == 0) break;                  // invalid UTF-8 lead byte
+        if (i + len > s.size()) break;        // truncated source string
+        if (i + len > maxBytes) break;        // would exceed maxBytes
+        // Validate continuation bytes (optional but nice)
+        for (size_t k = 1; k < len; ++k) {
+            unsigned char cc = static_cast<unsigned char>(s[i + k]);
+            if ((cc & 0xC0) != 0x80) { len = 0; break; }
+        }
+        if (len == 0) break;
+
+        i += len;
+        lastGood = i;
+    }
+    return s.substr(0, lastGood);
+}
+
+std::string truncateWithNoteUtf8(const std::string& s,
+                                        size_t maxBytes,
+                                        const std::string& note) {
+    if (s.size() <= maxBytes) return s;
+    if (maxBytes <= note.size()) return note.substr(0, maxBytes);
+    return utf8TruncateBytes(s, maxBytes - note.size()) + note;
+}
 
 
 }
