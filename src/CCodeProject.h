@@ -231,6 +231,7 @@ namespace stdrave {
         void finalizeBuild() override;
         uint32_t archiveTest(const std::string& testPath, std::string& trajectoryDir);
         void debugTests();
+        void synthetizeTrainingData();
         std::multimap<uint32_t, std::string, std::greater<uint32_t>>
         generateUnitTests(const std::string& finalTestPath, const std::string& prevFinalTestPath, std::string& fullTestRecommendation);
         bool buildBinary(bool enableSanitizer);

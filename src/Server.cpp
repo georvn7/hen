@@ -933,10 +933,11 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
     {
         if(llm->reasoning_effort != "na")
         {
-            requestFromClientBody[U("max_tokens")] = json::value::number(16384);
+            requestFromClientBody[U("max_tokens")] = json::value::number(6000);
             auto thinking = json::value::object();
+            //thinking[U("type")] = json::value::string(U("adaptive"));
             thinking[U("type")] = json::value::string(U("enabled"));
-            thinking[U("budget_tokens")] = json::value::number(8192);
+            thinking[U("budget_tokens")] = json::value::number(2000);
             requestFromClientBody[U("thinking")] = thinking;
             requestFromClientBody[U("temperature")] = json::value::number(1);
         }

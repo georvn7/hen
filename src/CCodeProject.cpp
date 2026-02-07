@@ -2001,6 +2001,41 @@ namespace stdrave {
         saveJson(config.to_json(), testDirecotry + "/config.json");
     }
 
+    void CCodeProject::synthetizeTrainingData()
+    {
+        std::string debugDir = getProjDir() + "/debug";
+        for (boost::filesystem::directory_iterator it(debugDir), end; it != end; ++it)
+        {
+            if (!boost::filesystem::is_directory(it->status()))
+                continue;
+
+            std::string testName = it->path().filename().string();
+            
+            uint32_t archIndex = (uint32_t)nextIndex(it->path().string() + "/trajectory", "step_");
+            if(archIndex < 3) continue;
+            archIndex--;
+            
+            DebugStep lastStep;
+            std::string lastStepDir = it->path().string() + "/trajectory/step_" + std::to_string(archIndex);
+            std::string lastStepPath = lastStepDir + "/dbgStep.json";
+            lastStep.load(lastStepPath);
+            
+            if(lastStep.m_debugNotes == "PASS")
+            {
+                std::string testWD = it->path().string() + "/trajectory/test";
+                if(!boost_fs::exists(testWD))
+                {
+                    testWD = lastStepDir + "/wd";
+                }
+                
+                if(boost_fs::exists(testWD))
+                {
+                    Distillery::getInstance().distillTrajectory(this, testWD, 0, -1);
+                }
+            }
+        }
+    }
+
     void CCodeProject::finalizeBuild()
     {
         Client& client = Client::getInstance();
@@ -2013,6 +2048,9 @@ namespace stdrave {
         saveDataDefinitions();
         
         Client::getInstance().agentToServer("\n\nDEBUGGING...\n\n");
+        
+        //TODO: ONLY FOR TEST
+        //synthetizeTrainingData();
         
         debugTests();
         
@@ -3412,25 +3450,36 @@ namespace stdrave {
         return printer;
     }
 
+    // We avoid switch/case because some enums include aliases (multiple names with the same underlying value),
+    // which would cause a "duplicate case value" compile error. Instead we compare the enum’s underlying
+    // integer value against a lookup table; the first matching entry determines the printed name.
     std::string CCodeProject::generateEnumPrinter(const TypeDefinition& typeDef)
     {
         std::string printer;
         printer += "inline void printValue(std::ostream& os, ";
         printer += typeDef.m_name;
         printer += " val, std::size_t depth, const PrintConfig& cfg) {\n";
-        
-        //---------------------------------------------------------------------
+        printer += "    (void)depth; (void)cfg;\n";
+        printer += "    using U = typename std::underlying_type<" + typeDef.m_name + ">::type;\n";
+        printer += "    const U u = static_cast<U>(val);\n";
+        printer += "    struct Item { U v; const char* s; };\n";
+        printer += "    static const Item kItems[] = {\n";
+
         std::vector<std::pair<std::string, std::string>> members = typeDef.sortMembers();
-        printer += "   switch(val) {\n";
-        for(auto& member : members)
+        for (auto& member : members)
         {
-            printer += "        case " + typeDef.m_name + "::" + member.first + ":";
-            printer += " os << \"" + typeDef.m_name + "::" + member.first + "\"; break;\n";
+            // Keep all members (including aliases). Order decides which name prints.
+            printer += "        { static_cast<U>(" + typeDef.m_name + "::" + member.first + "), "
+                       "\"" + typeDef.m_name + "::" + member.first + "\" },\n";
         }
-        printer += "        default : os << \"Unknown " + typeDef.m_name + "\"; break;\n";
-        printer += "   }\n";
+
+        printer += "    };\n";
+        printer += "    for (const auto& it : kItems) {\n";
+        printer += "        if (it.v == u) { os << it.s; return; }\n";
+        printer += "    }\n";
+        printer += "    os << \"Unknown " + typeDef.m_name + "\";\n";
         printer += "}\n\n";
-        
+
         return printer;
     }
 

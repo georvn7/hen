@@ -482,6 +482,7 @@ namespace stdrave {
         std::string generateConfig();
         
         bool deployToWorkingDirectory(CCodeProject* project, const std::string& testJsonDir, bool isPublic, TestDef& test);
+        bool saveTestToDirectory(CCodeProject* project, const std::string& testJsonDir, const std::string& testDirectory, TestDef& test);
         
         void reviewGiHistoryForFix(CCodeProject* project);
         

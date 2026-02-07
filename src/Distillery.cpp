@@ -329,7 +329,8 @@ namespace stdrave {
         }
         else
         {
-            info.hash = m_trajectory[info.fixIndex].m_commitHash;
+            //fixIndex+1 as the commit now is stored in the subsequent run_test step
+            info.hash = m_trajectory[info.fixIndex+1].m_commitHash;
         }
         
         while(info.hash.empty() && info.fixIndex >= 0 && info.fixIndex < m_trajectory.size())
@@ -340,7 +341,8 @@ namespace stdrave {
             info.checkoutParent = true;
             info.fixIndex = getFirstIndexAfter(fixStep + 1, "fix_function");
             
-            info.hash = m_trajectory[info.fixIndex].m_commitHash;
+            //fixIndex+1 as the commit now is stored in the subsequent run_test step
+            info.hash = m_trajectory[info.fixIndex+1].m_commitHash;
         }
         
         return info;
@@ -397,6 +399,12 @@ namespace stdrave {
             m_project = new CCodeProject;
             m_project->m_description = project->m_description;
             m_project->setup(distillProjDir);
+            
+            std::string promptsDir = Client::getInstance().getEnvironmentDir();
+            std::string promptsDirDistillery = promptsDir + "/Distillery/Prompts";
+            
+            Prompt::clearSearchPaths();
+            Prompt::addSearchPath(promptsDirDistillery);
             
             //m_project->generateCommonFiles("build");
             //m_project->compileCommonHeader(CCodeNode::BUILD_PRINT_TEST | CCodeNode::BUILD_DEBUG);
@@ -1845,7 +1853,8 @@ namespace stdrave {
         web::json::value schema;
         setupSchema<EditSourceSequence>(schema);
         
-        project->inference(cache, promptOptimizeFixTrack, schema, object);
+        std::string message = promptOptimizeFixTrack.str();
+        project->inference(cache, message, schema, object);
         
         optimalSequence.from_json(object);
         

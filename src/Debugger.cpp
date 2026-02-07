@@ -6754,29 +6754,16 @@ void Debugger::reviewGiHistoryForFix(CCodeProject* project)
     project->popContext();
 }
 
-bool Debugger::deployToWorkingDirectory(CCodeProject* project, const std::string& testJsonDir, bool isPublic, TestDef& test)
+bool Debugger::saveTestToDirectory(CCodeProject* project, const std::string& testJsonDir, const std::string& testDirectory, TestDef& test)
 {
-    m_workingDirectory = project->getProjDir();
-    m_workingDirectory += isPublic ? "/debug/wd_pub" : "/debug/wd_priv";
-    
-    if(boost_fs::exists(m_workingDirectory))
+    if(boost_fs::exists(testDirectory))
     {
-        boost_fs::remove_all(m_workingDirectory);
+        boost_fs::remove_all(testDirectory);
     }
     
-    boost_fs::create_directories(m_workingDirectory);
+    boost_fs::create_directories(testDirectory);
     
-    if(!test.load(testJsonDir + "/test.json"))
-    {
-        return false;
-    }
-    
-    if(!boost_fs::exists(testJsonDir + "/test.json"))
-    {
-        return false;
-    }
-    
-    boost_fs::copy(testJsonDir + "/test.json", m_workingDirectory + "/test.json");
+    boost_fs::copy(testJsonDir + "/test.json", testDirectory + "/test.json");
     
     const auto& inputFiles = test.getInputFiles();
     for(auto file : inputFiles)
@@ -6784,7 +6771,7 @@ bool Debugger::deployToWorkingDirectory(CCodeProject* project, const std::string
         std::string fileName = boost_fs::path(file).filename().string();
         if(boost_fs::exists(testJsonDir + "/" + fileName))
         {
-            boost_fs::copy(testJsonDir + "/" + fileName, m_workingDirectory + "/" + fileName);
+            boost_fs::copy(testJsonDir + "/" + fileName, testDirectory + "/" + fileName);
         }
     }
     
@@ -6795,11 +6782,31 @@ bool Debugger::deployToWorkingDirectory(CCodeProject* project, const std::string
             return false;
         }
         
-        boost_fs::remove(m_workingDirectory + "/main.cpp");
+        boost_fs::remove(testDirectory + "/main.cpp");
         
         //Copy the main.cpp for the unit test
-        boost_fs::copy(testJsonDir + "/main.cpp", m_workingDirectory + "/main.cpp");
+        boost_fs::copy(testJsonDir + "/main.cpp", testDirectory + "/main.cpp");
     }
+    
+    return true;
+}
+
+bool Debugger::deployToWorkingDirectory(CCodeProject* project, const std::string& testJsonDir, bool isPublic, TestDef& test)
+{
+    m_workingDirectory = project->getProjDir();
+    m_workingDirectory += isPublic ? "/debug/wd_pub" : "/debug/wd_priv";
+    
+    if(!boost_fs::exists(testJsonDir + "/test.json"))
+    {
+        return false;
+    }
+    
+    if(!test.load(testJsonDir + "/test.json"))
+    {
+        return false;
+    }
+    
+    return saveTestToDirectory(project, testJsonDir, m_workingDirectory, test);
 }
 
 std::pair<bool, std::string> Debugger::debug(CCodeProject* project,
@@ -6817,8 +6824,9 @@ std::pair<bool, std::string> Debugger::debug(CCodeProject* project,
     m_debugPort = debugPort;
     
     TestDef test;
-    if(deployToWorkingDirectory(project, testJsonPath, true, test))
+    if(!deployToWorkingDirectory(project, testJsonPath, true, test))
     {
+        criticalError("Couldn't deply the test");
         return std::make_pair(false, std::string());
     }
     
@@ -6827,6 +6835,12 @@ std::pair<bool, std::string> Debugger::debug(CCodeProject* project,
     loadTrajectory(project, test);
     
     m_hasValidBuild = false;
+    
+    std::string testDirectory = Client::getInstance().getProjectDirectory() + "/debug/" + test.name + "/trajectory/test";
+    if(!boost_fs::exists(testDirectory)) //if(m_trajectory.size() == 0)
+    {
+        saveTestToDirectory(project, testJsonPath, testDirectory, test);
+    }
     
     m_appInfo = getHighLevelAppInfo(project, m_system, PRINT_MAX_FUNCTIONS_DEPTH, PRINT_MAX_FUNCTIONS_DEPTH);
     
