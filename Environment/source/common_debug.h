@@ -752,7 +752,9 @@ inline void printValue(std::ostream& os,
 }
 
 // -------------------------------------------------------------------------- //
-// Print shared_ptr<T> by printing *ptr if non-null
+// Print shared_ptr<T>
+//  - If T is void (or cv-void), we can't dereference; print the address instead.
+//  - Otherwise print *ptr as before.
 // -------------------------------------------------------------------------- //
 template <typename T>
 void printValue(std::ostream& os,
@@ -764,7 +766,15 @@ void printValue(std::ostream& os,
         os << "[[null shared_ptr]]";
         return;
     }
-    printValue(os, *ptr, depth, cfg);
+
+    if constexpr (std::is_void_v<std::remove_cv_t<T>>) {
+        os << "[[shared_ptr<void>: " << static_cast<const void*>(ptr.get()) << "]]";
+        return;
+        // Alternatively:
+        // printValue(os, ptr.get(), depth, cfg); // would print [[pointer: 0x...]]
+    } else {
+        printValue(os, *ptr, depth, cfg);
+    }
 }
 
 // -------------------------------------------------------------------------- //
