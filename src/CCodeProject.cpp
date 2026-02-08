@@ -2115,6 +2115,9 @@ namespace stdrave {
             readme += "\n";
             readme += m_description.description;
             
+            readme += "\n\n\nARCHITECTURE\n\n";
+            readme += printGraph({}, 4, false);
+            
             client.enableLog(true);
             
             generateCMakeFile(m_description.name, sourcesDirectory, groups, readme, {}, {});
