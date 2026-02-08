@@ -3155,6 +3155,18 @@ namespace stdrave {
         std::string nodeDir = buildDir + "/" + buildSourcePath;
         std::string testDir = nodeDir + "/test";
         
+        // Diagnostic guard: verify build source on disk still contains current in-memory implementation.
+        const std::string srcFile = getSourceFilePath();
+        const std::string diskSource = getFileContent(srcFile);
+
+        if(diskSource.empty() || diskSource.find(m_implementation.m_source) == std::string::npos)
+        {
+            std::cout << "[WARN][compileSource] Source mismatch for '" << m_brief.func_name << "'\n";
+            std::cout << "  file: " << srcFile << "\n";
+            std::cout << "  mem_chars: " << m_implementation.m_source.size()
+                      << " disk_chars: " << diskSource.size() << std::endl;
+        }
+        
         //Recompile the updated sources
         output = exec(compileCL, testDir, "Compile");
         
