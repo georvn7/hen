@@ -1535,30 +1535,70 @@ namespace stdrave {
         
         std::string responseInfo;
         size_t nodesCount = proj->nodeMap().size();
-        bool enableInfoRequests = nodesCount > ENABLE_INFO_REQUESTS_AFTER_NODE_COUNT;
+        bool infoRequestsByNodeCount = nodesCount > ENABLE_INFO_REQUESTS_AFTER_NODE_COUNT;
+        bool infoRequestsByDepth = depth > ENABLE_INFO_REQUESTS_AFTER_NODE_DEPTH;
+        bool enableInfoRequests = infoRequestsByNodeCount || infoRequestsByDepth;
         
         if(!skipReasoning && enableInfoRequests)
         {
             //Let's give the model a chance to build contextural information
-            
+
             std::string maxInfoRequestsStr = std::to_string(DECOMPOSE_MAX_INFO_REQUESTS);
             std::string maxDecomposeNodesStr = std::to_string(DECOMPOSE_MAX_NODES_COUNT_HINT);
+            std::string infoRequestNodeCountStr = std::to_string(ENABLE_INFO_REQUESTS_AFTER_NODE_COUNT);
+            std::string infoRequestDepthStr = std::to_string(ENABLE_INFO_REQUESTS_AFTER_NODE_DEPTH);
+
             list_functions += "\n\nCurrently decomposing function " + std::to_string(nodesCount) + "/" + maxDecomposeNodesStr;
             list_functions += " (" + maxDecomposeNodesStr + " is a guideline for maximum scope, not a hard limit or goal we have to reach)";
+            list_functions += "\nCurrent call depth: " + std::to_string(depth);
+            list_functions += "\nInformation requests are enabled after node count > " + infoRequestNodeCountStr;
+            list_functions += " or call depth > " + infoRequestDepthStr + ".";
+
+            if(infoRequestsByNodeCount && infoRequestsByDepth)
+            {
+                list_functions += "\nReason: both project size and call depth are above the thresholds.";
+            }
+            else if(infoRequestsByNodeCount)
+            {
+                list_functions += "\nReason: project size is above the threshold.";
+            }
+            else if(infoRequestsByDepth)
+            {
+                list_functions += "\nReason: call depth is above the threshold.";
+            }
+            
+            list_functions += "\nPrefer balancing the architecture as: application -> system -> sub-system -> component -> module -> function -> helper functions...";
+
             list_functions += "\n\nBefore proceeding to list the functions, let me know if you need additional information ";
             list_functions += "about the architecture and implementation of this application ";
             list_functions += "for better assessing how '" + m_brief.func_name + "' should be decomposed. ";
             list_functions += "You can have up to " + maxInfoRequestsStr;
-            list_functions += " information reques. If you don't need more information in order to decide leave all fields empty.\n\n";
+            list_functions += " information requests. If you don't need more information in order to decide leave all fields empty.\n\n";
             list_functions += "Note, you must not list the called functions yet. ";
             list_functions += "This is only a chance to receive additional information before listing the functions. ";
             list_functions += "Then I will ask you to list the called functions.\n";
-            if(nodesCount > ENABLE_DECOMPOSE_NOTE_AFTER_NODE_COUNT)
+
+            bool noteByNodeCount = nodesCount >= ENABLE_DECOMPOSE_NOTE_AFTER_NODE_COUNT;
+            bool noteByDepth = depth >= ENABLE_DECOMPOSE_NOTE_AFTER_NODE_DEPTH;
+
+            if(noteByNodeCount || noteByDepth)
             {
-                std::string hintReason = nodesCount < DECOMPOSE_MAX_NODES_COUNT_HINT ? "approaching" : "exceeding";
-                list_functions += "\n\nSince we are " + hintReason + " the recommended maximum for the number of functions.";
-                list_functions += " Consider using the information requests to learn more about the architecture of the project ";
-                list_functions += "to avoid duplication of functionality and introduction of new functions that will further decompose on too many sub-functions\n\n";
+                list_functions += "\n\nScope guidance for decomposition:";
+
+                if(noteByNodeCount)
+                {
+                    std::string hintReason = nodesCount < DECOMPOSE_MAX_NODES_COUNT_HINT ? "approaching" : "exceeding";
+                    list_functions += "\n- We are " + hintReason + " the recommended maximum for the number of functions.";
+                }
+
+                if(noteByDepth)
+                {
+                    list_functions += "\n- Current call depth is " + std::to_string(depth) +
+                                    ", which is at or above the recommended depth of " +
+                                    std::to_string(ENABLE_DECOMPOSE_NOTE_AFTER_NODE_DEPTH) + ".";
+                }
+
+                list_functions += "\nConsider using information requests to reuse existing architecture and functionality and avoid introducing extra wrapper/helper layers that increase scope.\n\n";
             }
             
             inference(cache, list_functions, &infoRequest);
