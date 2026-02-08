@@ -3342,12 +3342,12 @@ namespace stdrave {
         
         m_stats.reset();
         
-        bool objectExists = updateSource(CodeType::FUNC_CMPL, parent, fixCompilationMessge, compileCL, output, false);
+        bool compiled_ok = updateSource(CodeType::FUNC_CMPL, parent, fixCompilationMessge, compileCL, output, false);
         
         thisReview.m_revisedImplementation = m_implementation.m_source;
         m_stats.m_compileProgress.push_back(thisReview);
         
-        //if(objectExists)
+        if(compiled_ok)
         {
             std::string commitMessage = "\nFix compilation for function: " + m_brief.func_name + "\n\n";
             commitMessage += compileProgressMessage();
@@ -3355,7 +3355,7 @@ namespace stdrave {
             proj->commit(commitMessage);
         }
         
-        return objectExists;
+        return compiled_ok;
     }
 
     std::string CCodeNode::getSourceFilePath() const
@@ -3635,6 +3635,16 @@ namespace stdrave {
                     m_implementation.m_source = sourceSnapshot;
                     //TODO: What if there was declaration change?
                     m_prototype = definitionSnapshot;
+                    
+                    // Keep diagnostics aligned with the restored source.
+                    generateAllSources(true);
+                    
+                    const bool restored_ok = compileSource(compileCL, output);
+                    if (restored_ok)
+                    {
+                        popContext();
+                        continue;
+                    }
                 }
                 
                 escalations = 0;
