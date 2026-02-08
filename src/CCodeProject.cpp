@@ -3762,7 +3762,7 @@ namespace stdrave {
                 std::string searchResult = searchSource(regexPattern);
                 
                 //Trim to LOG_SECTION_SIZE
-                if(info.length() > DECOMPOSE_REGEX_MATCH_MAX_CHARACTERS)
+                if(searchResult.length() > DECOMPOSE_REGEX_MATCH_MAX_CHARACTERS)
                 {
                     info += searchResult.substr(0, DECOMPOSE_REGEX_MATCH_MAX_CHARACTERS);
                     info += "\nThe search result has been trimmed due to size limitations\n";
@@ -3770,6 +3770,10 @@ namespace stdrave {
                 else if(searchResult.empty())
                 {
                     info += "\nNo matching strings found in the source for patter: " + *pattern + "\n";
+                }
+                else
+                {
+                    info += searchResult;
                 }
             }
             
