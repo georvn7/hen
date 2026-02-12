@@ -6385,6 +6385,8 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
                 debugNotes += "The function '" + functionName + "' has been fixed and the fix has been applied to the code base. ";
                 //TODO: this needs testing, how much context window space it takes
                 debugNotes += addedFunctions;
+                
+                m_lastFixStep = stepIndex;
             }
             else
             {
@@ -6644,7 +6646,22 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         Prompt breakpoints("Breakpoints.txt",{{"hit_count", hitCount}});
         project->pushMessage(breakpoints, "user", true);
         
-        project->inference(cache, promptNextStep, schema, object);
+        std::string promptNextStepMsg = promptNextStep.str();
+        
+        uint32_t sinceLastFix = stepIndex - m_lastFixStep;
+        if(sinceLastFix >= DISCLOSE_STOP_STEPS_AFTER_FIX && m_system != "main")
+        {
+            promptNextStepMsg += "\n\nYou haven't edited the source (via fix_function action) for approximately ";
+            promptNextStepMsg += std::to_string(sinceLastFix) + " steps. Since we are debugging a unit test (for function '";
+            promptNextStepMsg += m_system + "') there is a chance the unit test itself is broken. ";
+            promptNextStepMsg += "If you are sure there is enough evidence that ";
+            promptNextStepMsg += "the unit test main function source is the only reason for the test to fail, ";
+            promptNextStepMsg += "you can request a stop of the test by requesting next action 'stop_unit_test' ";
+            promptNextStepMsg += "and I will try to fix the test sources and resume the debugging. ";
+            promptNextStepMsg += "If you decide to do this, provide your justification in the motivation section.\n";
+        }
+        
+        project->inference(cache, promptNextStepMsg, schema, object);
         
         m_nextStep.clear();
         m_nextStep.from_json(object);
@@ -9297,6 +9314,7 @@ void Debugger::resetTest()
     m_actionFeedback.clear();
     m_infoStepsStart = -1;
     m_lastRunStep = 0;
+    m_lastFixStep = 0;
     m_lastRunInfo.clear();
     m_commitMessage.clear();
     

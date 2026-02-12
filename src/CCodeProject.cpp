@@ -1747,6 +1747,32 @@ namespace stdrave {
         return archIndex + 1;//Old archives plus the current trajectory
     }
 
+    void CCodeProject::archiveBrokenTest(const std::string& testPath)
+    {
+        TestDef unitTestDef;
+        unitTestDef.load(testPath + "/test.json");
+        std::string testDebugDir = getProjDir() + "/debug/" + unitTestDef.name;
+        std::string trajectoryDir = testDebugDir + "/trajectory";
+        if(!boost_fs::exists(trajectoryDir))
+        {
+            return ;
+        }
+        
+        std::string archiveDir = testDebugDir + "/broken";
+        
+        boost::system::error_code ec;
+        boost_fs::copy(trajectoryDir, archiveDir,
+                       boost_fs::copy_options::recursive |
+                       boost_fs::copy_options::overwrite_existing, ec);
+        
+        boost_fs::remove_all(trajectoryDir);
+        
+        //Logs
+        //For now just delete logs
+        std::string logsDebugDir = getProjDir() + "/logs/debug/" + unitTestDef.name;
+        boost_fs::remove_all(logsDebugDir);
+    }
+
     void CCodeProject::debugTests()
     {
         std::string testDirecotry = getProjDir() + "/tests";
@@ -1937,6 +1963,8 @@ namespace stdrave {
                                     //Get pointer to the new node after reload
                                     ccNode = getNodeByName(test.second);
                                     ccNode->improveUnitTest();
+                                    
+                                    archiveBrokenTest(unitTestPath);
                                 }
                                 else
                                 {

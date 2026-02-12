@@ -20,6 +20,8 @@
 
 #define DELETE_INFO_REQUESTS_ON_COMPACTION 3
 
+#define DISCLOSE_STOP_STEPS_AFTER_FIX 20
+
 #define ANALYSIS_HINT_MAX_SIZE (200*1024)
 #define LIMIT_DEBUG_NOTES_SIZE
 #define LIMIT_DESCRIPTION_SIZE
@@ -234,6 +236,7 @@ namespace stdrave {
         std::string             m_actionFeedback;
         int                     m_infoStepsStart;
         uint32_t                m_lastRunStep;
+        uint32_t                m_lastFixStep;
         std::string             m_lastRunInfo;
         std::string             m_rewardHackingReview;
         std::string             m_lastRunTestLog;

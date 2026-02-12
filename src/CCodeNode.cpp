@@ -7258,7 +7258,9 @@ namespace stdrave {
         
         pushMessage(improve.str(), "user");
 #if 1
+        captureContext();
         implementUnitTest();
+        popContext();
 #else
         generateUnitTestInputFiles();
         
@@ -7268,6 +7270,23 @@ namespace stdrave {
         
         linkUnitTest(true);
 #endif
+        
+        summarizeUnitTestDesc();
+        
+        //Save the unit test
+        {
+            Client& client = Client::getInstance();
+            CCodeProject* proj = (CCodeProject*)client.project();
+            
+            std::string buildSourcePath = getNodeBuildSourcePath();
+            std::string buildDir = proj->getProjDir() + "/build";
+            std::string nodeDir = buildDir + "/" + buildSourcePath;
+            std::string testDir = nodeDir + "/test";
+            
+            std::string soruceFile = testDir + "/main.cpp";
+            
+            saveJson(m_unitTest.definition.to_json(), testDir + "/test.json");
+        }
     
         return true;
     }

@@ -8,6 +8,7 @@ In the source of unit test implementation you must not include any header files.
 - Use std::cout with the << operator (avoid other methods) for output that should persist in release builds (user-facing messages, final results). Use PRINT_TEST for debug/diagnostic output that will be stripped from release builds.
 - Assume function declaration and data definitions required by '[[function]]' are included with the headers. No need to declare the function '[[function]]' or define any data types this function use
 - Do not define or declare functions and data types defined by the application in the test source
+- The source of the unit test driver (main.cpp) has to be less than 150 lines of code long.
 [[other_notes]]
 [[regex_contract]]
 

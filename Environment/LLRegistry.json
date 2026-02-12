@@ -348,8 +348,8 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 4.00,
-      "output_tokens_price": 16.00
+      "input_tokens_price": 3.00,
+      "output_tokens_price": 15.00
     },
     {
       "provider": "anthropic",

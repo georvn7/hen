@@ -232,6 +232,7 @@ namespace stdrave {
         void setupBuild() override;
         void finalizeBuild() override;
         uint32_t archiveTest(const std::string& testPath, std::string& trajectoryDir);
+        void archiveBrokenTest(const std::string& testPath);
         void debugTests();
         void synthetizeTrainingData();
         std::multimap<uint32_t, std::string, std::greater<uint32_t>>

@@ -957,7 +957,17 @@ namespace stdrave {
                         }
                         else
                         {
-                            pushMessage("Unable to extract source or the \"ACTUAL\" hint from the response. Please provide it again!", "user", true);
+                            std::string srcErrorMessage = "Unable to extract source or the \"ACTUAL\" hint from the response. Please provide it again!";
+                            if(isTruncated && !source.empty())
+                            {
+                                uint32_t srcCount = (uint32_t)countLines(source);
+                                if(srcCount > 150)
+                                {
+                                    srcErrorMessage += "\nThe returned response is " + std::to_string(srcCount) + " lines long. Maybe it is too much? Usually snippets are < 150 lines!";
+                                }
+                            }
+                            
+                            pushMessage(srcErrorMessage, "user", true);
                         }
                         
                         bool loop = Client::getInstance().processUserInput();

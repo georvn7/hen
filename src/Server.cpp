@@ -975,12 +975,41 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
             utility::string_t role = requestFromClientBody[U("messages")].as_array()[0][U("role")].as_string();
             if(role == U("system"))
             {
-                requestFromClientBody[U("system")] = requestFromClientBody[U("messages")].as_array()[0][U("content")];
+                auto systemText = requestFromClientBody[U("messages")].as_array()[0][U("content")].as_string();
+                auto systemBlock = json::value::object();
+                systemBlock[U("type")] = json::value::string(U("text"));
+                systemBlock[U("text")] = json::value::string(systemText);
+                systemBlock[U("cache_control")] = json::value::object();
+                systemBlock[U("cache_control")][U("type")] = json::value::string(U("ephemeral"));
+
+                auto systemArray = json::value::array();
+                systemArray[0] = systemBlock;
+                requestFromClientBody[U("system")] = systemArray;
+                
                 requestFromClientBody[U("messages")].as_array().erase(0);
             }
         }
         
         alternateRoles(requestFromClientBody);
+        
+        // Mark the last user message content for caching
+        auto& msgs = requestFromClientBody[U("messages")].as_array();
+        for (int i = (int)msgs.size() - 1; i >= 0; --i) {
+            if (msgs[i][U("role")].as_string() == U("user")) {
+                auto content = msgs[i][U("content")].as_string();
+                
+                auto contentBlock = json::value::object();
+                contentBlock[U("type")] = json::value::string(U("text"));
+                contentBlock[U("text")] = json::value::string(content);
+                contentBlock[U("cache_control")] = json::value::object();
+                contentBlock[U("cache_control")][U("type")] = json::value::string(U("ephemeral"));
+                
+                auto contentArray = json::value::array();
+                contentArray[0] = contentBlock;
+                msgs[i][U("content")] = contentArray;
+                break;
+            }
+        }
     }
     else if(llm->provider == "google")
     {
@@ -1046,6 +1075,9 @@ web::json::value Server::updateUsage(web::json::value& usageField,
     uint32_t prompt_tokens = 0;
     uint32_t completion_tokens = 0;
     
+    uint32_t cache_creation_tokens = 0;
+    uint32_t cache_read_tokens = 0;
+    
     //TODO: I'm not quite sure how to properly handle the thinking tokens here
 
     // Make sure usageField is valid
@@ -1084,6 +1116,16 @@ web::json::value Server::updateUsage(web::json::value& usageField,
         if (usageField.has_field(U("output_tokens"))) {
             completion_tokens = static_cast<uint32_t>(usageField[U("output_tokens")].as_number().to_uint64());
         }
+        
+        // Prompt caching token fields
+        if (usageField.has_field(U("cache_creation_input_tokens"))) {
+            cache_creation_tokens = static_cast<uint32_t>(usageField[U("cache_creation_input_tokens")].as_number().to_uint64());
+        }
+        if (usageField.has_field(U("cache_read_input_tokens"))) {
+            cache_read_tokens = static_cast<uint32_t>(usageField[U("cache_read_input_tokens")].as_number().to_uint64());
+        }
+        
+        prompt_tokens += cache_creation_tokens + cache_read_tokens;  // HERE
     }
     else if (llm->provider == "google")
     {
@@ -1113,8 +1155,16 @@ web::json::value Server::updateUsage(web::json::value& usageField,
     usage[U("completion_tokens")] = json::value::number(completion_tokens);
     usage[U("total_tokens")] = json::value::number(prompt_tokens + completion_tokens);
     
-    float credits = (prompt_tokens/1000000.0f)*llm->input_tokens_price +
-                    (completion_tokens/1000000.0f)*llm->output_tokens_price;
+    float credits;
+    if (cache_creation_tokens > 0 || cache_read_tokens > 0) {
+        credits = (prompt_tokens / 1000000.0f) * llm->input_tokens_price +
+        (cache_creation_tokens / 1000000.0f) * llm->input_tokens_price * 1.25f +
+        (cache_read_tokens / 1000000.0f) * llm->input_tokens_price * 0.1f +
+        (completion_tokens / 1000000.0f) * llm->output_tokens_price;
+    } else {
+        credits = (prompt_tokens / 1000000.0f) * llm->input_tokens_price +
+        (completion_tokens / 1000000.0f) * llm->output_tokens_price;
+    }
     
     float creditsConsumed = 0;
     uint32_t creditsLimit = 0;

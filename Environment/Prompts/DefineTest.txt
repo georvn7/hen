@@ -38,6 +38,8 @@ Important characteristic of the unit test is that the test itself resides in sin
 
  The unit tested application function '[[function]]' and all data types for its arguments and return type are already implemented and the test doesn't have to implement them. Other application functions won't be visible for the unit test and shouldn't be used. The test script must not generate main.cpp or to compile the executable being tested. The unit test executable must not be executed in the pretest and posttest steps. However, the framework will invoke the executable with the arguments specified in the 'test.command' field.
 
+The source of the unit test main.cpp must be less than 150 lines of source code. Plan for this!
+
 Please, note I'm not asking you here to implement the test's main.cpp. I'm not asking to provide the content of the input files. I will ask for the source of the test and content of the input files (if any) later in a separate step. I'm asking you only to provide description, information about the expected command line and input files as discussed above.
 
 The name of the unit test must be: [[test_name]]
