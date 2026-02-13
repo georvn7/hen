@@ -347,10 +347,11 @@ namespace stdrave {
         bool wasOnAuto = client.run();
         if(dataDefNeedsReview)
         {
+#ifdef ENABLE_DATA_SELF_REVIEW
             captureContext();
             reasonAboutData(cache, source, typeName);
             popContext();
-            
+#endif
             //During the review loop, we don't need the initial date definition provided by the firs inference:
             //inferenceDataSource(cache, false, defineDataMessage, typeName, source);
             popMessages(1);
@@ -1174,7 +1175,10 @@ namespace stdrave {
         
         captureContext();
         
-        bool selfReviewPass = inference(cache, funcDefinitionReview, true);
+        bool selfReviewPass = true;
+#ifdef ENABLE_CODE_SELF_REVIEW
+        selfReviewPass = inference(cache, funcDefinitionReview, true);
+#endif
         
         bool reviewPass = m_codeReview.str().empty();
         std::string reviseMessage;
@@ -1344,6 +1348,9 @@ namespace stdrave {
             reviewFunction(cache, parent_info, parentInitialReview);
         }
         
+        m_description.brief = m_prototype.brief;
+        m_description.description = m_brief.brief;
+        
         m_brief.brief = m_prototype.brief;
         
         popContext();
@@ -1377,11 +1384,11 @@ namespace stdrave {
         Client& client = Client::getInstance();
         CCodeProject* proj = (CCodeProject*)client.project();
         
+        m_stats.reset();
+#ifdef ENABLE_VERBOSE_FUNCTION_DESCRIPTION
         captureContext();
         
         std::string parent_info;
-        
-        m_stats.reset();
         
         if(m_this && m_this->m_parent && m_this->m_parent->m_data)
         {
@@ -1466,12 +1473,18 @@ namespace stdrave {
             popContext();
         }
         
+        popContext();
+#else //ENABLE_VERBOSE_FUNCTION_DESCRIPTION
+        
+        //Already done in defineFunction();
+        //m_description.description = m_brief.brief;
+        //m_description.brief = m_prototype.brief;
+#endif //ENABLE_VERBOSE_FUNCTION_DESCRIPTION
+        
         m_prototype.brief = m_description.brief;
         m_brief.brief = m_description.brief;
         
         m_prototype.description = m_description.description;
-        
-        popContext();
         
         //Validation
         if(m_prototype.declaration.size() < 6) return false;
@@ -1567,7 +1580,7 @@ namespace stdrave {
                 list_functions += "\nReason: call depth is above the threshold.";
             }
             
-            list_functions += "\nPrefer balancing the architecture as: application -> system -> sub-system -> component -> module -> function -> helper functions...";
+            list_functions += "\nPrefer balancing the architecture as: application -> sub-system -> component -> module -> function ";
 
             list_functions += "\n\nBefore proceeding to list the functions, let me know if you need additional information ";
             list_functions += "about the architecture and implementation of this application ";
@@ -4250,9 +4263,12 @@ namespace stdrave {
         CCodeProject* proj = (CCodeProject*)client.project();
         bool wasOnAuto = client.run();
         
+#ifdef ENABLE_CODE_SELF_REVIEW
         captureContext();
         reasonAboutCode(source, srcType, tryToRecover, enableSelfReview, enableCache);
         popContext();
+#endif //ENABLE_CODE_SELF_REVIEW
+        
         popMessages(1);//pop the original source from the context
         
         InferenceIntent intent = tryToRecover > 0 ? InferenceIntent::IMPLEMENT_OPTIMISTIC : InferenceIntent::IMPLEMENT;

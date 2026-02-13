@@ -4580,7 +4580,9 @@ std::string Debugger::fixFunction(CCodeProject* project, const TestDef& test, co
         project->pushMessage(programming, "user", true);
     }
     
-    bool fixed = project->updateSource(functionName, CCodeNode::FUNC_FIX, message, output, true);
+    //The thinking is, we allow refactorin for app->sub-systems->components->modules but not for functions (last level 5)
+    bool enableRefactoring = ccNode->getDepth() <= 4;
+    bool fixed = project->updateSource(functionName, CCodeNode::FUNC_FIX, message, output, enableRefactoring);
     project->popContext();
     
     //Ensure we are
