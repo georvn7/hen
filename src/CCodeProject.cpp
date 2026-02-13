@@ -2078,7 +2078,7 @@ namespace stdrave {
         Client::getInstance().agentToServer("\n\nDEBUGGING...\n\n");
         
         //TODO: ONLY FOR TEST
-        //synthetizeTrainingData();
+        synthetizeTrainingData();
         
         debugTests();
         

@@ -1367,7 +1367,7 @@ std::pair<bool, std::string> Debugger::analysisFullTrace(CCodeProject* project, 
     else if(m_tracer.getFramesCount() == 0)
     {
         analysisHint += "No frames recorded in the detailed trace (the provided full trace is less verbose).";
-        analysisHint += " This suggest probems in the build system to sucessfuly build instrumented binary.";
+        analysisHint += " This suggest problems in the build system to successfully build instrumented binary.";
         analysisHint += " Anothrer 'run_test' action might fix the build\n";
     }
     else if(m_system != "main")
@@ -6781,6 +6781,15 @@ bool Debugger::saveTestToDirectory(CCodeProject* project, const std::string& tes
     }
     
     boost_fs::create_directories(testDirectory);
+    
+    //We need to instrument the *.json.
+    //Inserting the function name, for now the only purpose is during training
+    {
+        web::json::value json;
+        loadJson(json, testJsonDir + "/test.json");
+        json[U("function")] = web::json::value::string(utility::conversions::to_string_t(m_system));
+        saveJson(json, testJsonDir + "/test.json");
+    }
     
     boost_fs::copy(testJsonDir + "/test.json", testDirectory + "/test.json");
     

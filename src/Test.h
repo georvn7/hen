@@ -93,7 +93,7 @@ private:
     
 public:
     DECLARE_TYPE(TestDef, "Description")
-    DECLARE_FIELD(std::string, name, "The name of the test")
+    DECLARE_FIELD(std::string, name, "Unique name of the test")
     DECLARE_FIELD(std::string, description, "Detailed description of the unit test. "\
                                 "This description will be used as implementation guidelines")
     DECLARE_FIELD(TestStep, pretest, "Setp with commands that will be executed before running the test")

@@ -584,12 +584,15 @@ class DebugContextProvider
     
     LogAnalyzer m_logger;
     TraceAnalyzer m_tracer;
+    std::string m_system;
 
 public:
     
-    void setup(const std::string& workingDirectory)
+    void setup(const std::string& workingDirectory, const std::string& system)
     {
         m_contextVisibility.clear();
+        
+        m_system = system;
         
         m_workingDirectory = workingDirectory;
         
@@ -2090,7 +2093,7 @@ public:
     
     std::string getSubSystemsData(CCodeProject* project, std::set<std::string>& subSystems)
     {
-        std::vector<std::string> topFunctions = project->listAllFunctions("", PRINT_MAX_FUNCTIONS_DEPTH-1, {});
+        std::vector<std::string> topFunctions = project->listAllFunctions(m_system, PRINT_MAX_FUNCTIONS_DEPTH-1, {});
         subSystems.clear();
      
         std::stringstream ss;
@@ -2316,10 +2319,24 @@ public:
                 }
             }
         }
-        else
+        else if(m_tracer.getFramesCount() == 0)
         {
             analysisHint += "No frames recorded in the trace.";
-            analysisHint += " This suggest probems in the build system to sucessfuly build instrumented binary.";
+            analysisHint += " This suggest problems in the build system to successfully build instrumented binary.";
+        }
+        else if(m_system != "main")
+        {
+            analysisHint += "The unit test executed without crashes or hangs! ";
+            /*if(!analysis.m_testResult)
+            {
+                analysisHint += "However, results for some of the commands don't match expected outcomes. ";
+                analysisHint += " Further investigation and debugging are required!\n";
+            }
+            else*/
+            {
+                analysisHint += "Verify that the test results match expected outcomes. ";
+                //analysisHint += "If they don't, investigate and debug.";
+            }
         }
         
         //Now check the log
@@ -2329,12 +2346,12 @@ public:
         {
             if(lastInvocation.first != "main")
             {
-                analysisHint += "From the log, the last logged function is '" + lastInvocation.first;
+                analysisHint += "\nFrom the log, the last logged function is '" + lastInvocation.first + "\n";
             }
         }
         else
         {
-            analysisHint += "Couldn't find logged messages from application functions in the log. This is not expected.";
+            analysisHint += "\nCouldn't find logged messages from application functions in the log. This is not expected.\n";
         }
         
         return std::make_pair(requireSeparateStep,analysisHint);

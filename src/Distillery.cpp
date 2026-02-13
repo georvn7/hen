@@ -437,7 +437,7 @@ namespace stdrave {
         stepDir += std::to_string(stepRun);
         stepDir += "/wd";
         
-        m_debugContext.setup(stepDir);
+        m_debugContext.setup(stepDir, m_system);
     }
 
     std::string Distillery::printTrajectory()
@@ -972,9 +972,12 @@ namespace stdrave {
                                         int fromStep, int toStep)
     {
         std::ifstream file(testJsonPath + "/test.json");
+        
         std::string jsonStr((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
         auto uJsonStr = utility::conversions::to_string_t(jsonStr);
         auto json = web::json::value::parse(uJsonStr);
+        m_system = utility::conversions::to_utf8string(json[U("function")].as_string());
+        
         m_test.from_json(json);
         
         loadTrajectory(project, m_test, fromStep, toStep);
@@ -1577,7 +1580,7 @@ namespace stdrave {
         std::string currentTrajectory = debugInfo;
         
         std::string stepStr = std::to_string(originalStep);
-        //TODO: I don't lieke extraction from logs, maybe replace with parsing traces/logs for that step, but for now if OKish
+        //TODO: I don't like extraction from logs, maybe replace with parsing traces/logs for that step, but for now it is OK-ish
         {
             std::string stepLogsDir = project->getProjDir() + "/logs/debug/" + m_test.name + "/step_" + stepStr;
             
@@ -1905,6 +1908,7 @@ namespace stdrave {
         //mergedUserMessage += m_testPrompt + "\n\n";
         mergedUserMessage += trajecotryContent;
         trajecotryMessage[U("content")] = json::value::string(utility::conversions::to_string_t(mergedUserMessage));
+        
         messagesArray[messagesArray.size()] = trajecotryMessage;
         
         //*** response message

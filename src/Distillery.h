@@ -89,6 +89,7 @@ namespace stdrave {
         DebugContextProvider    m_debugContext;
         
         std::vector<web::json::value> m_dataset;
+        std::string m_system;
         
         std::string m_dbgSystemPrompt;
         std::string m_projDesc;
@@ -126,6 +127,12 @@ namespace stdrave {
             std::string hash;
             int         fixIndex;
             bool        checkoutParent;
+        };
+        
+        struct StepInfo
+        {
+            std::string request;
+            std::string response;
         };
         
         CommitInfo findCommit(CCodeProject* project, int step);
