@@ -188,7 +188,8 @@ namespace stdrave {
                                 std::string& prevSteps,
                                 const std::string& requestedInfo,
                                 std::string& newInfo,
-                                DistilledStep& nextStep);
+                                DistilledStep& nextStep,
+                                const StepDisclosureMapEntry* disclosureEntry);
         
         web::json::value buildTrainingData(CCodeProject* project,
                                            const std::string& trajectory,

@@ -973,7 +973,7 @@ namespace stdrave {
     std::string buildPrompt(const std::string& content, const std::map<std::string, std::string>& params);
     bool addToSet(std::vector<std::shared_ptr<std::string>>& vset, const std::string& element);
     bool isInSet(std::vector<std::shared_ptr<std::string>>& vset, const std::string& element);
-    std::string getAsCsv(const std::set<std::string>& namesSet);
+    std::string getAsCsv(const std::set<std::string>& namesSet, int max = -1);
     std::vector<std::shared_ptr<std::string>> readFromCsv(const std::string& csv);
     std::string getAsList(const std::vector<std::shared_ptr<std::string>>& namesSet);
     uint32_t generateUniqueUint32();

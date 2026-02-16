@@ -1135,16 +1135,39 @@ bool isInSet(std::vector<std::shared_ptr<std::string>>& vset, const std::string&
     return it != vset.end();
 }
 
-std::string getAsCsv(const std::set<std::string>& namesSet)
+std::string getAsCsv(const std::set<std::string>& namesSet, int max /*= -1*/)
 {
     std::string csvList;
-    for(auto name : namesSet)
+    const bool limited = (max >= 0);
+    int emitted = 0;
+    
+    for (const auto& name : namesSet)
     {
-        if(!csvList.empty())
+        if (limited && emitted >= max)
+        {
+            break;
+        }
+        
+        if (!csvList.empty())
         {
             csvList += ", ";
         }
+        
         csvList += name;
+        ++emitted;
+    }
+    
+    if (limited)
+    {
+        const int remaining = static_cast<int>(namesSet.size()) - emitted;
+        if (remaining > 0)
+        {
+            if (!csvList.empty())
+            {
+                csvList += ", ";
+            }
+            csvList += "... (+" + std::to_string(remaining) + " more)";
+        }
     }
     
     return csvList;

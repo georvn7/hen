@@ -2093,6 +2093,8 @@ namespace stdrave {
         web::json::value schema;
         setupSchema<EditSourceSequence>(schema);
         
+        project->captureContext(std::string());
+        
         std::string message = promptOptimizeFixTrack.str();
         project->inference(cache, message, schema, object);
         
@@ -2119,6 +2121,13 @@ namespace stdrave {
             
             attempts++;
         }
+        
+        project->popContext();
+        
+        project->pushMessage(message, "user", true);
+        
+        std::string sequenceMsg = utility::conversions::to_utf8string(optimalSequence.to_json().serialize());
+        project->pushMessage(sequenceMsg, "assistant", true);
     }
 
     json::value Distillery::buildTrainingData(CCodeProject* project,
@@ -2232,7 +2241,8 @@ namespace stdrave {
                                         std::string& prevSteps,
                                         const std::string& requestedInfo,
                                         std::string& newInfo,
-                                        DistilledStep& nextStep)
+                                        DistilledStep& nextStep,
+                                        const StepDisclosureMapEntry* disclosureEntry)
     {
         web::json::value object;
         
@@ -2293,6 +2303,8 @@ namespace stdrave {
         const std::string lockedActionSubject = nextStep.debug_step.action_subject;
         const uint32_t    lockedInvocation    = nextStep.debug_step.invocation;
         const uint32_t    lockedLineNumber    = nextStep.debug_step.line_number;
+        
+        const std::set<std::string> functionCandidates = (m_project ? m_project : project)->getNodeNames();
         
         Prompt promptDistillStep("DistillStep.txt",{
                             {"current_trajectory", currentTrajectory},
@@ -2374,6 +2386,50 @@ namespace stdrave {
                 else
                 {
                     feedback += "The suggested mapping to the original step " + stepIdStr + " doesn't exist in the trajectory\n\n";
+                }
+            }
+            
+            if (disclosureEntry)
+            {
+                std::string narrative;
+                narrative += nextStep.debug_step.motivation;
+                narrative += "\n";
+                narrative += nextStep.motivation_summary;
+                narrative += "\n";
+                narrative += nextStep.analysis; // becomes assistant thinking in training
+                
+                std::set<std::string> mentionedFunctions;
+                addMentionedFunctionsFromText(narrative, functionCandidates,
+                                              mentionedFunctions);
+                
+                std::set<std::string> disallowed;
+                for (const auto& fn : mentionedFunctions)
+                {
+                    if (fn == lockedActionSubject) continue; // allow locked subject mention
+                    if (!disclosureEntry->visible_functions.count(fn))
+                    {
+                        disallowed.insert(fn);
+                    }
+                }
+                
+                if (!disallowed.empty())
+                {
+                    feedback += "Grounding violation in narrative fields (motivation/motivation_summary/analysis).\n";
+                    feedback += "Disallowed function names: " + getAsCsv(disallowed, 30) + "\n";
+                    feedback += "Currently visible functions at this step: " + getAsCsv(disclosureEntry->visible_functions, 30) + "\n";
+                    feedback += "Regenerate using only functions disclosed in CURRENT TRAJECTORY.\n\n";
+                }
+                
+                const bool lockedNeedsMention =
+                (lockedActionType == "function_info" || lockedActionType ==
+                 "fix_function" || lockedActionType == "debug_function") &&
+                !lockedActionSubject.empty() && lockedActionSubject != "none" &&
+                functionCandidates.count(lockedActionSubject);
+                
+                if (lockedNeedsMention && !containsToken(narrative, lockedActionSubject))
+                {
+                    feedback += "Grounding violation: narrative must explicitly mention locked action_subject '";
+                    feedback += lockedActionSubject + "'.\n\n";
                 }
             }
             
@@ -2581,6 +2637,8 @@ namespace stdrave {
         
         std::string summary = distillSummaryBefore(project, startStep, fixStep);
         
+        auto disclosure = buildDisclosureMap(project, optimalSequence, startStep, summary);
+        
         std::string prevSteps;
         std::string requestedInfo;
         std::vector<std::string> infoRequests;
@@ -2720,7 +2778,12 @@ namespace stdrave {
                 nextStep.debug_step.line_number = step->line_number;
                 nextStep.m_originalStep = step->original_step;
                 
-                std::string currentTrajectory = distillStep(project, step->original_step, startStep, fixStep, currentStep, summary, prevSteps, requestedInfo, newInfo, nextStep);
+                const StepDisclosureMapEntry* disclosureEntry = nullptr;
+                auto dIt = disclosure.find(currentStep);
+                if (dIt != disclosure.end()) disclosureEntry = &dIt->second;
+                
+                std::string currentTrajectory = distillStep(project, step->original_step, startStep, fixStep, currentStep,
+                                                            summary, prevSteps, requestedInfo, newInfo, nextStep, disclosureEntry);
                 
                 std::string content = utility::conversions::to_utf8string(nextStep.debug_step.to_json().serialize());
                 web::json::value schema;
@@ -2770,8 +2833,13 @@ namespace stdrave {
                 nextStep.debug_step.line_number = step->line_number;
                 nextStep.m_originalStep = step->original_step;
                 
+                const StepDisclosureMapEntry* disclosureEntry = nullptr;
+                auto dIt = disclosure.find(currentStep);
+                if (dIt != disclosure.end()) disclosureEntry = &dIt->second;
+                
                 std::string newInfo;
-                std::string currentTrajectory = distillStep(project, step->original_step, startStep, fixStep, currentStep, summary, prevSteps, requestedInfo, newInfo, nextStep);
+                std::string currentTrajectory = distillStep(project, step->original_step, startStep, fixStep, currentStep,
+                                                            summary, prevSteps, requestedInfo, newInfo, nextStep, disclosureEntry);
                 
                 if(!newInfo.empty())
                 {
