@@ -103,6 +103,7 @@ namespace stdrave {
         std::set<std::string> m_newFunctions;
         
         std::vector<std::pair<int,int>> m_mergedFixes;
+        std::string                     m_prologue;
         
         bool loadTrajectory(CCodeProject* project, const TestDef& test, int fromStep, int toStep);
         
@@ -182,7 +183,17 @@ namespace stdrave {
                                 std::string& newInfo,
                                 DistilledStep& nextStep);
         
-        web::json::value buildTrainingData(CCodeProject* project, const std::string& trajectory, const std::string& content, const std::string& thinking);
+        web::json::value buildTrainingData(CCodeProject* project,
+                                           const std::string& trajectory,
+                                           const std::string& content,
+                                           const std::string& thinking,
+                                           web::json::value* schema = nullptr,
+                                           web::json::value* messages = nullptr);
+        
+        void addStepToMessages(CCodeProject* project,
+                               const DistilledStep& step,
+                               const std::string& newInfo,
+                               web::json::value& messages);
         
         std::string rebuildRequestedInfo(CCodeProject* project, const std::vector<DistilledStep>& trajectory, int newDebugStep);
         
@@ -222,6 +233,7 @@ namespace stdrave {
         std::string distillDebugStep(CCodeProject* project,
                                      const std::string& summary,
                                      std::string& prevSteps,
+                                     std::string& newInfo,
                                      DistilledStep& distilledStep,
                                      int originalStep,
                                      int testStep, int debugStep);

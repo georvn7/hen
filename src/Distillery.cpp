@@ -965,6 +965,7 @@ namespace stdrave {
         
         //From first:fix_function to the last secodn:fix_function actions
         m_mergedFixes.clear();
+        m_prologue.clear();
     }
 
     uint32_t Distillery::loadTrajectory(CCodeProject* project,
@@ -1570,6 +1571,7 @@ namespace stdrave {
     std::string Distillery::distillDebugStep(CCodeProject* project,
                                              const std::string& summary,
                                              std::string& prevSteps,
+                                             std::string& newInfo,
                                              DistilledStep& distilledStep,
                                              int originalStep,
                                              int testStep, int debugStep)
@@ -1672,7 +1674,9 @@ namespace stdrave {
         
         //Reuse prevSteps to return step info to be added
         prevSteps = "\nSTEP " + debugStepStr + ":\n";
-        prevSteps += distilledDebugStep.fullInfo();
+        
+        newInfo = distilledDebugStep.fullInfo();
+        prevSteps += newInfo;
         
         
         std::string datasetDir = project->getProjDir() + "/dataset/" + m_test.name;
@@ -1680,6 +1684,34 @@ namespace stdrave {
         saveDebugAnalysis(project, datasetDir, "debug_" + testStepStr + "_" + debugStepStr, distilledDebugAnalysis, debugInfo);
         
         return currentTrajectory;
+    }
+
+    void Distillery::addStepToMessages(CCodeProject*,
+                                       const DistilledStep& step,
+                                       const std::string& newInfo,
+                                       web::json::value& messages)
+    {
+        // Prevent empty/whitespace-only user turns in interleaved history.
+        if (newInfo.find_first_not_of(" \t\r\n\f\v") == std::string::npos) {
+            return;
+        }
+        
+        auto& arr = messages.as_array();
+        
+        NextDebugStep req = step.debug_step;
+        if (!step.motivation_summary.empty()) {
+            req.motivation = step.motivation_summary;
+        }
+        
+        web::json::value a;
+        a[U("role")] = web::json::value::string(U("assistant"));
+        a[U("content")] = web::json::value::string(req.to_json().serialize());
+        arr[arr.size()] = a;
+        
+        web::json::value u;
+        u[U("role")] = web::json::value::string(U("user"));
+        u[U("content")] = web::json::value::string(utility::conversions::to_string_t(newInfo));
+        arr[arr.size()] = u;
     }
 
     std::string Distillery::rebuildRequestedInfo(CCodeProject* project, const std::vector<DistilledStep>& trajectory, int newDebugStep)
@@ -1729,6 +1761,7 @@ namespace stdrave {
         prologue += lastRunTestLog;
         prologue += "INFORMATION FOR THE LAST RUN STEP ENDS HERE\n\n\n";
         
+        m_prologue = prologue;
         return prologue;
     }
 
@@ -1759,10 +1792,10 @@ namespace stdrave {
         }
         
         std::string lastAction = optimalSequence.steps.back()->action_type;
-        if(optimalSequence.steps.back()->action_type != "run_test" &&
+        if(//optimalSequence.steps.back()->action_type != "run_test" &&
            optimalSequence.steps.back()->action_type != "fix_function")
         {
-            feedback += "The first step in the optimal sequecne is from type '" + lastAction;
+            feedback += "The last step in the optimal sequecne is from type '" + lastAction;
             feedback += "' it must be fix_function.\n\n";
         }
         
@@ -1877,53 +1910,108 @@ namespace stdrave {
         }
     }
 
-    json::value Distillery::buildTrainingData(CCodeProject* project, const std::string& trajectory,
-                                              const std::string& content, const std::string& thinking)
+    json::value Distillery::buildTrainingData(CCodeProject* project,
+                                              const std::string& trajectory,
+                                              const std::string& content,
+                                              const std::string& thinking,
+                                              web::json::value* schema,
+                                              web::json::value* messages)
     {
-        std::string datasetDir = project->getProjDir() + "/dataset/" + m_test.name;
-        std::string datasetFile = datasetDir + "/train.jsonl";
-        
         json::value messagesArray = json::value::array();
         
-        //*** system prompt
+        // system
         json::value systemMessage;
         systemMessage[U("role")] = json::value::string(U("system"));
         std::string systemPrompt = m_dbgSystemPrompt;
-        //systemPrompt += m_debugWorkflow;
         systemMessage[U("content")] = json::value::string(utility::conversions::to_string_t(systemPrompt));
         messagesArray[messagesArray.size()] = systemMessage;
         
-        //*** trajecotry
+        // schema/instrumentation tail
+        web::json::value localSchema;
+        if (!schema) {
+            setupSchema<NextDebugStep>(localSchema);
+            schema = &localSchema;
+        }
         
-        //Add json schema instruction for the tool call ?!?!
-        web::json::value schema;
-        setupSchema<NextDebugStep>(schema);
-        std::string trajecotryContent = trajectory;
-        trajecotryContent += "\n\n" + m_nextStepPrompt;
-        trajecotryContent += project->getInstrumentationMessage(schema);
+        std::string nextStepTail = "\n\n" + m_nextStepPrompt;
+        nextStepTail += project->getInstrumentationMessage(*schema);
         
-        json::value trajecotryMessage;
-        trajecotryMessage[U("role")] = json::value::string(U("user"));
-        std::string mergedUserMessage = m_projDesc + "\n\n";
-        //mergedUserMessage += m_testPrompt + "\n\n";
-        mergedUserMessage += trajecotryContent;
-        trajecotryMessage[U("content")] = json::value::string(utility::conversions::to_string_t(mergedUserMessage));
+        if (messages && messages->is_array()) {
+            // interleaved mode: user prologue + prior interleaved msgs
+            json::value prologueMessage;
+            prologueMessage[U("role")] = json::value::string(U("user"));
+            
+            std::string base = m_projDesc + "\n\n";
+            if (!m_prologue.empty()) {
+                base += m_prologue;
+            } else {
+                // fallback if prologue was not set yet
+                base += trajectory;
+            }
+            
+            prologueMessage[U("content")] = json::value::string(utility::conversions::to_string_t(base));
+            messagesArray[messagesArray.size()] = prologueMessage;
+            
+            auto& src = messages->as_array();
+            for (size_t i = 0; i < src.size(); ++i) {
+                messagesArray[messagesArray.size()] = src[i];
+            }
+            
+            // append instruction/schema to the last user message
+            auto& arr = messagesArray.as_array();
+            int lastUserIdx = -1;
+            for (int i = static_cast<int>(arr.size()) - 1; i >= 0; --i) {
+                if (!arr[i].is_object() || !arr[i].has_field(U("role")) || !arr[i].at(U("role")).is_string()) {
+                    continue;
+                }
+                
+                const std::string role =
+                utility::conversions::to_utf8string(arr[i].at(U("role")).as_string());
+                if (role == "user") {
+                    lastUserIdx = i;
+                    break;
+                }
+            }
+            
+            if (lastUserIdx >= 0) {
+                std::string lastContent;
+                if (arr[lastUserIdx].has_field(U("content")) && arr[lastUserIdx].at(U("content")).is_string()) {
+                    lastContent = utility::conversions::to_utf8string(arr[lastUserIdx].at(U("content")).as_string());
+                }
+                lastContent += nextStepTail;
+                arr[lastUserIdx][U("content")] = json::value::string(utility::conversions::to_string_t(lastContent));
+            } else {
+                json::value userMessage;
+                userMessage[U("role")] = json::value::string(U("user"));
+                userMessage[U("content")] = json::value::string(utility::conversions::to_string_t(nextStepTail));
+                arr[arr.size()] = userMessage;
+            }
+        } else {
+            // original single-turn mode
+            std::string trajectoryContent = trajectory;
+            trajectoryContent += nextStepTail;
+            
+            json::value trajectoryMessage;
+            trajectoryMessage[U("role")] = json::value::string(U("user"));
+            
+            std::string mergedUserMessage = m_projDesc + "\n\n";
+            mergedUserMessage += trajectoryContent;
+            trajectoryMessage[U("content")] = json::value::string(utility::conversions::to_string_t(mergedUserMessage));
+            
+            messagesArray[messagesArray.size()] = trajectoryMessage;
+        }
         
-        messagesArray[messagesArray.size()] = trajecotryMessage;
-        
-        //*** response message
+        // assistant target
         json::value responseMessage;
         responseMessage[U("role")] = json::value::string(U("assistant"));
         responseMessage[U("thinking")] = json::value::string(utility::conversions::to_string_t(thinking));
         responseMessage[U("content")] = json::value::string(utility::conversions::to_string_t(content));
-
-        //auto& messagesArray = jsonSample[U("messages")].as_array();
         messagesArray[messagesArray.size()] = responseMessage;
         
-        json::value jsonTrajecotry;
-        jsonTrajecotry[U("messages")] = messagesArray;
+        json::value jsonTrajectory;
+        jsonTrajectory[U("messages")] = messagesArray;
         
-        return jsonTrajecotry;
+        return jsonTrajectory;
     }
 
     std::string Distillery::distillStep(CCodeProject* project,
@@ -2278,6 +2366,7 @@ namespace stdrave {
         
         std::string startStepStr = std::to_string(startStep);
         int currentStep = startStep;
+        web::json::value messages = web::json::value::array();
         for(auto step : optimalSequence.steps)
         {
             std::string currentStepStr = std::to_string(currentStep);
@@ -2335,6 +2424,8 @@ namespace stdrave {
                 
                 stepInfo.m_debugNotes = systemAnalysis;
                 stepInfo.m_action = "run_test";
+                stepInfo.m_lineNumber = 0;
+                stepInfo.m_invocation = 1;
                 
                 //DebugStep prevFixStep;
                 if(prevLoaded &&
@@ -2343,6 +2434,7 @@ namespace stdrave {
                 {
                     stepInfo.m_motivation = "Run the test to verify the fix of '" + prevStep.m_subject;
                     stepInfo.m_motivation += "' and find what else needs fixes to successfully pass the test.";
+                    stepInfo.m_subject = prevStep.m_subject;
                     
                     std::string newInfo;
                     
@@ -2355,6 +2447,7 @@ namespace stdrave {
                 else
                 {
                     stepInfo.m_motivation = "Run the test to verify the recent fix and find what else needs fixes to successfully pass the test.";
+                    stepInfo.m_subject = "none";
                 }
                 
                 prevSteps += "\nSTEP: " + currentStepStr + "\n\n";
@@ -2372,6 +2465,7 @@ namespace stdrave {
                 distilledStep.m_debugNotes = systemAnalysis;
                 
                 distilledTrajectory.push_back(distilledStep);
+                addStepToMessages(project, distilledStep, stepInfo.notes(), messages);
             }
             else if(step->action_type == "debug_function")
             {
@@ -2394,7 +2488,9 @@ namespace stdrave {
                 std::string currentTrajectory = distillStep(project, step->original_step, startStep, fixStep, currentStep, summary, prevSteps, requestedInfo, newInfo, nextStep);
                 
                 std::string content = utility::conversions::to_utf8string(nextStep.debug_step.to_json().serialize());
-                json::value jsonSample = buildTrainingData(project, currentTrajectory, content, nextStep.analysis);
+                web::json::value schema;
+                setupSchema<NextDebugStep>(schema);
+                json::value jsonSample = buildTrainingData(project, currentTrajectory, content, nextStep.analysis, &schema, &messages);
                 saveTrainingData(datasetDir, "step_" + startStepStr + "_" + currentStepStr, jsonSample, true);
                 
                 distilledTrajectory.push_back(nextStep);
@@ -2417,6 +2513,7 @@ namespace stdrave {
                 
                 std::string trajectory = distillDebugStep(project, summary,
                                                            tempPrevSteps,
+                                                          newInfo,
                                                           nextStep,
                                                           step->original_step,
                                                           startStep, currentStep);
@@ -2427,6 +2524,7 @@ namespace stdrave {
                 
                 int newDebugStep = currentStep - startStep;
                 requestedInfo = rebuildRequestedInfo(project, distilledTrajectory, newDebugStep);
+                addStepToMessages(project, nextStep, newInfo, messages);
             }
             else
             {
@@ -2453,9 +2551,16 @@ namespace stdrave {
                 //TODO: Find the proper way to save the data!!!
                 
                 std::string content = utility::conversions::to_utf8string(nextStep.debug_step.to_json().serialize());
-                json::value jsonSample = buildTrainingData(project, currentTrajectory, content, nextStep.analysis);
+                web::json::value schema;
+                setupSchema<NextDebugStep>(schema);
+                json::value jsonSample = buildTrainingData(project, currentTrajectory, content, nextStep.analysis, &schema, &messages);
                 
                 saveTrainingData(datasetDir, "step_" + startStepStr + "_" + currentStepStr, jsonSample, true);
+                
+                if(NextDebugStep::isInformationRequest(step->action_type))
+                {
+                    addStepToMessages(project, nextStep, newInfo, messages);
+                }
             }
             
             currentStep++;
