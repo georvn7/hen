@@ -2078,6 +2078,11 @@ namespace stdrave {
             }
         }
         
+        const std::string lockedActionType    = nextStep.debug_step.action_type;
+        const std::string lockedActionSubject = nextStep.debug_step.action_subject;
+        const uint32_t    lockedInvocation    = nextStep.debug_step.invocation;
+        const uint32_t    lockedLineNumber    = nextStep.debug_step.line_number;
+        
         Prompt promptDistillStep("DistillStep.txt",{
                             {"current_trajectory", currentTrajectory},
                             {"new_functions", newFunctionsHint},
@@ -2091,25 +2096,24 @@ namespace stdrave {
         
         DebugStep debugStep;
         
-        if(nextStep.debug_step.isInformationRequest())
-        {
-            newInfo = m_debugContext.stepInfo(m_project, m_test,
-                                              nextStep.debug_step.action_type,
-                                              nextStep.debug_step.action_subject,
-                                              nextStep.debug_step.motivation,
-                                              nextStep.debug_step.invocation,
-                                              nextStep.debug_step.line_number,
-                                              debugStep);
-            
-            prevSteps += "\nSTEP " + stepIdStr + " ";
-            prevSteps += debugStep.summary() + "\n";
-            prevSteps += nextStep.motivation_summary + "\n\n";
-        }
-        
         std::string feedback;
         do
         {
             feedback.clear();
+            
+            if (nextStep.debug_step.action_type != lockedActionType ||
+                nextStep.debug_step.action_subject != lockedActionSubject ||
+                nextStep.debug_step.invocation != lockedInvocation ||
+                nextStep.debug_step.line_number != lockedLineNumber)
+            {
+                feedback += "ACTION LOCK violation.\n";
+                feedback += "Preserve exactly these fields from OPTIMIZED TRAJECTORY:\n";
+                feedback += "  action_type=" + lockedActionType + "\n";
+                feedback += "  action_subject=" + lockedActionSubject + "\n";
+                feedback += "  invocation=" + std::to_string(lockedInvocation) + "\n";
+                feedback += "  line_number=" + std::to_string(lockedLineNumber) + "\n";
+                feedback += "Regenerate. Change only motivation/motivation_summary/analysis.\n\n";
+            }
             
             if(nextStep.debug_step.action_type == "debug_function")
             {
@@ -2170,6 +2174,21 @@ namespace stdrave {
             }
             
         } while(!feedback.empty());
+        
+        if(nextStep.debug_step.isInformationRequest())
+        {
+            newInfo = m_debugContext.stepInfo(m_project, m_test,
+                                              nextStep.debug_step.action_type,
+                                              nextStep.debug_step.action_subject,
+                                              nextStep.debug_step.motivation,
+                                              nextStep.debug_step.invocation,
+                                              nextStep.debug_step.line_number,
+                                              debugStep);
+            
+            prevSteps += "\nSTEP " + stepIdStr + " ";
+            prevSteps += debugStep.summary() + "\n";
+            prevSteps += nextStep.motivation_summary + "\n\n";
+        }
         
         project->popContext();
         

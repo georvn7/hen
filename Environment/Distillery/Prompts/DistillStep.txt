@@ -69,6 +69,18 @@ Analysis Field:
 - Should demonstrate debugging expert intuition and domain knowledge in action
 - Focus on the reasoning flow, not on accumulating details (that's motivation's job)
 
+ACTION LOCK (STRICT, NON-NEGOTIABLE)
+
+You must preserve exactly these fields from the current optimized step:
+- action_type
+- action_subject
+- invocation
+- line_number
+
+Do NOT change them.
+Do NOT reinterpret them.
+Do NOT replace an info action with fix_function (or vice versa).
+
 CRITICAL DISTINCTION: ANALYSIS vs MOTIVATION
 
 **Analysis (Thinking):**
