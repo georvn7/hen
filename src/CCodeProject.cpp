@@ -2032,33 +2032,44 @@ namespace stdrave {
     void CCodeProject::synthetizeTrainingData()
     {
         std::string debugDir = getProjDir() + "/debug";
-        for (boost::filesystem::directory_iterator it(debugDir), end; it != end; ++it)
+        
+        //For all tests
+        for (boost::filesystem::directory_iterator itTest(debugDir), end; itTest != end; ++itTest)
         {
-            if (!boost::filesystem::is_directory(it->status()))
+            if (!boost::filesystem::is_directory(itTest->status()))
                 continue;
 
-            std::string testName = it->path().filename().string();
+            std::string testName = itTest->path().filename().string();
             
-            uint32_t archIndex = (uint32_t)nextIndex(it->path().string() + "/trajectory", "step_");
-            if(archIndex < 3) continue;
-            archIndex--;
-            
-            DebugStep lastStep;
-            std::string lastStepDir = it->path().string() + "/trajectory/step_" + std::to_string(archIndex);
-            std::string lastStepPath = lastStepDir + "/dbgStep.json";
-            lastStep.load(lastStepPath);
-            
-            if(lastStep.m_debugNotes == "PASS")
+            std::string testDir = debugDir + "/" + testName;
+            //For all trajectories: trajectory, archive, broken
+            for (boost::filesystem::directory_iterator it(testDir), end; it != end; ++it)
             {
-                std::string testWD = it->path().string() + "/trajectory/test";
-                if(!boost_fs::exists(testWD))
-                {
-                    testWD = lastStepDir + "/wd";
-                }
+                if (!boost::filesystem::is_directory(it->status()))
+                    continue;
                 
-                if(boost_fs::exists(testWD))
+                uint32_t archIndex = (uint32_t)nextIndex(it->path().string(), "step_");
+                
+                if(archIndex < 3) continue;
+                archIndex--;
+                
+                DebugStep lastStep;
+                std::string lastStepDir = it->path().string() + "/step_" + std::to_string(archIndex);
+                std::string lastStepPath = lastStepDir + "/dbgStep.json";
+                lastStep.load(lastStepPath);
+                
+                if(lastStep.m_debugNotes == "PASS")
                 {
-                    Distillery::getInstance().distillTrajectory(this, testWD, 0, -1);
+                    std::string testWD = it->path().string() + "/test";
+                    if(!boost_fs::exists(testWD))
+                    {
+                        testWD = lastStepDir + "/wd";
+                    }
+                    
+                    if(boost_fs::exists(testWD))
+                    {
+                        Distillery::getInstance().distillTrajectory(this, testWD, 0, -1);
+                    }
                 }
             }
         }

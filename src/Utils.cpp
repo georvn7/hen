@@ -1769,7 +1769,8 @@ bool saveToFile(const std::string& content, const std::string& path)
         return false;
     }
 
-    fileJson << content << std::endl;
+    fileJson << content;
+    
     fileJson.close();
     return true;
 }

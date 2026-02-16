@@ -177,10 +177,9 @@ struct DebugStep
         return info;
     }
     
-    std::string fullInfo() const
+    std::string notes() const
     {
         std::string info;
-        info += concise();
         if(!m_debugNotes.empty())
         {
             info += "\ndebug notes: " + m_debugNotes + "\n";
@@ -189,6 +188,14 @@ struct DebugStep
         {
             info += "\nlog summary: " + m_logSummary + "\n";
         }
+        return info;
+    }
+    
+    std::string fullInfo() const
+    {
+        std::string info;
+        info += concise();
+        info += notes();
         return info;
     }
 };
