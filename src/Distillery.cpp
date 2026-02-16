@@ -1748,7 +1748,7 @@ namespace stdrave {
         std::string prologue;
         
         //Ensure we have the correct info incorporating the modification from the last debug step
-        prologue += m_debugContext.getHighLevelAppInfo(m_project, {}, 0, PRINT_MAX_FUNCTIONS_DEPTH-1);
+        prologue += m_debugContext.getHighLevelAppInfo(m_project, {}, 0, PRINT_MAX_FUNCTIONS_DEPTH);
         prologue += "\n\n";
         
         prologue += "\nSUMMARY OF PREVIOUS STEPS:\n\n";
@@ -1765,6 +1765,137 @@ namespace stdrave {
         return prologue;
     }
 
+    static bool isIdentChar(char c)
+    {
+        const unsigned char uc = static_cast<unsigned char>(c);
+        return std::isalnum(uc) || c == '_';
+    }
+
+    static bool containsToken(const std::string& text, const std::string& token)
+    {
+        if (token.empty()) return false;
+        
+        std::size_t pos = 0;
+        while ((pos = text.find(token, pos)) != std::string::npos)
+        {
+            const bool leftOk = (pos == 0) || !isIdentChar(text[pos - 1]);
+            const std::size_t endPos = pos + token.size();
+            const bool rightOk = (endPos >= text.size()) || !isIdentChar(text[endPos]);
+            if (leftOk && rightOk) return true;
+            pos = endPos;
+        }
+        return false;
+    }
+
+    static void addMentionedFunctionsFromText(const std::string& text,
+                                              const std::set<std::string>& candidates,
+                                              std::set<std::string>& out)
+    {
+        for (const auto& fn : candidates)
+        {
+            if (containsToken(text, fn))
+            {
+                out.insert(fn);
+            }
+        }
+    }
+
+    std::map<int, StepDisclosureMapEntry>
+    Distillery::buildDisclosureMap(CCodeProject* project,
+                                   const EditSourceSequence& optimalSequence,
+                                   int runStep,
+                                   const std::string& summary)
+    {
+        std::map<int, StepDisclosureMapEntry> out;
+        if (!project || optimalSequence.steps.empty()) return out;
+        
+        // Reset to exactly the same starting state as distillation.
+        goTo(project, runStep - 1);
+        m_debugContext.clear();
+        
+        const std::set<std::string> functionCandidates = project->getNodeNames();
+        
+        std::string prevSteps;
+        std::string requestedInfo;
+        std::set<std::string> fixableByFunctionInfo;
+        
+        int stepId = runStep;
+        
+        for (std::size_t i = 0; i < optimalSequence.steps.size(); ++i, ++stepId)
+        {
+            const auto& step = optimalSequence.steps[i];
+            
+            // Build the same textual view used by distillStep.
+            std::string currentTrajectory = getTrajectoryPrologue(project, runStep, runStep, summary);
+            currentTrajectory += prevSteps;
+            
+            if (!requestedInfo.empty())
+            {
+                currentTrajectory += "\n//Information requested previous steps starts here\n\n";
+                currentTrajectory += requestedInfo;
+                currentTrajectory += "\n//Information requested previous steps ends here\n\n";
+            }
+            
+            // Distilled step files start from runStep+1 (run_test itself is not a step_ sample).
+            if (i > 0)
+            {
+                StepDisclosureMapEntry entry;
+                const DebugVisibility& vis = m_debugContext.visibility();
+                
+                entry.visible_functions = vis.m_functions;
+                entry.visible_data_types = vis.m_dataTypes;
+                entry.fixable_functions = fixableByFunctionInfo;
+                
+                // Text parity fallback: include names explicitly visible in the distilled prompt text.
+                addMentionedFunctionsFromText(currentTrajectory, functionCandidates, entry.visible_functions);
+                
+                out[stepId] = std::move(entry);
+            }
+            
+            // Advance simulated visibility using the same context provider path.
+            if (step->action_type == "function_info")
+            {
+                fixableByFunctionInfo.insert(step->action_subject);
+            }
+            
+            if (NextDebugStep::isInformationRequest(step->action_type))
+            {
+                DebugStep dbgStep;
+                std::string info = m_debugContext.stepInfo(m_project ? m_project : project,
+                                                           m_test,
+                                                           step->action_type,
+                                                           step->action_subject,
+                                                           std::string(),
+                                                           step->invocation,
+                                                           step->line_number,
+                                                           dbgStep);
+                
+                if (!info.empty())
+                {
+                    if (!requestedInfo.empty()) requestedInfo += "\n\n";
+                    requestedInfo += info;
+                }
+                
+                prevSteps += "\nSTEP " + std::to_string(stepId) + " ";
+                prevSteps += dbgStep.summary() + "\n\n";
+            }
+            else
+            {
+                // Keep step trace shape consistent even for non-info actions.
+                DebugStep dbgStep;
+                dbgStep.m_action = step->action_type;
+                dbgStep.m_subject = step->action_subject;
+                dbgStep.m_invocation = step->invocation;
+                dbgStep.m_lineNumber = step->line_number;
+                
+                prevSteps += "\nSTEP " + std::to_string(stepId) + " ";
+                prevSteps += dbgStep.summary() + "\n\n";
+            }
+        }
+        
+        return out;
+    }
+
     std::pair<std::string, std::string> Distillery::validateSequence(CCodeProject* project, const EditSourceSequence& optimalSequence, int originalSize, int startStep)
     {
         std::string feedback;
@@ -1776,12 +1907,16 @@ namespace stdrave {
             return std::pair<std::string, std::string>(); //We should not continue
         }
         
+        std::string summary;
+        getSummaryStepForStep(project, startStep, summary);
+        auto disclosure = buildDisclosureMap(project, optimalSequence, startStep, summary);
+        
         if(optimalSequence.steps.size() > originalSize)
         {
             std::string originalSizeStr = std::to_string(originalSize);
             std::string optimalSizeStr = std::to_string(optimalSequence.steps.size());
             feedback += "The optimal sequence has more steps (" + optimalSizeStr + ") than the original (";
-            feedback += optimalSizeStr + ").\n\n";
+            feedback += originalSizeStr + ").\n\n";
         }
         
         std::string firstAction = optimalSequence.steps.front()->action_type;
@@ -1802,6 +1937,75 @@ namespace stdrave {
         int stepIndex = 1;
         for(const auto& step : optimalSequence.steps)
         {
+            // stepIndex is 1-based; stepId aligns with distilled step ids.
+            const int stepId = startStep + stepIndex - 1;
+            if (stepIndex > 1) // only distilled step_* entries
+            {
+                auto it = disclosure.find(stepId);
+                if (it != disclosure.end())
+                {
+                    const auto& d = it->second;
+                    
+                    std::string visiblePreview;
+                    {
+                        int shown = 0;
+                        const int kMaxShown = 30;
+                        for (const auto& fn : d.visible_functions)
+                        {
+                            if (!visiblePreview.empty()) visiblePreview += ", ";
+                            visiblePreview += fn;
+                            ++shown;
+                            if (shown >= kMaxShown) break;
+                        }
+                        if (visiblePreview.empty()) visiblePreview = "<none>";
+                        else if ((int)d.visible_functions.size() > shown) visiblePreview += ", ...";
+                    }
+                    
+                    if ((step->action_type == "function_info" || step->action_type == "fix_function") &&
+                        d.visible_functions.find(step->action_subject) == d.visible_functions.end())
+                    {
+                        feedback += "Step " + std::to_string(stepId) + " action '" + step->action_type +
+                        "' uses subject '" + step->action_subject +
+                        "' that is not visible in CURRENT TRAJECTORY at this step.\n";
+                        feedback += "Visibility rule: a function is visible only if it appears in information available up to this step "
+                        "(prologue + last run_test info + prior distilled steps + prior info responses), "
+                        "not from skipped/original trajectory steps.\n";
+                        feedback += "Recovery: regenerate the optimized sequence so this step uses a currently visible subject, "
+                        "or add earlier info steps (e.g., function_info on a visible caller/dependency) that disclose '" +
+                        step->action_subject + "' before this step.\n\n";
+                        
+                        feedback += "Currently visible functions at step " + std::to_string(stepId) + ": " + visiblePreview + "\n";
+                    }
+                    
+                    if (step->action_type == "fix_function" &&
+                        d.fixable_functions.find(step->action_subject) == d.fixable_functions.end())
+                    {
+                        feedback += "Step " + std::to_string(stepId) + " fix_function target '" + step->action_subject +
+                        "' lacks prior function_info disclosure in CURRENT TRAJECTORY.\n";
+                        feedback += "Fix precondition: before fix_function(X), the optimized sequence must contain an earlier function_info(X).\n";
+                        feedback += "Recovery: insert function_info('" + step->action_subject + "') before this fix, "
+                        "then keep fix_function('" + step->action_subject + "') as the final step.\n\n";
+                        
+                        std::string fixablePreview;
+                        {
+                            int shown = 0;
+                            const int kMaxShown = 10;
+                            for (const auto& fn : d.fixable_functions)
+                            {
+                                if (!fixablePreview.empty()) fixablePreview += ", ";
+                                fixablePreview += fn;
+                                ++shown;
+                                if (shown >= kMaxShown) break;
+                            }
+                            if (fixablePreview.empty()) fixablePreview = "<none>";
+                            else if ((int)d.fixable_functions.size() > shown) fixablePreview += ", ...";
+                        }
+                        feedback += "Functions already eligible for fix (prior function_info) at step ";
+                        feedback += std::to_string(stepId) + ": " + fixablePreview + "\n";
+                    }
+                }
+            }
+            
             if(step->action_type == "run_test")
             {
                 goTo(project, startStep);
@@ -1896,8 +2100,13 @@ namespace stdrave {
         
         auto feedback = validateSequence(project, optimalSequence, originalSize, runStep);
         bool firstFb = true;
-        while(!feedback.first.empty() ||
-              (firstFb && !feedback.second.empty()))
+        uint32_t attempts = 0;
+        while(attempts < 8 &&
+                (
+                    !feedback.first.empty() ||
+                    (firstFb && !feedback.second.empty())
+                )
+             )
         {
             std::string feedbackPrompt = feedback.first + feedback.second;
             project->inference(cache, feedbackPrompt, schema, object);
@@ -1907,6 +2116,8 @@ namespace stdrave {
             feedback = validateSequence(project, optimalSequence, originalSize, runStep);
             
             firstFb = false;
+            
+            attempts++;
         }
     }
 
@@ -2306,7 +2517,7 @@ namespace stdrave {
     void Distillery::distillFixTrack(CCodeProject* project, const std::string& trajectoryAnalysis, uint32_t fixStep)
     {
         auto fixRange = getFixTrackRange(project, fixStep);
-        bool needsOptimization = fixRange.second - fixRange.first > 2;
+        bool needsOptimization = fixRange.second - fixRange.first > 3;
         std::string fixTrack = trackForFix(project, fixStep);
         
         int startStep = trajectoryIndexToStep(fixRange.first);
@@ -2344,6 +2555,11 @@ namespace stdrave {
                 step.from_json(stepJson);
                 
                 OptimizedStep optimizedStep;
+                
+                optimizedStep.action_type = step.action_type;
+                optimizedStep.action_subject = step.action_subject;
+                optimizedStep.line_number = step.line_number;
+                optimizedStep.invocation = step.invocation;
                 optimizedStep.original_step = stepId;
                 
                 optimalSequence.steps.push_back(std::make_shared<OptimizedStep>(optimizedStep));

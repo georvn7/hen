@@ -2050,7 +2050,7 @@ namespace stdrave {
                 
                 uint32_t archIndex = (uint32_t)nextIndex(it->path().string(), "step_");
                 
-                if(archIndex < 3) continue;
+                if(archIndex < 4) continue;
                 archIndex--;
                 
                 DebugStep lastStep;

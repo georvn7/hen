@@ -77,6 +77,13 @@ namespace stdrave {
         }
     };
 
+    struct StepDisclosureMapEntry
+    {
+        std::set<std::string> visible_functions;
+        std::set<std::string> visible_data_types;
+        std::set<std::string> fixable_functions; // disclosed via function_info earlier
+    };
+
     class Distillery : public Singleton<Distillery>
     {
         Context                 m_distilleryContext;
@@ -244,6 +251,11 @@ namespace stdrave {
         std::pair<std::string, std::string> getChat(CCodeProject* project, const std::string& sufix, int step);
         
         std::string prevStepsSummary(const std::vector<DistilledStep>& distilledTrajectory, int startStep);
+        
+        std::map<int, StepDisclosureMapEntry> buildDisclosureMap(CCodeProject* project,
+                                                                 const EditSourceSequence& optimalSequence,
+                                                                 int runStep,
+                                                                 const std::string& summary);
         
     public:
         

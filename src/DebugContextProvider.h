@@ -595,6 +595,11 @@ class DebugContextProvider
 
 public:
     
+    const DebugVisibility& visibility() const
+    {
+        return m_contextVisibility;
+    }
+
     void setup(const std::string& workingDirectory, const std::string& system)
     {
         m_contextVisibility.clear();
