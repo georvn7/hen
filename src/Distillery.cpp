@@ -2027,12 +2027,12 @@ namespace stdrave {
         getSummaryStepForStep(project, startStep, summary);
         auto disclosure = buildDisclosureMap(project, optimalSequence, startStep, summary);
         
-        if(optimalSequence.steps.size() > originalSize)
+        if((int)optimalSequence.steps.size() > originalSize + 2)
         {
             std::string originalSizeStr = std::to_string(originalSize);
             std::string optimalSizeStr = std::to_string(optimalSequence.steps.size());
-            feedback += "The optimal sequence has more steps (" + optimalSizeStr + ") than the original (";
-            feedback += originalSizeStr + ").\n\n";
+            feedback += "The optimal sequence has too many steps (" + optimalSizeStr + ") compared to the original (";
+            feedback += originalSizeStr + "). Maximum allowed expansion is +2 steps.\n\n";
         }
         
         std::string firstAction = optimalSequence.steps.front()->action_type;
@@ -2057,6 +2057,79 @@ namespace stdrave {
         {
             // stepIndex is 1-based; stepId aligns with distilled step ids.
             const int stepId = startStep + stepIndex - 1;
+            if (step->action_type.empty())
+            {
+                feedback += "Step " + std::to_string(stepId) + " has empty action_type.\n";
+                feedback += "Every optimized step must have a valid non-empty action_type.\n\n";
+            }
+            
+            if (step->original_step == 0 || step->original_step < -1)
+            {
+                feedback += "Step " + std::to_string(stepId) + " has invalid original_step=";
+                feedback += std::to_string(step->original_step) + ".\n";
+                feedback += "original_step must be > 0 (mapped to original trajectory) or -1 (synthetic inserted step).\n\n";
+            }
+            
+            if (step->action_type == "debug_function" && step->original_step <= 0)
+            {
+                feedback += "Step " + std::to_string(stepId) + " debug_function has invalid original_step=";
+                feedback += std::to_string(step->original_step) + ".\n";
+                feedback += "debug_function must map to a real original step (> 0).\n\n";
+            }
+            
+            if (step->action_type == "debug_function" && step->original_step > 0)
+            {
+                // Keep mapping semantics identical to distillStep(): originalStep -> step_(originalStep-1)/nextStep.json
+                const int mappedStepId = step->original_step - 1;
+                if (mappedStepId <= 0 || mappedStepId > m_fromStep + (int)m_trajectory.size())
+                {
+                    feedback += "Step " + std::to_string(stepId) + " debug_function maps to invalid original step id ";
+                    feedback += std::to_string(mappedStepId) + ".\n\n";
+                }
+                else
+                {
+                    std::string stepDir = project->getProjDir() + "/debug/" + m_test.name + "/trajectory/step_" + std::to_string(mappedStepId);
+                    web::json::value stepJson;
+                    if (!loadJson(stepJson, stepDir + "/nextStep.json"))
+                    {
+                        feedback += "Step " + std::to_string(stepId) + " debug_function mapping failed: missing original nextStep.json at ";
+                        feedback += stepDir + "/nextStep.json\n\n";
+                    }
+                    else
+                    {
+                        NextDebugStep originalStep;
+                        originalStep.from_json(stepJson);
+                        
+                        if (originalStep.action_type != "debug_function")
+                        {
+                            feedback += "Step " + std::to_string(stepId) + " debug_function mapping mismatch: ";
+                            feedback += "mapped original step is action_type='" + originalStep.action_type + "' (expected debug_function).\n\n";
+                        }
+                        
+                        if (originalStep.action_type == "debug_function" &&
+                            (originalStep.action_subject != step->action_subject ||
+                             originalStep.invocation != step->invocation ||
+                             originalStep.line_number != step->line_number))
+                        {
+                            feedback += "Step " + std::to_string(stepId) + " debug_function mapping mismatch in locked fields.\n";
+                            feedback += "Expected from original: subject='" + originalStep.action_subject + "', ";
+                            feedback += "invocation=" + std::to_string(originalStep.invocation) + ", ";
+                            feedback += "line_number=" + std::to_string(originalStep.line_number) + ".\n";
+                            feedback += "Got optimized: subject='" + step->action_subject + "', ";
+                            feedback += "invocation=" + std::to_string(step->invocation) + ", ";
+                            feedback += "line_number=" + std::to_string(step->line_number) + ".\n\n";
+                        }
+                    }
+                }
+            }
+            
+            if (step->line_number == (uint32_t)-1)
+            {
+                feedback += "Step " + std::to_string(stepId) + " has invalid line_number=UINT_MAX";
+                feedback += " (likely wrapped from a negative value).\n";
+                feedback += "Use line_number=0 when not needed.\n\n";
+            }
+            
             if (stepIndex > 1) // only distilled step_* entries
             {
                 auto it = disclosure.find(stepId);
@@ -2284,6 +2357,17 @@ namespace stdrave {
         }
         
         project->popContext();
+        
+        // Hard cap on expansion: allow at most +2 steps over the original run->fix span.
+        if ((int)optimalSequence.steps.size() > originalSize + 2)
+        {
+            std::cout << "ERROR: Rejecting optimized sequence due to expansion > +2. ";
+            std::cout << "optimized=" << optimalSequence.steps.size();
+            std::cout << ", original=" << originalSize << std::endl;
+            
+            optimalSequence.clear();
+            return;
+        }
         
         project->pushMessage(message, "user", true);
         
@@ -2809,17 +2893,31 @@ namespace stdrave {
             for(int s = fixRange.first; s<fixRange.second; ++s)
             {
                 NextDebugStep step;
-                int stepId = trajectoryIndexToStep(s)-1;
+                int stepId = trajectoryIndexToStep(s);
                 std::string stepDir = project->getProjDir() + "/debug/" + m_test.name + "/trajectory/step_" + std::to_string(stepId);
                 web::json::value stepJson;
-                loadJson(stepJson, stepDir + "/nextStep.json");
+                if(!loadJson(stepJson, stepDir + "/nextStep.json"))
+                {
+                    std::cout << "ERROR: Unable to load fallback optimized step from: ";
+                    std::cout << stepDir + "/nextStep.json" << std::endl;
+                    project->popContext();
+                    return;
+                }
                 step.from_json(stepJson);
+                
+                if(step.action_type.empty())
+                {
+                    std::cout << "ERROR: Fallback optimized step has empty action_type at step ";
+                    std::cout << stepId << std::endl;
+                    project->popContext();
+                    return;
+                }
                 
                 OptimizedStep optimizedStep;
                 
                 optimizedStep.action_type = step.action_type;
                 optimizedStep.action_subject = step.action_subject;
-                optimizedStep.line_number = step.line_number;
+                optimizedStep.line_number = (step.line_number == (uint32_t)-1) ? 0 : step.line_number;
                 optimizedStep.invocation = step.invocation;
                 optimizedStep.original_step = stepId;
                 
@@ -2835,6 +2933,14 @@ namespace stdrave {
             originalFixSequence += fixTrack + "\n";
             
             project->pushMessage(originalFixSequence, "user", true);
+        }
+        
+        if(optimalSequence.steps.empty())
+        {
+            std::cout << "Skipping fix track due to invalid/empty optimized sequence for ";
+            std::cout << optimizedJson << std::endl;
+            project->popContext();
+            return;
         }
         
         //Save optimized sequence
@@ -2856,6 +2962,26 @@ namespace stdrave {
         {
             //Do not distill the last run_test step
             optimalSequence.steps.pop_back();
+        }
+        
+        for(const auto& step : optimalSequence.steps)
+        {
+            const bool badOriginalStep =
+                (step->original_step == 0 || step->original_step < -1) ||
+                (step->action_type == "debug_function" && step->original_step <= 0);
+            
+            if(step->action_type.empty() || badOriginalStep)
+            {
+                std::cout << "ERROR: Rejecting optimized sequence with invalid step fields: ";
+                std::cout << "action_type='" << step->action_type << "', original_step=" << step->original_step << std::endl;
+                project->popContext();
+                return;
+            }
+            
+            if(step->line_number == (uint32_t)-1)
+            {
+                step->line_number = 0;
+            }
         }
         
         std::string systemAnalysis;
