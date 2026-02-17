@@ -29,6 +29,10 @@ namespace stdrave {
     DEFINE_TYPE(EditSourceSequence)
     DEFINE_ARRAY_FIELD(EditSourceSequence, steps)
     DEFINE_FIELD(EditSourceSequence, analysis)
+
+    static void addMentionedFunctionsFromText(const std::string& text,
+                                              const std::set<std::string>& candidates,
+                                              std::set<std::string>& out);
     
     Distillery::Distillery()
     {
@@ -945,6 +949,7 @@ namespace stdrave {
         if(m_project)
         {
             delete m_project;
+            m_project = nullptr;
         }
         
         m_debugContext.clear();
@@ -1058,6 +1063,8 @@ namespace stdrave {
         
         Client::getInstance().unlockLLM();
         project->switchToCompileContext();
+        
+        clear();
     }
 
     //TODO: Consider moving the to the DebugContextProvider
@@ -1449,12 +1456,83 @@ namespace stdrave {
             
             Cache cache;
             
+            // Build visibility from EXACT text that will be in the distilled sample.
+            const std::set<std::string> functionCandidates = (m_project ? m_project :
+                                                              project)->getNodeNames();
+            std::set<std::string> visibleFunctions;
+            addMentionedFunctionsFromText(currentTrajectory, functionCandidates,
+                                          visibleFunctions);
+            
+            auto validateSystemGrounding = [&](const DistilledAanalysis& candidate,
+                                               std::string& outFeedback) -> bool
+            {
+                outFeedback.clear();
+                
+                std::string narrative;
+                narrative += candidate.system_analysis.debug_notes;
+                narrative += "\n";
+                narrative += candidate.system_analysis.log_summary;
+                narrative += "\n";
+                narrative += candidate.thinking_analysis;
+                
+                std::set<std::string> mentionedFunctions;
+                addMentionedFunctionsFromText(narrative, functionCandidates,
+                                              mentionedFunctions);
+                
+                std::set<std::string> disallowed;
+                for (const auto& fn : mentionedFunctions)
+                {
+                    if (!fixedFunction.empty() && fixedFunction != "none" && fn ==
+                        fixedFunction) continue;
+                    if (!visibleFunctions.count(fn))
+                    {
+                        disallowed.insert(fn);
+                    }
+                }
+                
+                if (disallowed.empty())
+                {
+                    return true;
+                }
+                
+                outFeedback += "Grounding violation in system analysis narrative fields ";
+                outFeedback += "(debug_notes/log_summary/thinking_analysis).\n";
+                outFeedback += "Disallowed function names: " + getAsCsv(disallowed, 30) + "\n";
+                outFeedback += "Currently visible functions in CURRENT TRAJECTORY: ";
+                outFeedback += getAsCsv(visibleFunctions, 30) + "\n";
+                outFeedback += "Rule: mention only functions visible in CURRENT TRAJECTORY for this distilled sample.\n";
+                outFeedback += "Do not use function names known only from OLD SYSTEM ANALYSIS REQUEST/RESPONSE or OPTIMIZED SEQUENCE.\n";
+                outFeedback += "Regenerate using only grounded names.\n\n";
+                
+                return false;
+            };
+            
             web::json::value object;
             project->inference(cache, promptDistillStep, schema, object);
+            distilledSystemAnalysis.from_json(object);
+            
+            std::string groundingFeedback;
+            uint32_t attempts = 0;
+            const uint32_t kMaxAttempts = 8;
+            
+            while (attempts < kMaxAttempts &&
+                   !validateSystemGrounding(distilledSystemAnalysis, groundingFeedback))
+            {
+                project->inference(cache, groundingFeedback, schema, object);
+                distilledSystemAnalysis = DistilledAanalysis();
+                distilledSystemAnalysis.from_json(object);
+                ++attempts;
+            }
+            
+            // Final check after loop (important).
+            if (!validateSystemGrounding(distilledSystemAnalysis, groundingFeedback))
+            {
+                std::cout << "System-analysis grounding didn't converge after "
+                << kMaxAttempts << " retries at step " << testStep
+                << ". Keeping last response." << std::endl;
+            }
             
             project->popContext();
-            
-            distilledSystemAnalysis.from_json(object);
         }
         
         project->popContext();
@@ -1800,6 +1878,44 @@ namespace stdrave {
         }
     }
 
+    static void extractIdentifierTokensFromRegex(const std::string& pattern,
+                                                 std::set<std::string>& out)
+    {
+        std::string token;
+        bool escaped = false;
+        
+        auto flush = [&]() {
+            if (!token.empty()) {
+                out.insert(token);
+                token.clear();
+            }
+        };
+        
+        for (char c : pattern)
+        {
+            if (escaped) {
+                escaped = false;
+                flush();
+                continue;
+            }
+            
+            if (c == '\\') {
+                escaped = true;
+                flush();
+                continue;
+            }
+            
+            const unsigned char uc = static_cast<unsigned char>(c);
+            if (std::isalnum(uc) || c == '_') {
+                token.push_back(c);
+            } else {
+                flush();
+            }
+        }
+        
+        flush();
+    }
+
     std::map<int, StepDisclosureMapEntry>
     Distillery::buildDisclosureMap(CCodeProject* project,
                                    const EditSourceSequence& optimalSequence,
@@ -1934,6 +2050,8 @@ namespace stdrave {
             feedback += "' it must be fix_function.\n\n";
         }
         
+        const std::set<std::string> functionCandidates = (m_project ? m_project : project)->getNodeNames();
+        
         int stepIndex = 1;
         for(const auto& step : optimalSequence.steps)
         {
@@ -1961,8 +2079,15 @@ namespace stdrave {
                         else if ((int)d.visible_functions.size() > shown) visiblePreview += ", ...";
                     }
                     
-                    if ((step->action_type == "function_info" || step->action_type == "fix_function") &&
-                        d.visible_functions.find(step->action_subject) == d.visible_functions.end())
+                    if (
+                        (step->action_type == "function_info" ||
+                         step->action_type == "fix_function" ||
+                         step->action_type == "call_graph") &&
+                        
+                        !step->action_subject.empty() &&
+                        step->action_subject != "none" &&
+                        d.visible_functions.find(step->action_subject) == d.visible_functions.end()
+                        )
                     {
                         feedback += "Step " + std::to_string(stepId) + " action '" + step->action_type +
                         "' uses subject '" + step->action_subject +
@@ -2002,6 +2127,42 @@ namespace stdrave {
                         }
                         feedback += "Functions already eligible for fix (prior function_info) at step ";
                         feedback += std::to_string(stepId) + ": " + fixablePreview + "\n";
+                    }
+                    
+                    if (step->action_type == "search_source")
+                    {
+                        std::set<std::string> regexTokens;
+                        extractIdentifierTokensFromRegex(step->action_subject, regexTokens);
+                        
+                        std::set<std::string> referencedFunctions;
+                        for (const auto& tok : regexTokens)
+                        {
+                            if (functionCandidates.count(tok))
+                            {
+                                referencedFunctions.insert(tok); // exact-name only
+                            }
+                        }
+                        
+                        std::set<std::string> notVisible;
+                        for (const auto& fn : referencedFunctions)
+                        {
+                            if (!d.visible_functions.count(fn))
+                            {
+                                notVisible.insert(fn);
+                            }
+                        }
+                        
+                        if (!notVisible.empty())
+                        {
+                            feedback += "Step " + std::to_string(stepId) + " search_source regex references function names ";
+                            feedback += "not visible in CURRENT TRAJECTORY at this step.\n";
+                            feedback += "Disallowed function names in regex: ";
+                            feedback += getAsCsv(notVisible, 30) + "\n";
+                            feedback += "Currently visible functions at step ";
+                            feedback += std::to_string(stepId) + ": " + visiblePreview + "\n";
+                            feedback += "Recovery: use only currently visible function names in search_source regex, ";
+                            feedback += "or add earlier disclosure steps.\n\n";
+                        }
                     }
                 }
             }
@@ -2265,38 +2426,45 @@ namespace stdrave {
         
         std::string stepIdStr = std::to_string(step);
         
+        std::set<std::string> allowedNewHelpers;
+        
         std::string newFunctionsHint;
         if(nextStep.debug_step.action_type == "fix_function")
         {
-            CCodeNode* ccFixed = project->getNodeByName(nextStep.debug_step.action_subject);
+            CCodeNode* ccFixed =
+            project->getNodeByName(nextStep.debug_step.action_subject);
             
-            auto it = m_newFunctionsPerStep.find(nextStep.m_originalStep);
-            if(it != m_newFunctionsPerStep.end() && it->second.size() > 0)
-            {
-                for(auto func : it->second)
+            //Also collect helper names allowed in narrative
+            auto collectHelpers = [&](int keyStep) {
+                auto it = m_newFunctionsPerStep.find(keyStep);
+                if(it == m_newFunctionsPerStep.end() || it->second.empty())
+                    return;
+                
+                for(const auto& func : it->second)
                 {
                     CCodeNode* ccNode = project->getNodeByName(func);
                     if(!ccNode) continue;
-
                     if(ccFixed && !ccFixed->calledInTheSource(func)) continue;
-
-                    if(ccNode->hasPathToMain())
+                    if(!ccNode->hasPathToMain()) continue;
+                    
+                    allowedNewHelpers.insert(func);
+                    
+                    if(newFunctionsHint.empty())
                     {
-                        bool addSource = false;
-                        if(newFunctionsHint.empty())
-                        {
-                            newFunctionsHint += "\n\nThe original fix_function step you're distilling from maybe introduced the following helper functions that were used in the source.";
-                            newFunctionsHint += " Consider mentioning their addition in the motivation and analysis:\n";
-                            addSource = true;
-                        }
-                        
-                        newFunctionsHint += "//" + ccNode->m_prototype.brief;
-                        newFunctionsHint += "\n";
-                        newFunctionsHint += ccNode->m_prototype.declaration;
-                        newFunctionsHint += "\n\n";
+                        newFunctionsHint += "\n\nThe original fix_function step you're distilling from maybe ";
+                        newFunctionsHint += "introduced the following helper functions that were used in the source.";
+                        newFunctionsHint += " Consider mentioning their addition in the motivation and analysis:\n";
                     }
+                    
+                    newFunctionsHint += "//" + ccNode->m_prototype.brief;
+                    newFunctionsHint += "\n";
+                    newFunctionsHint += ccNode->m_prototype.declaration;
+                    newFunctionsHint += "\n\n";
                 }
-            }
+            };
+            
+            collectHelpers(nextStep.m_originalStep);
+            collectHelpers(nextStep.m_originalStep + 1); // robust against step-index offset
         }
         
         const std::string lockedActionType    = nextStep.debug_step.action_type;
@@ -2320,7 +2488,17 @@ namespace stdrave {
         DebugStep debugStep;
         
         std::string feedback;
-        do
+        uint32_t attempts = 0;
+        const uint32_t kMaxAttempts = 8;
+        bool converged = false;
+        
+        auto summarizeFeedback = [](const std::string& s) -> std::string {
+            const std::size_t kMax = 600;
+            if (s.size() <= kMax) return s;
+            return s.substr(0, kMax) + "...";
+        };
+        
+        while(true)
         {
             feedback.clear();
             
@@ -2406,7 +2584,11 @@ namespace stdrave {
                 for (const auto& fn : mentionedFunctions)
                 {
                     if (fn == lockedActionSubject) continue; // allow locked subject mention
-                    if (!disclosureEntry->visible_functions.count(fn))
+                    
+                    const bool isVisible = disclosureEntry->visible_functions.count(fn) > 0;
+                    const bool isAllowedHelper = allowedNewHelpers.count(fn) > 0;
+                    
+                    if (!isVisible && !isAllowedHelper)
                     {
                         disallowed.insert(fn);
                     }
@@ -2418,6 +2600,12 @@ namespace stdrave {
                     feedback += "Disallowed function names: " + getAsCsv(disallowed, 30) + "\n";
                     feedback += "Currently visible functions at this step: " + getAsCsv(disclosureEntry->visible_functions, 30) + "\n";
                     feedback += "Regenerate using only functions disclosed in CURRENT TRAJECTORY.\n\n";
+                    
+                    if (!allowedNewHelpers.empty())
+                    {
+                        feedback += "Allowed newly introduced helper functions for this fix step: ";
+                        feedback += getAsCsv(allowedNewHelpers, 30) + "\n";
+                    }
                 }
                 
                 const bool lockedNeedsMention =
@@ -2433,14 +2621,31 @@ namespace stdrave {
                 }
             }
             
-            if(!feedback.empty())
+            if (feedback.empty())
             {
-                project->inference(cache, feedback, schema, object);
-                nextStep.debug_step.clear();
-                nextStep.from_json(object);
+                converged = true;
+                break;
             }
             
-        } while(!feedback.empty());
+            if (attempts >= kMaxAttempts)
+            {
+                break; // keep last response, but report explicit non-convergence
+            }
+            
+            ++attempts;
+            project->inference(cache, feedback, schema, object);
+            nextStep.debug_step.clear();
+            nextStep.from_json(object);
+            
+        }
+        
+        if (!converged)
+        {
+            std::cout << "Step distillation didn't converge after ";
+            std::cout << kMaxAttempts << " retries at distilled step " << step;
+            std::cout << " (original step " << originalStep << "). Keeping last response.\n";
+            std::cout << "Last validation feedback:\n" << summarizeFeedback(feedback) << std::endl;
+        }
         
         if(nextStep.debug_step.isInformationRequest())
         {

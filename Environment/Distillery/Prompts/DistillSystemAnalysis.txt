@@ -90,6 +90,8 @@ Structure it as a flowing narrative (not bullet points) covering:
 - You can incorporate wisdom derived from steps to fix the problem and going from sub-optimal to the optimized trajectory "similar debugging experiences" but express it as intuition, not explicit references to the trajectory
 - Example: Instead of "the sub-optimal trajectory showed we need to fix X, Y, Z but they're all in one function", say "this pattern of cascading failures across multiple precedence levels suggests a common root cause, likely a precedence delegation issue in the cast-expression parser where fallback paths don't properly handle..."
 - Ideally this is 5-10 concise sentences
+- Function names mentioned in debug_notes/log_summary/thinking_analysis must be visible in CURRENT TRAJECTORY.
+- Do NOT introduce function names that appear only in OLD SYSTEM ANALYSIS REQUEST/RESPONSE or OPTIMIZED SEQUENCE.
 
 ## Key Insight: Expanding Analysis to Cover Merged Fixes
 
