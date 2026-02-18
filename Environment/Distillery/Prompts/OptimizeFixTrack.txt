@@ -18,7 +18,7 @@ STEP TYPES IN THE TRAJECTORY:
 3. Debugging - debug_function action to debug a given function with optional breakpoints
 4. Fix function (fix_function action)
 
-Note: After each fix_function action, the agent automatically schedules a run_test action to verify the fix and assess progress.
+Note: In the real agent loop, a run_test may be auto-scheduled after fix_function, but that auto-run_test is OUTSIDE this optimization segment. This optimized segment must end at fix_function.
 
 ==============================================================================
 PROVIDED DATA
@@ -29,6 +29,9 @@ TRAJECTORY PRECEDING THE SEGMENT TO OPTIMIZE:
 
 TRAJECTORY SEGMENT TO OPTIMIZE:
 [[fix_track]]
+
+DISCLOSURE CONTRACT (STRICT):
+[[disclosure_contract]]
 
 ==============================================================================
 YOUR TASK
@@ -82,6 +85,12 @@ STEP NUMBERING:
 - Subsequent steps use ascending numbers
 - All step number references within motivations must align with the new sequence
 
+SEQUENCE SHAPE (HARD):
+- Step 1 in optimized output MUST be action_type="run_test".
+- The final step in optimized output MUST be action_type="fix_function".
+- No fix_function is allowed before the final step.
+- Do NOT append trailing run_test in this task.
+
 ACTIONS debug_function
 - Must exactly match a debug_function step from the original trajectory. The original_step field must have the index of the original step
 
@@ -132,6 +141,12 @@ WORKFLOW ADHERENCE & LOGICAL PROGRESSION:
 - Each information-gathering action should be justified by discoveries in prior steps
 - The fix_function should only appear after enough context has been collected to understand the root cause
 - Maintain proper causality: each motivation should reference specific details from previous steps that led to this action
+
+DISCLOSURE CONTRACT COMPLIANCE (HARD):
+- For each step, action_subject must be selected only from that step's `visible_functions` in the DISCLOSURE CONTRACT.
+- For `search_source`, if regex includes identifier tokens that are function names, those tokens must also be in that step's `visible_functions`.
+- If a subject is not visible at step N, add earlier disclosure actions before step N (for example function_info on a visible function) or choose a different visible subject.
+- For synthetic inserted steps that do not exist in the original trajectory segment, set `original_step = -1`; only steps copied/mapped from the original trajectory should use `original_step > 0`.
 
 ================================================
 HOW THE AI AGENT WORKS (FOR YOUR UNDERSTANDING)
@@ -187,6 +202,16 @@ version goes directly to the comprehensive fix once sufficient information is ga
 ==============================================================================
 YOUR TASK (REPEATED FOR CLARITY)
 ==============================================================================
+
+PRE-OUTPUT SELF-CHECK (MUST PASS):
+- Check first step is run_test.
+- Check last step is fix_function.
+- Check exactly one fix_function exists, and it is the last step.
+- If any check fails, regenerate internally and output only the corrected JSON.
+
+INVALID EXAMPLE (do not do this):
+- run_test -> function_info -> fix_function -> run_test
+Reason: trailing run_test is outside this segment and invalid.
 
 Now please provide an optimized version of the trajectory segment with a more efficient sequence of actions that achieves the same final result (both source code state and test outcome).
 

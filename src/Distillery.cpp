@@ -269,6 +269,90 @@ namespace stdrave {
 
         return s.substr(0, kMax) + "...";
     }
+
+    static std::string buildDisclosureContractText(const std::map<int, StepDisclosureMapEntry>& disclosure,
+                                                   int maxVisiblePerStep = 40)
+    {
+        if (disclosure.empty())
+        {
+            return "No per-step disclosure data available.";
+        }
+
+        std::string out;
+        out += "DISCLOSURE CONTRACT (per-step visible functions in distilled trajectory context)\n";
+        out += "Use this as hard grounding constraint when selecting action_subject/search_source.\n\n";
+
+        for (const auto& perStep : disclosure)
+        {
+            const int stepId = perStep.first;
+            const auto& entry = perStep.second;
+
+            out += "STEP " + std::to_string(stepId) + ":\n";
+            out += "  visible_functions: " + getAsCsv(entry.visible_functions, maxVisiblePerStep) + "\n";
+            out += "  fixable_functions (prior function_info): " + getAsCsv(entry.fixable_functions, maxVisiblePerStep) + "\n\n";
+        }
+
+        return out;
+    }
+
+    static std::string buildAllowedCandidatesLine(const std::set<std::string>& visibleFunctions,
+                                                  const std::string& disallowedSubject,
+                                                  int maxCandidates = 30)
+    {
+        if (visibleFunctions.empty())
+        {
+            return "<none>";
+        }
+
+        std::vector<std::pair<int, std::string>> ranked;
+        ranked.reserve(visibleFunctions.size());
+
+        auto commonPrefixLen = [&](const std::string& a, const std::string& b) {
+            int n = 0;
+            while (n < (int)a.size() && n < (int)b.size() && a[n] == b[n]) ++n;
+            return n;
+        };
+
+        for (const auto& fn : visibleFunctions)
+        {
+            int score = commonPrefixLen(fn, disallowedSubject);
+            if (!disallowedSubject.empty() && fn.find(disallowedSubject) != std::string::npos)
+            {
+                score += 4;
+            }
+            if (!disallowedSubject.empty() && disallowedSubject.find(fn) != std::string::npos)
+            {
+                score += 2;
+            }
+
+            ranked.push_back({score, fn});
+        }
+
+        std::sort(ranked.begin(), ranked.end(),
+                  [](const std::pair<int, std::string>& a,
+                     const std::pair<int, std::string>& b) {
+            if (a.first != b.first) return a.first > b.first;
+            return a.second < b.second;
+        });
+
+        std::string out;
+        int emitted = 0;
+        for (const auto& item : ranked)
+        {
+            if (emitted >= maxCandidates) break;
+            if (!out.empty()) out += ", ";
+            out += item.second;
+            ++emitted;
+        }
+
+        const int remaining = static_cast<int>(ranked.size()) - emitted;
+        if (remaining > 0)
+        {
+            out += ", ... (+" + std::to_string(remaining) + " more)";
+        }
+
+        return out;
+    }
     
     Distillery::Distillery()
     {
@@ -2536,7 +2620,11 @@ namespace stdrave {
                         feedback += "Recovery: regenerate the optimized sequence so this step uses a currently visible subject, "
                         "or add earlier info steps (e.g., function_info on a visible caller/dependency) that disclose '" +
                         step->action_subject + "' before this step.\n\n";
-                        
+
+                        feedback += "FAILING_STEP_INDEX: " + std::to_string(stepId) + "\n";
+                        feedback += "DISALLOWED_SUBJECT: " + step->action_subject + "\n";
+                        feedback += "ALLOWED_VISIBLE_CANDIDATES_FOR_THIS_STEP: ";
+                        feedback += buildAllowedCandidatesLine(d.visible_functions, step->action_subject, 35) + "\n";
                         feedback += "Currently visible functions at step " + std::to_string(stepId) + ": " + visiblePreview + "\n";
                     }
                     
@@ -2563,6 +2651,9 @@ namespace stdrave {
                             if (fixablePreview.empty()) fixablePreview = "<none>";
                             else if ((int)d.fixable_functions.size() > shown) fixablePreview += ", ...";
                         }
+                        feedback += "FAILING_STEP_INDEX: " + std::to_string(stepId) + "\n";
+                        feedback += "DISALLOWED_SUBJECT: " + step->action_subject + "\n";
+                        feedback += "ALLOWED_FIXABLE_CANDIDATES_FOR_THIS_STEP: " + fixablePreview + "\n";
                         feedback += "Functions already eligible for fix (prior function_info) at step ";
                         feedback += std::to_string(stepId) + ": " + fixablePreview + "\n";
                     }
@@ -2596,6 +2687,10 @@ namespace stdrave {
                             feedback += "not visible in CURRENT TRAJECTORY at this step.\n";
                             feedback += "Disallowed function names in regex: ";
                             feedback += getAsCsv(notVisible, 30) + "\n";
+                            feedback += "FAILING_STEP_INDEX: " + std::to_string(stepId) + "\n";
+                            feedback += "DISALLOWED_SUBJECT(regex): " + step->action_subject + "\n";
+                            feedback += "ALLOWED_VISIBLE_FUNCTION_TOKENS_FOR_REGEX: ";
+                            feedback += getAsCsv(d.visible_functions, 40) + "\n";
                             feedback += "Currently visible functions at step ";
                             feedback += std::to_string(stepId) + ": " + visiblePreview + "\n";
                             feedback += "Recovery: use only currently visible function names in search_source regex, ";
@@ -2678,6 +2773,28 @@ namespace stdrave {
         {
             trajecotry = "Information for previous steps is not available";
         }
+
+        EditSourceSequence originalSequence;
+        {
+            const int fixStepIndex = stepToTrajectoryIndex(fixStep);
+            for (int s = runStepIndex; s <= fixStepIndex; ++s)
+            {
+                const DebugStep& srcStep = m_trajectory[s];
+                const int sourceStepId = trajectoryIndexToStep(s);
+
+                OptimizedStep opt;
+                opt.action_type = srcStep.m_action;
+                opt.action_subject = srcStep.m_subject.empty() ? "none" : srcStep.m_subject;
+                opt.line_number = srcStep.m_lineNumber < 0 ? 0 : (uint32_t)srcStep.m_lineNumber;
+                opt.invocation = srcStep.m_invocation <= 0 ? 1 : (uint32_t)srcStep.m_invocation;
+                opt.original_step = sourceStepId;
+
+                originalSequence.steps.push_back(std::make_shared<OptimizedStep>(opt));
+            }
+        }
+
+        auto disclosureForOptimize = buildDisclosureMap(project, originalSequence, runStep, summary);
+        std::string disclosureContract = buildDisclosureContractText(disclosureForOptimize, 45);
         
         goTo(project, fixStep-1);
         std::string appInfo = m_debugContext.getHighLevelAppInfo(m_project, "", PRINT_MAX_FUNCTIONS_DEPTH, PRINT_MAX_FUNCTIONS_DEPTH);
@@ -2685,7 +2802,8 @@ namespace stdrave {
         Prompt promptOptimizeFixTrack("OptimizeFixTrack.txt",{
                             {"app_info", appInfo},
                             {"trajectory", trajecotry},
-                            {"fix_track", fixTrack}
+                            {"fix_track", fixTrack},
+                            {"disclosure_contract", disclosureContract}
         });
         
         web::json::value object;
