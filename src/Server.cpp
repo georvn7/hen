@@ -808,6 +808,119 @@ web::json::value Server::convertToGoogle(const web::json::value& openAIRequestBo
     return googleRequestBody;
 }
 
+static std::string extractResponsesText(const web::json::value& contentValue)
+{
+    using namespace web;
+    std::string content;
+    
+    if (contentValue.is_string())
+    {
+        return utility::conversions::to_utf8string(contentValue.as_string());
+    }
+    
+    if (contentValue.is_array())
+    {
+        for (const auto& part : contentValue.as_array())
+        {
+            if (part.is_string())
+            {
+                content += utility::conversions::to_utf8string(part.as_string());
+            }
+            else if (part.is_object())
+            {
+                if (part.has_field(U("text")) && part.at(U("text")).is_string())
+                {
+                    content += utility::conversions::to_utf8string(part.at(U("text")).as_string());
+                }
+                else if (part.has_field(U("content")) && part.at(U("content")).is_string())
+                {
+                    content += utility::conversions::to_utf8string(part.at(U("content")).as_string());
+                }
+            }
+        }
+        return content;
+    }
+    
+    if (contentValue.is_object())
+    {
+        if (contentValue.has_field(U("text")) && contentValue.at(U("text")).is_string())
+        {
+            return utility::conversions::to_utf8string(contentValue.at(U("text")).as_string());
+        }
+        
+        if (contentValue.has_field(U("content")) && contentValue.at(U("content")).is_string())
+        {
+            return utility::conversions::to_utf8string(contentValue.at(U("content")).as_string());
+        }
+    }
+    
+    return content;
+}
+
+static utility::string_t buildResponsesInputFromMessages(const web::json::value& messagesValue)
+{
+    using namespace web;
+    
+    if (messagesValue.is_string())
+    {
+        return messagesValue.as_string();
+    }
+    
+    std::string input;
+    auto appendMessage = [&input](const json::value& msg)
+    {
+        if (!msg.is_object())
+        {
+            return;
+        }
+        
+        std::string role = "user";
+        if (msg.has_field(U("role")) && msg.at(U("role")).is_string())
+        {
+            role = utility::conversions::to_utf8string(msg.at(U("role")).as_string());
+        }
+        
+        std::string content;
+        if (msg.has_field(U("content")))
+        {
+            content = extractResponsesText(msg.at(U("content")));
+        }
+        else if (msg.has_field(U("text")))
+        {
+            content = extractResponsesText(msg.at(U("text")));
+        }
+        
+        if (content.empty())
+        {
+            return;
+        }
+        
+        if (!input.empty())
+        {
+            input += "\n\n";
+        }
+        
+        input += "[";
+        input += role;
+        input += "]\n";
+        input += content;
+    };
+    
+    if (messagesValue.is_array())
+    {
+        for (const auto& message : messagesValue.as_array())
+        {
+            appendMessage(message);
+        }
+    }
+    else if (messagesValue.is_object())
+    {
+        appendMessage(messagesValue);
+    }
+    
+    return utility::conversions::to_string_t(input);
+}
+
 std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_ptr<LLMConfig>& llm)
 {
     std::string llmCfgStr = utility::conversions::to_utf8string(requestFromClientBody[U("llm")].as_string());
@@ -879,21 +992,88 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
                               startsWith(llm->model, "gpt-5") ||
                               startsWith(llm->model, "codex");
         
-        if(!openai_reasoning)
+        utility::string_t llmUrl = utility::conversions::to_string_t(llm->url);
+        bool openaiResponsesEndpoint = llmUrl.find(U("/v1/responses")) != utility::string_t::npos;
+        
+        if(openaiResponsesEndpoint)
         {
-            requestFromClientBody[U("temperature")] = json::value::number(0);
-        }
-        else //openAIModel_o1
-        {
-            //Skip the 'system' role message
-            uint32_t messagesCount = (uint32_t)requestFromClientBody[U("messages")].as_array().size();
-            if(messagesCount > 1)
+            if (requestFromClientBody.has_field(U("messages")))
             {
-                utility::string_t role = requestFromClientBody[U("messages")].as_array()[0][U("role")].as_string();
-                if(role == U("system"))
+                auto input = buildResponsesInputFromMessages(requestFromClientBody[U("messages")]);
+                requestFromClientBody[U("input")] = json::value::string(input);
+                requestFromClientBody.erase(U("messages"));
+            }
+            else if (requestFromClientBody.has_field(U("input")) && !requestFromClientBody[U("input")].is_string())
+            {
+                requestFromClientBody[U("input")] = json::value::string(buildResponsesInputFromMessages(requestFromClientBody[U("input")]));
+            }
+            
+            utility::string_t reasoningEffort;
+            bool hasReasoningEffort = false;
+            if (requestFromClientBody.has_field(U("reasoning_effort")))
+            {
+                reasoningEffort = requestFromClientBody[U("reasoning_effort")].as_string();
+                requestFromClientBody.erase(U("reasoning_effort"));
+                hasReasoningEffort = true;
+            }
+            else if(llm->reasoning_effort != "na")
+            {
+                reasoningEffort = utility::conversions::to_string_t(llm->reasoning_effort);
+                hasReasoningEffort = true;
+            }
+            
+            if (hasReasoningEffort)
+            {
+                requestFromClientBody[U("reasoning")][U("effort")] = json::value::string(reasoningEffort);
+            }
+            
+            utility::string_t verbosity;
+            bool hasVerbosity = false;
+            if (requestFromClientBody.has_field(U("verbosity")))
+            {
+                verbosity = requestFromClientBody[U("verbosity")].as_string();
+                requestFromClientBody.erase(U("verbosity"));
+                hasVerbosity = true;
+            }
+            else if(llm->verbosity != "na")
+            {
+                verbosity = utility::conversions::to_string_t(llm->verbosity);
+                hasVerbosity = true;
+            }
+            
+            if (hasVerbosity)
+            {
+                requestFromClientBody[U("text")][U("verbosity")] = json::value::string(verbosity);
+            }
+        }
+        else
+        {
+            if(!openai_reasoning)
+            {
+                requestFromClientBody[U("temperature")] = json::value::number(0);
+            }
+            else //openAIModel_o1
+            {
+                //Skip the 'system' role message
+                uint32_t messagesCount = (uint32_t)requestFromClientBody[U("messages")].as_array().size();
+                if(messagesCount > 1)
                 {
-                    requestFromClientBody[U("messages")].as_array().erase(0);
+                    utility::string_t role = requestFromClientBody[U("messages")].as_array()[0][U("role")].as_string();
+                    if(role == U("system"))
+                    {
+                        requestFromClientBody[U("messages")].as_array().erase(0);
+                    }
                 }
+            }
+            
+            if(llm->reasoning_effort != "na")
+            {
+                requestFromClientBody[U("reasoning_effort")] = json::value::string(utility::conversions::to_string_t(llm->reasoning_effort));
+            }
+            
+            if(llm->verbosity != "na")
+            {
+                requestFromClientBody[U("verbosity")] = json::value::string(utility::conversions::to_string_t(llm->verbosity));
             }
         }
         
@@ -908,16 +1088,6 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
         else if(startsWith(llm->model, "gpt-5-mini"))
         {
             requestFromClientBody[U("model")] = json::value::string(U("gpt-5-mini"));
-        }
-        
-        if(llm->reasoning_effort != "na")
-        {
-            requestFromClientBody[U("reasoning_effort")] = json::value::string(utility::conversions::to_string_t(llm->reasoning_effort));
-        }
-        
-        if(llm->verbosity != "na")
-        {
-            requestFromClientBody[U("verbosity")] = json::value::string(utility::conversions::to_string_t(llm->verbosity));
         }
         
         if(llm->provider == "deepinfra")
@@ -1107,6 +1277,16 @@ web::json::value Server::updateUsage(web::json::value& usageField,
         if (usageField.has_field(U("completion_tokens"))) {
             completion_tokens = static_cast<uint32_t>(usageField[U("completion_tokens")].as_number().to_uint64());
         }
+        
+        if (prompt_tokens == 0 && completion_tokens == 0)
+        {
+            if (usageField.has_field(U("input_tokens"))) {
+                prompt_tokens = static_cast<uint32_t>(usageField[U("input_tokens")].as_number().to_uint64());
+            }
+            if (usageField.has_field(U("output_tokens"))) {
+                completion_tokens = static_cast<uint32_t>(usageField[U("output_tokens")].as_number().to_uint64());
+            }
+        }
     }
     else if (llm->provider == "anthropic")
     {
@@ -1201,7 +1381,50 @@ json::value Server::handleResponse(json::value& json_response, std::shared_ptr<L
     //TODO: Log the json_response since it has useful info - tokens count etc
     
     json::value reply;
-    if (json_response.has_field(U("choices")) && json_response[U("choices")].is_array() && json_response[U("choices")].as_array().size() > 0) {
+    if (json_response.has_field(U("output")) && json_response[U("output")].is_array())
+    {
+        std::string fullContent;
+        auto outputArray = json_response[U("output")].as_array();
+        for (auto& outputItem : outputArray)
+        {
+            if (!outputItem.is_object() ||
+                !outputItem.has_field(U("type")) ||
+                outputItem[U("type")].as_string() != U("message"))
+            {
+                continue;
+            }
+            
+            if (!outputItem.has_field(U("content")) || !outputItem[U("content")].is_array())
+            {
+                continue;
+            }
+            
+            auto contentArray = outputItem[U("content")].as_array();
+            for (auto& contentItem : contentArray)
+            {
+                if (!contentItem.is_object()) {
+                    continue;
+                }
+                
+                if (contentItem.has_field(U("type")) &&
+                    contentItem[U("type")].as_string() == U("output_text"))
+                {
+                    if (contentItem.has_field(U("text")))
+                    {
+                        fullContent += utility::conversions::to_utf8string(contentItem[U("text")].as_string());
+                    }
+                }
+                else if (contentItem.has_field(U("text")))
+                {
+                    fullContent += utility::conversions::to_utf8string(contentItem[U("text")].as_string());
+                }
+            }
+        }
+        
+        reply[U("message")][U("role")] = json::value::string(U("assistant"));
+        reply[U("message")][U("content")] = json::value::string(utility::conversions::to_string_t(fullContent));
+    }
+    else if (json_response.has_field(U("choices")) && json_response[U("choices")].is_array() && json_response[U("choices")].as_array().size() > 0) {
         //OpenAI format
         auto choicesArray = json_response[U("choices")].as_array();
         reply = choicesArray[0];

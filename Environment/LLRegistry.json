@@ -287,6 +287,19 @@
       "output_tokens_price": 7.00
     },
     {
+      "provider": "openai",
+      "url": "https://api.openai.com/v1/responses",
+      "model": "gpt-5.2-codex",
+      "reasoning_effort": "high",
+      "verbosity": "na",
+      "context_size": 200,
+      "rate_limit": -1,
+      "rate_limit_rpm": -1,
+      "roles": "director,expert,developer",
+      "input_tokens_price": 1.74,
+      "output_tokens_price": 14.00
+    },
+    {
       "provider": "anthropic",
       "url": "https://api.anthropic.com/v1/messages",
       "model": "claude-3-5-sonnet-latest",
