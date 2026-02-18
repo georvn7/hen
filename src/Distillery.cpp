@@ -1,5 +1,6 @@
 #include "Distillery.h"
 #include "Client.h"
+#include <algorithm>
 
 namespace stdrave {
 
@@ -33,6 +34,241 @@ namespace stdrave {
     static void addMentionedFunctionsFromText(const std::string& text,
                                               const std::set<std::string>& candidates,
                                               std::set<std::string>& out);
+
+    static bool tryParseJsonText(const std::string& text, web::json::value& out)
+    {
+        try
+        {
+            out = web::json::value::parse(utility::conversions::to_string_t(text));
+            return true;
+        }
+        catch (...)
+        {
+            return false;
+        }
+    }
+
+    static bool normalizeActionPayload(web::json::value& actionObj, std::string& reason)
+    {
+        reason.clear();
+        if (!actionObj.is_object())
+        {
+            reason = "action payload is not a JSON object";
+            return false;
+        }
+
+        if (!actionObj.has_field(U("action_type")) || !actionObj.at(U("action_type")).is_string())
+        {
+            reason = "action payload missing string field 'action_type'";
+            return false;
+        }
+
+        if (!actionObj.has_field(U("action_subject")) || !actionObj.at(U("action_subject")).is_string())
+        {
+            reason = "action payload missing string field 'action_subject'";
+            return false;
+        }
+
+        if (!actionObj.has_field(U("motivation")) || !actionObj.at(U("motivation")).is_string())
+        {
+            actionObj[U("motivation")] = web::json::value::string(U(""));
+        }
+
+        if (!actionObj.has_field(U("breakpoints")) || !actionObj.at(U("breakpoints")).is_array())
+        {
+            actionObj[U("breakpoints")] = web::json::value::array();
+        }
+
+        int invocation = 1;
+        if (actionObj.has_field(U("invocation")))
+        {
+            const auto& inv = actionObj.at(U("invocation"));
+            if (!inv.is_number())
+            {
+                reason = "action payload field 'invocation' is not numeric";
+                return false;
+            }
+
+            try
+            {
+                invocation = inv.as_integer();
+            }
+            catch (...)
+            {
+                reason = "action payload field 'invocation' cannot be converted to integer";
+                return false;
+            }
+        }
+
+        if (invocation <= 0)
+        {
+            invocation = 1;
+        }
+        actionObj[U("invocation")] = web::json::value::number(invocation);
+
+        int lineNumber = 0;
+        if (actionObj.has_field(U("line_number")))
+        {
+            const auto& ln = actionObj.at(U("line_number"));
+            if (!ln.is_number())
+            {
+                reason = "action payload field 'line_number' is not numeric";
+                return false;
+            }
+
+            try
+            {
+                lineNumber = ln.as_integer();
+            }
+            catch (...)
+            {
+                // Handle very large numbers (e.g. UINT_MAX rendered in JSON)
+                double lnDouble = ln.as_double();
+                if (lnDouble > 2147483647.0 || lnDouble < -2147483648.0)
+                {
+                    lineNumber = 0;
+                }
+                else
+                {
+                    lineNumber = static_cast<int>(lnDouble);
+                }
+            }
+        }
+
+        if (lineNumber < 0)
+        {
+            lineNumber = 0;
+        }
+        actionObj[U("line_number")] = web::json::value::number(lineNumber);
+
+        return true;
+    }
+
+    static bool sanitizeTrainingSampleByName(const std::string& sampleName,
+                                             web::json::value& chatSample,
+                                             std::string& reason)
+    {
+        reason.clear();
+
+        if (!chatSample.is_object() ||
+            !chatSample.has_field(U("messages")) ||
+            !chatSample.at(U("messages")).is_array())
+        {
+            reason = "sample has no valid messages array";
+            return false;
+        }
+
+        auto& messages = chatSample[U("messages")].as_array();
+        if (messages.size() == 0)
+        {
+            reason = "messages array is empty";
+            return false;
+        }
+
+        // Basic role/content shape validation for all turns.
+        for (size_t i = 0; i < messages.size(); ++i)
+        {
+            if (!messages[i].is_object())
+            {
+                reason = "message[" + std::to_string(i) + "] is not an object";
+                return false;
+            }
+
+            auto& msg = messages[i];
+            if (!msg.has_field(U("role")) || !msg.at(U("role")).is_string())
+            {
+                reason = "message[" + std::to_string(i) + "] missing string role";
+                return false;
+            }
+
+            if (!msg.has_field(U("content")) || !msg.at(U("content")).is_string())
+            {
+                reason = "message[" + std::to_string(i) + "] missing string content";
+                return false;
+            }
+
+            // Normalize any assistant action payload in interleaved history.
+            const std::string role = utility::conversions::to_utf8string(msg.at(U("role")).as_string());
+            if (role == "assistant")
+            {
+                const std::string content =
+                utility::conversions::to_utf8string(msg.at(U("content")).as_string());
+                web::json::value parsed;
+                if (tryParseJsonText(content, parsed) && parsed.is_object() &&
+                    parsed.has_field(U("action_type")))
+                {
+                    std::string localReason;
+                    if (!normalizeActionPayload(parsed, localReason))
+                    {
+                        reason = "assistant action payload in history is invalid: " + localReason;
+                        return false;
+                    }
+
+                    msg[U("content")] = web::json::value::string(parsed.serialize());
+                }
+            }
+        }
+
+        auto& last = messages[messages.size() - 1];
+        if (!last.is_object() || !last.has_field(U("content")) || !last.at(U("content")).is_string())
+        {
+            reason = "last message has no string content";
+            return false;
+        }
+
+        std::string lastContent = utility::conversions::to_utf8string(last.at(U("content")).as_string());
+
+        if (startsWith(sampleName, "step_"))
+        {
+            web::json::value parsed;
+            if (!tryParseJsonText(lastContent, parsed))
+            {
+                reason = "step sample assistant content is not valid JSON";
+                return false;
+            }
+
+            std::string localReason;
+            if (!normalizeActionPayload(parsed, localReason))
+            {
+                reason = "step sample assistant content invalid: " + localReason;
+                return false;
+            }
+
+            last[U("content")] = web::json::value::string(parsed.serialize());
+            return true;
+        }
+
+        if (startsWith(sampleName, "system_") || startsWith(sampleName, "debug_"))
+        {
+            web::json::value parsed;
+            if (tryParseJsonText(lastContent, parsed) && parsed.is_object() &&
+                parsed.has_field(U("debug_notes")) && parsed.has_field(U("log_summary")) &&
+                parsed.at(U("debug_notes")).is_string() && parsed.at(U("log_summary")).is_string())
+            {
+                return true;
+            }
+
+            // Enforce schema shape even when model returned free text.
+            RunAnalysis normalized;
+            normalized.debug_notes = trim(lastContent);
+            normalized.log_summary = std::string();
+            last[U("content")] = web::json::value::string(normalized.to_json().serialize());
+            return true;
+        }
+
+        return true;
+    }
+
+    static std::string summarizeFeedbackText(const std::string& s)
+    {
+        const std::size_t kMax = 600;
+        if (s.size() <= kMax)
+        {
+            return s;
+        }
+
+        return s.substr(0, kMax) + "...";
+    }
     
     Distillery::Distillery()
     {
@@ -820,21 +1056,46 @@ namespace stdrave {
         if (!boost_fs::exists(root) || !boost_fs::is_directory(root)) {
             throw std::runtime_error("compileDataset(): datasetDir is not a directory: " + datasetDir);
         }
-        
-        boost_fs::remove(datasetDir + "/train_dbg_sft.jsonl");
 
-        
+        std::vector<boost_fs::path> files;
         for (boost_fs::directory_iterator it(root), end; it != end; ++it)
         {
-            if (!boost_fs::is_regular_file(*it))
-                continue;
+            if (boost_fs::is_regular_file(*it))
+            {
+                files.push_back(it->path());
+            }
+        }
 
-            const boost_fs::path& p = it->path();
+        std::sort(files.begin(), files.end(),
+                  [](const boost_fs::path& a, const boost_fs::path& b) {
+            return a.filename().string() < b.filename().string();
+        });
 
+        boost_fs::remove(datasetDir + "/train_dbg_sft.jsonl");
+
+        for (const auto& p : files)
+        {
             if (p.extension() == ".json" && startsWith(p.filename().string(), "step_"))
             {
                 std::string jsonSample = getFileContent(p.string());
-                
+                web::json::value chatSample;
+                if (!tryParseJsonText(jsonSample, chatSample))
+                {
+                    std::cout << "Skipping malformed training sample during compileDataset: ";
+                    std::cout << p.string() << std::endl;
+                    continue;
+                }
+
+                std::string sanitizeReason;
+                const std::string sampleName = p.stem().string();
+                if (!sanitizeTrainingSampleByName(sampleName, chatSample, sanitizeReason))
+                {
+                    std::cout << "Skipping invalid training sample during compileDataset: ";
+                    std::cout << p.string() << "\nReason: " << sanitizeReason << std::endl;
+                    continue;
+                }
+
+                jsonSample = utility::conversions::to_utf8string(chatSample.serialize());
                 std::ofstream trainFile(datasetDir + "/train_dbg_sft.jsonl", std::ios::app);
                 if(trainFile.good())
                 {
@@ -842,21 +1103,33 @@ namespace stdrave {
                 }
             }
         }
-        
+
         boost_fs::remove(datasetDir + "/train_run_sft.jsonl");
 
-        for (boost_fs::directory_iterator it(root), end; it != end; ++it)
+        for (const auto& p : files)
         {
-            if (!boost_fs::is_regular_file(*it))
-                continue;
-
-            const boost_fs::path& p = it->path();
-
             if (p.extension() == ".json" &&
                 (startsWith(p.filename().string(), "system_") || startsWith(p.filename().string(), "debug_")))
             {
                 std::string jsonSample = getFileContent(p.string());
-                
+                web::json::value chatSample;
+                if (!tryParseJsonText(jsonSample, chatSample))
+                {
+                    std::cout << "Skipping malformed training sample during compileDataset: ";
+                    std::cout << p.string() << std::endl;
+                    continue;
+                }
+
+                std::string sanitizeReason;
+                const std::string sampleName = p.stem().string();
+                if (!sanitizeTrainingSampleByName(sampleName, chatSample, sanitizeReason))
+                {
+                    std::cout << "Skipping invalid training sample during compileDataset: ";
+                    std::cout << p.string() << "\nReason: " << sanitizeReason << std::endl;
+                    continue;
+                }
+
+                jsonSample = utility::conversions::to_utf8string(chatSample.serialize());
                 std::ofstream trainFile(datasetDir + "/train_run_sft.jsonl", std::ios::app);
                 if(trainFile.good())
                 {
@@ -1203,6 +1476,14 @@ namespace stdrave {
         //TODO: Consider to enforce alternated messages user->assistant
         
         //alternateRoles(chatSample);
+
+        std::string sanitizeReason;
+        if(!sanitizeTrainingSampleByName(sampleName, chatSample, sanitizeReason))
+        {
+            std::cout << "Skipping training sample '" << sampleName << "' due to invalid shape. Reason: ";
+            std::cout << sanitizeReason << std::endl;
+            return;
+        }
         
         if(!boost_fs::exists(datasetDir)) {
             boost_fs::create_directories(datasetDir);
@@ -1725,11 +2006,82 @@ namespace stdrave {
         
         web::json::value object;
         project->inference(cache, promptDistillStep, schema, object);
-        
-        project->popContext();
-        
+
         DistilledAanalysis distilledDebugAnalysis;
         distilledDebugAnalysis.from_json(object);
+
+        const std::set<std::string> functionCandidates = (m_project ? m_project :
+                                                          project)->getNodeNames();
+        std::set<std::string> visibleFunctions;
+        addMentionedFunctionsFromText(debugInfo, functionCandidates, visibleFunctions);
+
+        const std::string lockedDebugSubject = distilledStep.debug_step.action_subject;
+
+        auto validateDebugGrounding = [&](const DistilledAanalysis& candidate,
+                                          std::string& outFeedback) -> bool
+        {
+            outFeedback.clear();
+
+            std::string narrative;
+            narrative += candidate.system_analysis.debug_notes;
+            narrative += "\n";
+            narrative += candidate.system_analysis.log_summary;
+            narrative += "\n";
+            narrative += candidate.thinking_analysis;
+
+            std::set<std::string> mentionedFunctions;
+            addMentionedFunctionsFromText(narrative, functionCandidates, mentionedFunctions);
+
+            std::set<std::string> disallowed;
+            for (const auto& fn : mentionedFunctions)
+            {
+                if (!lockedDebugSubject.empty() && lockedDebugSubject != "none" && fn == lockedDebugSubject)
+                {
+                    continue;
+                }
+
+                if (!visibleFunctions.count(fn))
+                {
+                    disallowed.insert(fn);
+                }
+            }
+
+            if (disallowed.empty())
+            {
+                return true;
+            }
+
+            outFeedback += "Grounding violation in debug analysis narrative fields ";
+            outFeedback += "(debug_notes/log_summary/thinking_analysis).\n";
+            outFeedback += "Disallowed function names: " + getAsCsv(disallowed, 30) + "\n";
+            outFeedback += "Currently visible functions in CURRENT TRAJECTORY: ";
+            outFeedback += getAsCsv(visibleFunctions, 30) + "\n";
+            outFeedback += "Rule: mention only functions visible in CURRENT TRAJECTORY for this distilled sample.\n";
+            outFeedback += "Regenerate using only grounded names.\n\n";
+
+            return false;
+        };
+
+        std::string debugGroundingFeedback;
+        uint32_t attempts = 0;
+        const uint32_t kMaxAttempts = 8;
+        while (attempts < kMaxAttempts &&
+               !validateDebugGrounding(distilledDebugAnalysis, debugGroundingFeedback))
+        {
+            project->inference(cache, debugGroundingFeedback, schema, object);
+            distilledDebugAnalysis = DistilledAanalysis();
+            distilledDebugAnalysis.from_json(object);
+            ++attempts;
+        }
+
+        if (!validateDebugGrounding(distilledDebugAnalysis, debugGroundingFeedback))
+        {
+            std::cout << "Debug-analysis grounding didn't converge after "
+            << kMaxAttempts << " retries at step " << debugStep
+            << ". Keeping last response." << std::endl;
+        }
+
+        project->popContext();
         
         DebugStep distilledDebugStep;
         
@@ -1777,6 +2129,12 @@ namespace stdrave {
         auto& arr = messages.as_array();
         
         NextDebugStep req = step.debug_step;
+        if (req.invocation <= 0) {
+            req.invocation = 1;
+        }
+        if (req.line_number == (uint32_t)-1) {
+            req.line_number = 0;
+        }
         if (!step.motivation_summary.empty()) {
             req.motivation = step.motivation_summary;
         }
@@ -2062,6 +2420,12 @@ namespace stdrave {
                 feedback += "Step " + std::to_string(stepId) + " has empty action_type.\n";
                 feedback += "Every optimized step must have a valid non-empty action_type.\n\n";
             }
+
+            if (step->invocation == 0)
+            {
+                feedback += "Step " + std::to_string(stepId) + " has invalid invocation=0.\n";
+                feedback += "Use invocation=1 when not needed.\n\n";
+            }
             
             if (step->original_step == 0 || step->original_step < -1)
             {
@@ -2155,7 +2519,8 @@ namespace stdrave {
                     if (
                         (step->action_type == "function_info" ||
                          step->action_type == "fix_function" ||
-                         step->action_type == "call_graph") &&
+                         step->action_type == "call_graph" ||
+                         step->action_type == "debug_function") &&
                         
                         !step->action_subject.empty() &&
                         step->action_subject != "none" &&
@@ -2354,6 +2719,15 @@ namespace stdrave {
             firstFb = false;
             
             attempts++;
+        }
+
+        if (!feedback.first.empty())
+        {
+            std::cout << "ERROR: Rejecting optimized sequence due to unresolved validator feedback after retries.\n";
+            std::cout << summarizeFeedbackText(feedback.first) << std::endl;
+            optimalSequence.clear();
+            project->popContext();
+            return;
         }
         
         project->popContext();
@@ -2918,7 +3292,7 @@ namespace stdrave {
                 optimizedStep.action_type = step.action_type;
                 optimizedStep.action_subject = step.action_subject;
                 optimizedStep.line_number = (step.line_number == (uint32_t)-1) ? 0 : step.line_number;
-                optimizedStep.invocation = step.invocation;
+                optimizedStep.invocation = (step.invocation == 0) ? 1 : step.invocation;
                 optimizedStep.original_step = stepId;
                 
                 optimalSequence.steps.push_back(std::make_shared<OptimizedStep>(optimizedStep));
@@ -2941,6 +3315,18 @@ namespace stdrave {
             std::cout << optimizedJson << std::endl;
             project->popContext();
             return;
+        }
+
+        {
+            const int originalSize = fixStep - startStep + 1;
+            auto finalValidation = validateSequence(project, optimalSequence, originalSize, startStep);
+            if (!finalValidation.first.empty())
+            {
+                std::cout << "Skipping fix track due to invalid optimized sequence after validation.\n";
+                std::cout << summarizeFeedbackText(finalValidation.first) << std::endl;
+                project->popContext();
+                return;
+            }
         }
         
         //Save optimized sequence
@@ -2981,6 +3367,11 @@ namespace stdrave {
             if(step->line_number == (uint32_t)-1)
             {
                 step->line_number = 0;
+            }
+
+            if(step->invocation == 0)
+            {
+                step->invocation = 1;
             }
         }
         
@@ -3035,14 +3426,11 @@ namespace stdrave {
                         stepInfo.m_logSummary = rewardAnalysis.system_analysis.log_summary;
                         
                         std::string rewardHackingRequestStr = utility::conversions::to_utf8string(rewardHackingRequest.serialize());
-                        
-                        auto contentU = rewardHackingResponse[U("message")][U("content")].as_string();
-                        std::string rewardHackingResponseStr = utility::conversions::to_utf8string(contentU);
-                        saveResponseForTraining(datasetDir,
-                                                "system_" + testStepStr + "_" + fixStepStr,
-                                                rewardHackingRequestStr,
-                                                rewardHacking.second,
-                                                rewardHackingResponseStr, false);
+
+                        saveSystemAnalysis(datasetDir,
+                                           "system_" + testStepStr + "_" + fixStepStr,
+                                           rewardAnalysis,
+                                           rewardHackingRequestStr);
                     }
                 }
                 
@@ -3105,7 +3493,7 @@ namespace stdrave {
                 std::string newInfo;
                 nextStep.debug_step.action_type = step->action_type;
                 nextStep.debug_step.action_subject = step->action_subject;
-                nextStep.debug_step.invocation = step->invocation;
+                nextStep.debug_step.invocation = (step->invocation == 0) ? 1 : step->invocation;
                 nextStep.debug_step.line_number = step->line_number;
                 nextStep.m_originalStep = step->original_step;
                 
@@ -3160,7 +3548,7 @@ namespace stdrave {
                 DistilledStep nextStep;
                 nextStep.debug_step.action_type = step->action_type;
                 nextStep.debug_step.action_subject = step->action_subject;
-                nextStep.debug_step.invocation = step->invocation;
+                nextStep.debug_step.invocation = (step->invocation == 0) ? 1 : step->invocation;
                 nextStep.debug_step.line_number = step->line_number;
                 nextStep.m_originalStep = step->original_step;
                 
