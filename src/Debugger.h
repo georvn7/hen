@@ -26,6 +26,8 @@
 #define LIMIT_DEBUG_NOTES_SIZE
 #define LIMIT_DESCRIPTION_SIZE
 
+#define DEBUGGER_INTERLEAVED_TRAJECTORY
+
 #include "TraceAnalyzer.h"
 #include "LogAnalyzer.h"
 
@@ -211,6 +213,8 @@ namespace stdrave {
         std::vector<DebugStep> m_trajectory;
         std::string            m_lldbLog;
         
+        std::vector<std::pair<std::string, std::string>> m_rawTrajectory;
+        
         uint32_t m_step;
         uint32_t m_runAnalysisStep;
         uint32_t m_attemptsToFixUnitTestMain;
@@ -324,7 +328,14 @@ namespace stdrave {
         std::pair<bool, std::string> analysisFullTrace(CCodeProject* project, RunAnalysis& analysis, const TestDef& test);
         std::string analysisFrameTrace(CCodeProject* project, const std::string& function, uint32_t invocation);
         
-        std::string getTrajectory(int fromStep, int toStep, bool addCurrent, bool addSummary, bool includeRunInfo = false) const;
+        std::string getTrajectory(int fromStep,
+                                  int toStep,
+                                  bool addCurrent,
+                                  bool addSummary,
+                                  bool includeRunInfo = false) const;
+        
+        void pushTrajectory(CCodeProject* project);
+        
         void debugAnalysis(CCodeProject* project,
                            const std::string& function,
                            RunAnalysis& analysis,

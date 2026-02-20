@@ -1,9 +1,5 @@
 [[app_info]]
-
-//Current progress log start
 [[trajectory]]
-//Current progress log end
-
 [[info]]
 
 Analyze the provided information and current progress debugging the application, consult with the DEBUGGING WORKFLOW section and let me know what should be the next action in order to debug the application '[[application]]' ?

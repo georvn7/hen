@@ -1339,7 +1339,10 @@ namespace stdrave {
         std::string jsonStr((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
         auto uJsonStr = utility::conversions::to_string_t(jsonStr);
         auto json = web::json::value::parse(uJsonStr);
-        m_system = utility::conversions::to_utf8string(json[U("function")].as_string());
+        if(json.has_field(U("function")))
+        {
+            m_system = utility::conversions::to_utf8string(json[U("function")].as_string());
+        }
         
         m_test.from_json(json);
         

@@ -4325,6 +4325,19 @@ std::string Debugger::getTrajectory(int fromStep, int toStep, bool addCurrent, b
     return trajectory;
 }
 
+void Debugger::pushTrajectory(CCodeProject* project)
+{
+    //Ensure we have the correct info incorporating the modification from the last debug step
+    std::string appInfo = getHighLevelAppInfo(project, m_system, PRINT_MAX_FUNCTIONS_DEPTH, PRINT_MAX_FUNCTIONS_DEPTH);
+    project->pushMessage(appInfo, "user", true);
+    
+    //std::vector<std::string> m_rawTrajectory;
+    for(auto step : m_rawTrajectory)
+    {
+        project->pushMessage(step.first, step.second, true);
+    }
+}
+
 void Debugger::debugAnalysis(CCodeProject* project, const std::string& function,
                              RunAnalysis& analysis, const TestDef& test)
 {
@@ -4911,9 +4924,17 @@ void Debugger::optimizeTrajectory(CCodeProject* project, const TestDef& test)
         }
     }
     
+#ifdef DEBUGGER_INTERLEAVED_TRAJECTORY
+    //We want to summarize trajectory and compact the context with each run
+    if(m_nextStep.action_type != "run_test")
+    {
+        return;
+    }
+#else
     //couldn't find run_test command to summarize the range from 0 to the first run_test after the MIN_STEPS_TO_SUMMARIZE
     if(step == trajectorySize)
         return;
+#endif
     
     std::string stepStr = std::to_string(m_previousSteps + step);
     std::string trajectoryToSummarize = getTrajectory(0, step, false, true);
@@ -6156,6 +6177,8 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
     }
     else if(m_nextStep.action_type == "run_test")
     {
+        m_rawTrajectory.clear();
+        
         RunAnalysis analysis;
         //Need to rebuild to ensure all recent changes from the trajectory so far are applieds
         bool compiled = project->buildBinary(true);
@@ -6257,6 +6280,10 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         m_lastRunInfo = stepInfo.fullInfo();
         m_lastRunStep = stepIndex;
         
+#ifdef DEBUGGER_INTERLEAVED_TRAJECTORY
+        infoForCurrentStep = m_lastRunInfo + infoForCurrentStep;
+#endif
+        
         m_trajectory.push_back(stepInfo);
         
         //In case we have context accumulated during the run_test analysis
@@ -6319,6 +6346,10 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         }
         
         m_lastRunInfo = stepInfo.fullInfo();
+        
+#ifdef DEBUGGER_INTERLEAVED_TRAJECTORY
+        infoForCurrentStep = m_lastRunInfo + infoForCurrentStep;
+#endif
         
         m_trajectory.push_back(stepInfo);
         
@@ -6575,6 +6606,8 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
     //Ensure we have the correct info incorporating the modification from the last debug step
     m_appInfo = getHighLevelAppInfo(project, m_system, PRINT_MAX_FUNCTIONS_DEPTH, PRINT_MAX_FUNCTIONS_DEPTH);
     
+    m_rawTrajectory.push_back(std::make_pair(infoForCurrentStep, "user"));
+    
     std::string info;
     {
         if(!infoForCurrentStep.empty())
@@ -6628,6 +6661,19 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
     {
         m_commitMessage.clear();
         
+        Cache cache;
+        project->captureContext(std::string());
+        
+#ifdef DEBUGGER_INTERLEAVED_TRAJECTORY
+        info.clear();
+        m_appInfo.clear();
+        trajectory.clear();
+        pushTrajectory(project);
+#else
+        trajectory = "\n\n//Current progress log start" + trajectory;
+        trajectory += "\n//Current progress log end\n\n";
+#endif
+        
         Prompt promptNextStep("NextStep.txt",{
                             {"app_info", m_appInfo},
                             {"application", application},
@@ -6639,14 +6685,6 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         
         web::json::value schema;
         setupSchema<NextDebugStep>(schema);
-        
-        Cache cache;
-        project->captureContext(std::string());
-        
-        std::string hitCount = std::to_string(MAX_BREKPOINT_HITCOUNT);
-        //Push instructions for the breakpoints just before the next step
-        Prompt breakpoints("Breakpoints.txt",{{"hit_count", hitCount}});
-        project->pushMessage(breakpoints, "user", true);
         
         std::string promptNextStepMsg = promptNextStep.str();
         
@@ -6715,6 +6753,9 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
     }
     
     m_nextStep.m_stepId = stepIndex + 1;
+    
+    std::string stepMessage = utility::conversions::to_utf8string(m_nextStep.to_json().serialize());
+    m_rawTrajectory.push_back(std::make_pair(stepMessage, "assistant"));
      
     setStepHint(test);
     
@@ -6914,6 +6955,15 @@ std::pair<bool, std::string> Debugger::debug(CCodeProject* project,
         workflowMsg += "\n";
     }
     
+    {
+        std::string hitCount = std::to_string(MAX_BREKPOINT_HITCOUNT);
+        //Push instructions for the breakpoints just before the next step
+        Prompt breakpoints("Breakpoints.txt",{{"hit_count", hitCount}});
+        workflowMsg += "\n";
+        workflowMsg += breakpoints.str();
+        workflowMsg += "\n";
+    }
+    
     project->pushMessage(workflowMsg, "user", true);
     
     std::string testDescription = getTestDescription(project, test, regressionTestJsonPath);
@@ -6933,6 +6983,9 @@ std::pair<bool, std::string> Debugger::debug(CCodeProject* project,
         m_nextStep.motivation = "first run";
         m_nextStep.action_type = "run_test";
         m_nextStep.m_stepId = 1;
+        
+        std::string stepMessage = utility::conversions::to_utf8string(m_nextStep.to_json().serialize());
+        m_rawTrajectory.push_back(std::make_pair(stepMessage,"assistant"));
     }
     else
     {
@@ -9332,6 +9385,7 @@ void Debugger::resetTest()
     m_testFunctionalityDelta.clear();
     m_unitTestSource.clear();
     m_attemptsToFixUnitTestMain = 0;
+    m_rawTrajectory.clear();
 }
 
 Debugger::Debugger():
