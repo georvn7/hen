@@ -2068,8 +2068,13 @@ namespace stdrave {
                     
                     if(boost_fs::exists(testWD))
                     {
-                        Distillery::getInstance().distillTrajectory(this, testWD, 0, -1);
+                        int startFrom = 0;
+                        Distillery::getInstance().distillTrajectory(this, testWD, startFrom, -1);
                     }
+                }
+                else
+                {
+                    std::cout << "Skipping data synthesis for trajectory due to unsuccessful debug session: " << it->path().string() << std::endl;
                 }
             }
         }

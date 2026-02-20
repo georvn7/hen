@@ -1343,6 +1343,12 @@ namespace stdrave {
         {
             m_system = utility::conversions::to_utf8string(json[U("function")].as_string());
         }
+        else
+        {
+            std::cout << "The test file doesn't have 'function' field: ";
+            std::cout << testJsonPath << "/test.json" << std::endl;
+            m_system = "main";
+        }
         
         m_test.from_json(json);
         
@@ -1351,9 +1357,26 @@ namespace stdrave {
         return (uint32_t)m_trajectory.size();
     }
 
-    void Distillery::distillTrajectory(CCodeProject* project, const std::string& testJsonPath, int fromStep, int toStep)
+    void Distillery::distillTrajectory(CCodeProject* project, const std::string& testJsonPath, int& fromStep, int toStep)
     {
-        loadTrajectory(project, testJsonPath, fromStep, toStep);
+        {
+            web::json::value jsonTest;
+            loadJson(jsonTest, testJsonPath + "/test.json");
+            TestDef tempTest;
+            tempTest.from_json(jsonTest);
+            std::string trajectoryDir = Client::getInstance().getProjectDirectory() + "/debug/" + tempTest.name + "/trajectory";
+            
+            uint32_t nextStepIndex = (uint32_t)nextIndex(trajectoryDir, "step_");
+            if(nextStepIndex > 300)
+            {
+                fromStep = nextStepIndex - 300;
+            }
+        }
+        
+        if(loadTrajectory(project, testJsonPath, fromStep, toStep) <= 0)
+        {
+            return;
+        }
         
         std::cout << printTrajectory();
         

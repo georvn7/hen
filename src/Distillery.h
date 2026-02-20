@@ -264,7 +264,7 @@ namespace stdrave {
         
         uint32_t loadTrajectory(CCodeProject* project, const std::string& testJsonPath, int fromStep, int toStep);
         std::string printTrajectory();
-        void distillTrajectory(CCodeProject* project, const std::string& testJsonPath, int fromStep, int toStep);
+        void distillTrajectory(CCodeProject* project, const std::string& testJsonPath, int& fromStep, int toStep);
         
         void printTrajectoryInfo();
         void printFixesAndTests();
