@@ -4418,133 +4418,11 @@ namespace stdrave {
         proj->pushMessage(summary, "assistant", true);
     }
 
-#if 0
-    void CCodeNode::defineUnitTest(const std::string& fullTestPath, const std::string& prevFullTestPath, const std::string& recommendation)
-    {
-        TestDef fullTestDef;
-        fullTestDef.load(fullTestPath + "/test.json");
-        
-        Client& client = Client::getInstance();
-        CCodeProject* proj = (CCodeProject*)client.project();
-        
-        Client::getInstance().selectLLM(InferenceIntent::DEBUG_ANALYSIS);
-        
-        captureContext();
-        
-        std::string buildSourcePath = getNodeBuildSourcePath();
-        std::string buildDir = proj->getProjDir() + "/build";
-        std::string nodeDir = buildDir + "/" + buildSourcePath;
-        std::string testDir = nodeDir + "/test";
-        std::string platform = getPlatform() + "_test";
-        
-        CCodeNode* parent = nullptr;
-        std::string parentCtx;
-        std::set<std::string> referencedNodes;
-        if(m_this->m_parent)
-        {
-            parent = (CCodeNode*)m_this->m_parent->m_data;
-            assert(parent);
-            
-            parentCtx = "\nAlso, this function will be called by the '";
-            parentCtx += parent->m_brief.func_name;
-            parentCtx += "' and here is more information about that function:\n";
-            parentCtx += parent->getContexInfo(true, true, false, referencedNodes);
-        }
-        
-        std::string functionCtx = getContexInfo(true, false, false, referencedNodes);
-        
-        std::string testFrameworkMan = getFileContent(client.getEnvironmentDir() + "/Prompts/TestFramework.txt");
-        
-        std::string systemData = proj->getHighLevelAppInfo("main", 3, 3);
-        
-        systemData += "\n\nSome of the above functions are designated as subsystems and as such ";
-        systemData += "require a precise contract defining dataflow, ownership, and initialization\n\n";
-        
-        std::string fullTest = fullTestDef.getDescription(fullTestPath);
-        std::string prevFullTest;
-        std::string prevFullTestNote;
-        if(!prevFullTestPath.empty())
-        {
-            TestDef prevFullTestDef;
-            prevFullTestDef.load(prevFullTestPath + "/test.json");
-            
-            prevFullTest += "\n\nPREVIOUS FULL APPLICATION TEST (SUCCEEDED)\n\n";
-            prevFullTest += prevFullTestDef.getDescription(prevFullTestPath) + "\n\n";
-
-            prevFullTestNote += "\n\nNote - the previous full test passed. When generating this unit test, ";
-            prevFullTestNote += "consider which features—both existing and newly added—are relevant to its scope. ";
-            prevFullTestNote += "Among relevant features, prioritize coverage of new additions; ";
-            prevFullTestNote += "they are the most likely source of issues, though regressions remain possible.\n\n";
-        }
-        
-        std::string recoNote;
-        if(!recommendation.empty())
-        {
-            recoNote = "\n\nAnalysis form the most recent session debugging the test '" + fullTestDef.name + "' is provided above. ";
-            recoNote += "Consult the analysis and recommendations and, if it makes sense, ";
-            recoNote += "prioritize unit testing the features currently blocking the full application test from passing.\n";
-            recoNote += "The recommendation and analysis might sound more general-purpose or to suggest a specific unsupported workflow ";
-            recoNote += "but you need to adapt them to our unit tests specification (see the manual)\n\n";
-        }
-        
-        std::string unitTestName = fullTestDef.name + "_" + getName();
-        std::string defineTest = proj->define_test.prompt({
-            {"function", m_brief.func_name},
-            {"function_ctx", functionCtx},
-            {"full_test", fullTest},
-            {"prev_full_test", prevFullTest},
-            {"prev_full_test_note", prevFullTestNote},
-            {"recommendation", recommendation},
-            {"recommendation_note", recoNote},
-            {"system_data", systemData},
-            {"test_framework_manual", testFrameworkMan},
-            {"parent_ctx", parentCtx},
-            {"test_name", unitTestName}
-        });
-        
-        inferenceUnitTestDef(defineTest);
-        
-        popContext();
-        
-        //Just in case enforce the right unit test name
-        m_unitTest.definition.name = unitTestName;
-        
-        std::stringstream sout;
-        
-        sout << testFrameworkMan << std::endl << std::endl;
-        sout << "Information for the FULL APPLICATION TEST:\n\n";
-        sout << fullTest << std::endl << std::endl;
-        
-        if(!prevFullTest.empty())
-        {
-            sout << "Information for the PREVIOUS FULL APPLICATION TEST (SUCCEEDED):\n\n";
-            sout << prevFullTest;
-            
-            sout << prevFullTestNote;
-        }
-        
-        sout << "The unit test has to cover functionality required to pass the full application test\n\n";
-        
-        sout << "Unit test for function: " << m_brief.func_name << std::endl << std::endl;
-        
-        sout << functionCtx << std::endl << std::endl;
-        if(!parentCtx.empty()) {
-            sout << parentCtx << std::endl;
-        }
-        
-        std::string summary = sout.str();
-        proj->pushMessage(summary, "user", true);
-        
-        captureContext();
-        pushUnitTestDef();
-    }
-#endif
-
     void CCodeNode::generateUnitTestInputFiles()
     {
         CCodeProject* proj = (CCodeProject*)Client::getInstance().project();
         
-        Client::getInstance().selectLLM(InferenceIntent::DEBUG_ANALYSIS);
+        Client::getInstance().selectLLM(InferenceIntent::WRITE_TESTS);
         
         std::string buildSourcePath = getNodeBuildSourcePath();
         std::string buildDir = proj->getProjDir() + "/build";
@@ -4612,7 +4490,7 @@ namespace stdrave {
     {
         CCodeProject* proj = (CCodeProject*)Client::getInstance().project();
         
-        Client::getInstance().selectLLM(InferenceIntent::DEBUG_ANALYSIS);
+        Client::getInstance().selectLLM(InferenceIntent::WRITE_TESTS);
         
         std::string buildSourcePath = getNodeBuildSourcePath();
         std::string buildDir = proj->getProjDir() + "/build";
@@ -5237,7 +5115,7 @@ namespace stdrave {
     {
         CCodeProject* proj = (CCodeProject*)Client::getInstance().project();
         
-        Client::getInstance().selectLLM(InferenceIntent::DEBUG_ANALYSIS);
+        Client::getInstance().selectLLM(InferenceIntent::WRITE_TESTS);
         
         std::string buildSourcePath = getNodeBuildSourcePath();
         std::string buildDir = proj->getProjDir() + "/build";
@@ -5315,7 +5193,7 @@ namespace stdrave {
             }
             else
             {
-                Client::getInstance().selectLLM(InferenceIntent::DEBUG_ANALYSIS);
+                Client::getInstance().selectLLM(InferenceIntent::WRITE_TESTS);
                 
                 flags |= BUILD_PRINT_TEST;
                 std::string compileCL = compileCommand(platform, flags);
@@ -5448,7 +5326,7 @@ namespace stdrave {
         Client& client = Client::getInstance();
         CCodeProject* proj = (CCodeProject*)client.project();
         
-        Client::getInstance().selectLLM(InferenceIntent::DEBUG_ANALYSIS);
+        Client::getInstance().selectLLM(InferenceIntent::WRITE_TESTS);
         
         captureContext();
         

@@ -14,6 +14,7 @@ namespace stdrave {
         DEVELOPER = 1,
         EXPERT = 2,
         DIRECTOR = 4,
+        DEBUGGER = 8,
     };
 
     class LLMConfig : public Reflection<LLMConfig>

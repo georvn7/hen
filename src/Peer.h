@@ -27,6 +27,7 @@ namespace stdrave {
         std::pair<std::string, std::string> m_llmDirector;
         std::pair<std::string, std::string> m_llmExpert;
         std::pair<std::string, std::string> m_llmDeveloper;
+        std::pair<std::string, std::string> m_llmDebugger;
         
         std::string m_llmProxyIP;
         std::string m_chatProxyIP;

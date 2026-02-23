@@ -254,6 +254,10 @@ std::shared_ptr<LLMConfig> Client::currentLLMConfig()
     {
         return findLLM(m_llmDirector.first, m_llmDirector.second);
     }
+    else if(m_currentLLM == LLMRole::DEBUGGER)
+    {
+        return findLLM(m_llmDebugger.first, m_llmDebugger.second);
+    }
     
     return nullptr;
 }
@@ -272,6 +276,10 @@ std::shared_ptr<LLMConfig> Client::getLLMConfig(LLMRole forRole)
     {
         return findLLM(m_llmDirector.first, m_llmDirector.second);
     }
+    else if(forRole == LLMRole::DEBUGGER)
+    {
+        return findLLM(m_llmDebugger.first, m_llmDebugger.second);
+    }
     
     return nullptr;
 }
@@ -289,6 +297,9 @@ void Client::checkLLMContextSize(const json::value& messages, json::value& reque
     }
     else if(m_currentLLM == LLMRole::DIRECTOR) {
         selectedLLM = m_llmDirector.first + "/" + m_llmDirector.second;
+    }
+    else if(m_currentLLM == LLMRole::DEBUGGER) {
+        selectedLLM = m_llmDebugger.first + "/" + m_llmDebugger.second;
     }
     
     if(currentLLM == LLMRole::DEVELOPER)
@@ -318,6 +329,12 @@ void Client::checkLLMContextSize(const json::value& messages, json::value& reque
         m_ctxLLMRequested = m_llmDirector.first + "/" + m_llmDirector.second;
         
         uLLM = U(m_llmDirector.first + "/" + m_llmDirector.second);
+    }
+    if(currentLLM == LLMRole::DEBUGGER)
+    {
+        m_ctxLLMRequested = m_llmDebugger.first + "/" + m_llmDebugger.second;
+        
+        uLLM = U(m_llmDebugger.first + "/" + m_llmDebugger.second);
     }
     
     if(m_currentLLM != currentLLM)
@@ -783,7 +800,7 @@ void Client::useMentorLLM()
     m_currentLLM = LLMRole::DIRECTOR;
 }
 
-void Client::useArchitectLLM()
+void Client::useExpertLLM()
 {
     m_currentLLM = LLMRole::EXPERT;
 }
@@ -795,6 +812,8 @@ void Client::useDeveloperLLM()
 
 bool Client::escalateLLM()
 {
+    //NEVER escalate to the DEBUGGER!
+    
     if(m_currentLLM == LLMRole::DEVELOPER)
     {
         setLLM(LLMRole::EXPERT);
@@ -819,7 +838,7 @@ void Client::setLLM(LLMRole role)
             useMentorLLM();
             break;
         case LLMRole::EXPERT:
-            useArchitectLLM();
+            useExpertLLM();
             break;
         case LLMRole::DEVELOPER:
         default:
@@ -855,8 +874,9 @@ LLMRole Client::getLLMIntent(InferenceIntent intent)
         EXPERT,//REASON_DATA,
         DEVELOPER,//REASON_FIX,
         DEVELOPER,//REASON,
-        DIRECTOR,//DEBUG_ANALYSIS
-        EXPERT//DEBUG_ASSISTANT
+        DEBUGGER,//DEBUG_ANALYSIS
+        EXPERT,//DEBUG_ASSISTANT
+        DIRECTOR//WRITE_TESTS
         //COUNT
     };
     

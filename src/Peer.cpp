@@ -78,6 +78,11 @@ int Peer::init(int argc, char* argv[])
             std::string providerAndModelArg = argv[i+1];
             m_llmDeveloper = splitByFirstOccurence(providerAndModelArg, '/');
         }
+        else if(std::string(argv[i]) == "-llmDbg")
+        {
+            std::string providerAndModelArg = argv[i+1];
+            m_llmDebugger = splitByFirstOccurence(providerAndModelArg, '/');
+        }
     }
     
     if(!m_environmentDirectory.empty())

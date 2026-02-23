@@ -159,6 +159,8 @@ std::pair<std::string, std::string> Server::getLLMForTheRole(json::value& reques
             return m_llmExpert;
         case LLMRole::DIRECTOR:
             return m_llmDirector;
+        case LLMRole::DEBUGGER:
+            return m_llmDebugger;
         default:
             //TODO: We must not be here!!!
             //assert(role < LLMRole::LLM_ROLE_COUNT);

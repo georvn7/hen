@@ -44,6 +44,7 @@ namespace stdrave {
         REASON,
         DEBUG_ANALYSIS,
         DEBUG_ASSISTANT,
+        WRITE_TESTS,
         INFERENCE_INTENT_COUNT
     };
 
@@ -124,7 +125,7 @@ namespace stdrave {
         bool supportsFunctionCalls() const {return m_supportsFunctionCalls;}
         
         void useMentorLLM();
-        void useArchitectLLM();
+        void useExpertLLM();
         void useDeveloperLLM();
         bool escalateLLM();
         void selectLLM(InferenceIntent intent);
