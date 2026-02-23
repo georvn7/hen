@@ -213,14 +213,17 @@ public:
         url_ = *result;
 
         scheme_ = std::string(url_.scheme());
+        if (scheme_ != "https" && scheme_ != "http")
+        {
+            handleError("Unsupported URL scheme: " + scheme_);
+            return;
+        }
+        useSSL_ = (scheme_ == "https");
+        
         host_   = std::string(url_.host());
         port_   = url_.has_port()
                     ? std::string(url_.port())
                     : (scheme_ == "https" ? "443" : "80");
-
-        // If you have plain HTTP endpoints:
-        //   if(scheme_ == "http"){ ... do plain tcp ... }
-        // We'll assume https for now.
 
         // Resolve host and port
         resolver_.async_resolve(host_, port_,
@@ -260,16 +263,23 @@ private:
             handleError("connect", ec);
             return;
         }
-
-        // Set SNI (Server Name Indication)
-        ::SSL_set_tlsext_host_name(stream_.native_handle(), host_.c_str());
-
-        // async_handshake
-        stream_.async_handshake(ssl::stream_base::client,
-            [self = shared_from_this()](boost::beast::error_code ec){
-                self->onHandshake(ec);
-            }
-        );
+        
+        if(useSSL_)
+        {
+            // Set SNI (Server Name Indication)
+            ::SSL_set_tlsext_host_name(stream_.native_handle(), host_.c_str());
+            
+            // async_handshake
+            stream_.async_handshake(ssl::stream_base::client,
+                [self = shared_from_this()](boost::beast::error_code ec){
+                    self->onHandshake(ec);
+                }
+            );
+        }
+        else
+        {
+            writeRequest();
+        }
     }
 
     // Step 3: onHandshake
@@ -280,15 +290,32 @@ private:
             return;
         }
 
+        writeRequest();
+    }
+    
+    void writeRequest()
+    {
         // Write request
         // If you need to update .target(...), do it here before writing
         // e.g. combine path + query from url_ if not already in req_
-        boost::beast::http::async_write(stream_, req_,
-            [self = shared_from_this()](boost::beast::error_code ec, size_t)
-            {
-                self->onWrite(ec);
-            }
-        );
+        if(useSSL_)
+        {
+            boost::beast::http::async_write(stream_, req_,
+                [self = shared_from_this()](boost::beast::error_code ec, size_t)
+                {
+                    self->onWrite(ec);
+                }
+            );
+        }
+        else
+        {
+            boost::beast::http::async_write(stream_.next_layer(), req_,
+                [self = shared_from_this()](boost::beast::error_code ec, size_t)
+                {
+                    self->onWrite(ec);
+                }
+            );
+        }
     }
 
     // Step 4: onWrite
@@ -300,12 +327,24 @@ private:
         }
 
         // Read the response
-        boost::beast::http::async_read(stream_, buffer_, res_,
-            [self = shared_from_this()](boost::beast::error_code ec, size_t)
-            {
-                self->onRead(ec);
-            }
-        );
+        if(useSSL_)
+        {
+            boost::beast::http::async_read(stream_, buffer_, res_,
+                [self = shared_from_this()](boost::beast::error_code ec, size_t)
+                {
+                    self->onRead(ec);
+                }
+            );
+        }
+        else
+        {
+            boost::beast::http::async_read(stream_.next_layer(), buffer_, res_,
+                [self = shared_from_this()](boost::beast::error_code ec, size_t)
+                {
+                    self->onRead(ec);
+                }
+            );
+        }
     }
 
     // Step 5: onRead
@@ -317,13 +356,20 @@ private:
         }
 
         // Now we have the response in res_
-        // We'll shut down SSL, but some servers might not do a clean shutdown
-        stream_.async_shutdown(
-            [self = shared_from_this()](boost::beast::error_code shutdownEc){
-                // ignoring shutdownEc for brevity
-                self->onShutdown();
-            }
-        );
+        if(useSSL_)
+        {
+            // We'll shut down SSL, but some servers might not do a clean shutdown
+            stream_.async_shutdown(
+                [self = shared_from_this()](boost::beast::error_code shutdownEc){
+                    // ignoring shutdownEc for brevity
+                    self->onShutdown();
+                }
+            );
+        }
+        else
+        {
+            onShutdown();
+        }
     }
 
     // Step 6: onShutdown
@@ -401,6 +447,7 @@ private:
     std::string scheme_;
     std::string host_;
     std::string port_;
+    bool useSSL_ = true;
     uint32_t requestId_;
 };
 
@@ -1220,7 +1267,13 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
     else
     {
         requestFromClientBody[U("stream")] = json::value::boolean(false);
-        requestFromClientBody[U("options")][U("num_ctx")] = json::value::number(8192);
+        //For Ollama served models we enforce the context size specified in the registry
+        requestFromClientBody[U("options")][U("num_ctx")] = json::value::number(llm->context_size*1024);
+        requestFromClientBody[U("max_tokens")] = json::value::number(4096);
+        requestFromClientBody[U("temperature")] = json::value::number(0.0);
+        requestFromClientBody[U("top_p")] = json::value::number(1.0);
+        requestFromClientBody[U("verbosity")] = json::value::string(U("medium"));
+        requestFromClientBody[U("reasoning_effort")] = json::value::string(U("medium"));
     }
     
     //This is for test

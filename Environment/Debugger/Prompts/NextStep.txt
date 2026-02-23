@@ -2,22 +2,4 @@
 [[trajectory]]
 [[info]]
 
-Analyze the provided information and current progress debugging the application, consult with the DEBUGGING WORKFLOW section and let me know what should be the next action in order to debug the application '[[application]]' ?
-
-If you request information for a function - source, description etc, via the 'function_info' action, specify 1-based invocation in the 'invocation' field.
-
-For log section request, via the 'log_info' action, you can specify the start line (in the 'line_number' field) and optionally provide filters by function name (via the 'action_subject' field) and 1-based function invocation (via the 'invocation' field).  
-
-In case you've decided to debug a function, via the 'debug_function' action, consult with 'HOW TO SET BREAKPOINTS' section for how you can set a custom breakpoint. The 'invocation' field will not be considered when the breakpoints are set!
-
-If you decided to scan in the data type and function source files, via the 'search_source' action, for lines matching a give regex, specify the pattern in the 'action_subject' field.
-
-When investigating an issue and suggesting a fix, considering the tradeoff required "Structural vs. Local" changes based on which is likely to reach a passing test in the fewest steps.
-
-If you decide to fix a function source via 'fix_function' action, ensure the exact fix is explained with implementation details in the 'motivation' field.
-
-If you need information for struct or enum use data_info action.
-
-It is crucial to summarize all important details received for this steps (since the last one from the progress log) in the 'Motivation' section as this will be the only information available in the next steps (have a look at the current progress log if available to see what I mean). Preserve in the motivation all specific data (functions, source locations, log messages, trace fragments, other hints) that actually led to this decision. The idea is to accumulate in the progress log knowledge that we can refer to in the next steps while debugging the application.
-
-Ideally, the 'motivation' field has to be 3 paragraphs or fewer, less than 2048 characters, but this is not a hard limit as we don't want to miss something important.
+Consult with the NEXT STEP INSTRUCTIONS section and let me know what should be the next action in order to debug the application '[[application]]' ?

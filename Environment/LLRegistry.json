@@ -649,6 +649,19 @@
       "roles": "director,expert,developer",
       "input_tokens_price": 1.3,
       "output_tokens_price": 2.20
+    },
+    {
+      "provider": "ollama",
+      "url": "http://10.0.0.34:11434/v1/chat/completions",
+      "model": "gptoss120b:train_20260222_32k_chatfix3",
+      "reasoning_effort": "na",
+      "verbosity": "na",
+      "context_size": 128,
+      "rate_limit": -1,
+      "rate_limit_rpm": -1,
+      "roles": "director,expert,developer",
+      "input_tokens_price": 0.00,
+      "output_tokens_price": 0.00
     }
   ]
 }

@@ -4908,11 +4908,13 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
 
 void Debugger::optimizeTrajectory(CCodeProject* project, const TestDef& test)
 {
+    int trajectorySize = (int)m_trajectory.size();
+    int step=0;
+    
+#ifndef DEBUGGER_INTERLEAVED_TRAJECTORY
     if(m_trajectory.size() <= MAX_TRAJECTORY_FOR_SUMMARIZATION)
         return;
     
-    int trajectorySize = (int)m_trajectory.size();
-    int step=0;
     for(; step < trajectorySize; ++step)
     {
         //if(m_trajectory[step].m_action == "run_test")
@@ -4923,21 +4925,27 @@ void Debugger::optimizeTrajectory(CCodeProject* project, const TestDef& test)
             }
         }
     }
-    
-#ifdef DEBUGGER_INTERLEAVED_TRAJECTORY
-    //We want to summarize trajectory and compact the context with each run
-    if(m_nextStep.action_type != "run_test")
-    {
-        return;
-    }
-#else
     //couldn't find run_test command to summarize the range from 0 to the first run_test after the MIN_STEPS_TO_SUMMARIZE
     if(step == trajectorySize)
         return;
+#else
+    // Compact only right after a run has just been executed.
+    if(trajectorySize <= 1)
+        return;
+    
+    if(m_trajectory.back().m_action != "run_test")
+        return;
+    
+    // Keep only the latest run_test step, summarize the previous prefix.
+    step = trajectorySize - 1;
 #endif
     
     std::string stepStr = std::to_string(m_previousSteps + step);
     std::string trajectoryToSummarize = getTrajectory(0, step, false, true);
+    
+    if(trajectoryToSummarize.empty())
+        return;
+    
     std::string remainingTrajectory = getTrajectory(step, -1, false, false);
     
     {
@@ -6946,6 +6954,12 @@ std::pair<bool, std::string> Debugger::debug(CCodeProject* project,
         });
         
         workflowMsg += "\n" + traceDesc.str();
+    }
+    
+    {
+        Prompt nextStepInstruct("NextStepInstructions.txt", {});
+        
+        workflowMsg += "\n" + nextStepInstruct.str();
     }
     
     //Add source checklist requirements
