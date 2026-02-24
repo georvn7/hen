@@ -1,3 +1,4 @@
+
 NEXT STEP INSTRUCTIONS
 
 Analyze the provided information and current progress debugging the application, consult with the DEBUGGING WORKFLOW section.

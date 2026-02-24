@@ -169,7 +169,12 @@ namespace stdrave {
         Context* switchToCompileContext();
         
         std::string getInstrumentationMessage(web::json::value& schema);
-        bool inference(Cache& cache, const std::string& message, web::json::value& schema, web::json::value& object);
+        bool inference(Cache& cache,
+                       const std::string& message,
+                       web::json::value& schema,
+                       web::json::value& object,
+                       bool pushSchema = true);
+        
         bool inference(Cache& cache, const std::string& message, std::string& source, bool* truncated);
         
         bool inference(Cache& cache, const std::string& question, bool enforceBinaryAnswer, std::string& response, bool defaultResponse);

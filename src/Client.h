@@ -55,6 +55,8 @@ namespace stdrave {
 
         void logRequest(const json::value& jsonObject, const std::string& fileName);
         void logResponse(const json::value& jsonObject, const std::string& fileName);
+        void logChat(const json::value& request, const json::value& response, const std::string& fileName);
+        
 		void log(const json::value& jsonObject, const std::string& fileName);
         
 		uint32_t m_requestId;
@@ -124,7 +126,8 @@ namespace stdrave {
 		}
         bool supportsFunctionCalls() const {return m_supportsFunctionCalls;}
         
-        void useMentorLLM();
+        void useDirectorLLM();
+        void useDebuggerLLM();
         void useExpertLLM();
         void useDeveloperLLM();
         bool escalateLLM();

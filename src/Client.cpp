@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 #include <iomanip>
+#include <functional>
 
 #ifdef _WIN32
 #include <direct.h>
@@ -214,6 +215,242 @@ void Client::logRequest(const json::value& jsonObject, const std::string& fileNa
 void Client::logResponse(const json::value& jsonObject, const std::string& fileName)
 {
     log(jsonObject, fileName);
+}
+
+void Client::logChat(const json::value& request, const json::value& response, const std::string& fileName)
+{
+    auto toUtf8 = [](const utility::string_t& value) -> std::string {
+        return utility::conversions::to_utf8string(value);
+    };
+    
+    auto stripThinking = [](std::string text) -> std::string {
+        // Remove all <think>...</think> spans if present.
+        while (true)
+        {
+            std::string stripped = removeThinkPart(text);
+            if (stripped == text)
+            {
+                break;
+            }
+            
+            text = stripped;
+        }
+        
+        return text;
+    };
+    
+    std::function<std::string(const json::value&)> extractText = [&](const json::value& value) -> std::string {
+        if (value.is_string())
+        {
+            return toUtf8(value.as_string());
+        }
+        
+        if (!value.is_object())
+        {
+            return "";
+        }
+        
+        if (value.has_field(U("text")) && value.at(U("text")).is_string())
+        {
+            return toUtf8(value.at(U("text")).as_string());
+        }
+        
+        if (value.has_field(U("output_text")) && value.at(U("output_text")).is_string())
+        {
+            return toUtf8(value.at(U("output_text")).as_string());
+        }
+        
+        if (value.has_field(U("response")) && value.at(U("response")).is_string())
+        {
+            return toUtf8(value.at(U("response")).as_string());
+        }
+        
+        if (value.has_field(U("content")))
+        {
+            const auto& content = value.at(U("content"));
+            if (content.is_string())
+            {
+                return toUtf8(content.as_string());
+            }
+            
+            if (content.is_array())
+            {
+                std::string result;
+                for (const auto& part : content.as_array())
+                {
+                    if (part.is_object() && part.has_field(U("type")) && part.at(U("type")).is_string())
+                    {
+                        const std::string type = toUtf8(part.at(U("type")).as_string());
+                        if (type == "thinking")
+                        {
+                            continue;
+                        }
+                    }
+                    
+                    std::string piece = extractText(part);
+                    if (piece.empty())
+                    {
+                        continue;
+                    }
+                    
+                    if (!result.empty())
+                    {
+                        result += "\n";
+                    }
+                    
+                    result += piece;
+                }
+                
+                return result;
+            }
+        }
+        
+        return "";
+    };
+    
+    std::string chatLog;
+    
+    auto appendMessage = [&](const std::string& role, const std::string& rawContent) {
+        if (role == "thinking")
+        {
+            return;
+        }
+        
+        std::string content = stripThinking(rawContent);
+        if (content.empty())
+        {
+            return;
+        }
+        
+        chatLog += ">> ";
+        chatLog += role.empty() ? "assistant" : role;
+        chatLog += "\n\n\n";
+        chatLog += content;
+        chatLog += "\n\n\n";
+    };
+    
+    auto readRole = [&](const json::value& message, const std::string& fallback) -> std::string {
+        if (message.is_object() && message.has_field(U("role")) && message.at(U("role")).is_string())
+        {
+            return toUtf8(message.at(U("role")).as_string());
+        }
+        
+        return fallback;
+    };
+    
+    if (request.has_field(U("messages")) && request.at(U("messages")).is_array())
+    {
+        for (const auto& msg : request.at(U("messages")).as_array())
+        {
+            appendMessage(readRole(msg, "user"), extractText(msg));
+        }
+    }
+    else if (request.has_field(U("input")))
+    {
+        const auto& input = request.at(U("input"));
+        if (input.is_string())
+        {
+            appendMessage("user", toUtf8(input.as_string()));
+        }
+        else if (input.is_array())
+        {
+            for (const auto& msg : input.as_array())
+            {
+                appendMessage(readRole(msg, "user"), extractText(msg));
+            }
+        }
+    }
+    
+    bool hasResponseMessage = false;
+    if (response.has_field(U("message")))
+    {
+        const auto& message = response.at(U("message"));
+        const std::size_t before = chatLog.size();
+        appendMessage(readRole(message, "assistant"), extractText(message));
+        hasResponseMessage = chatLog.size() != before;
+    }
+    
+    if (!hasResponseMessage && response.has_field(U("choices")) && response.at(U("choices")).is_array())
+    {
+        for (const auto& choice : response.at(U("choices")).as_array())
+        {
+            if (choice.is_object() && choice.has_field(U("message")))
+            {
+                const auto& message = choice.at(U("message"));
+                const std::size_t before = chatLog.size();
+                appendMessage(readRole(message, "assistant"), extractText(message));
+                hasResponseMessage = chatLog.size() != before;
+            }
+            else if (choice.is_object() && choice.has_field(U("text")) && choice.at(U("text")).is_string())
+            {
+                const std::size_t before = chatLog.size();
+                appendMessage("assistant", toUtf8(choice.at(U("text")).as_string()));
+                hasResponseMessage = chatLog.size() != before;
+            }
+            
+            if (hasResponseMessage)
+            {
+                break;
+            }
+        }
+    }
+    
+    if (!hasResponseMessage && response.has_field(U("output")) && response.at(U("output")).is_array())
+    {
+        for (const auto& item : response.at(U("output")).as_array())
+        {
+            if (!item.is_object())
+            {
+                continue;
+            }
+            
+            if (item.has_field(U("type")) && item.at(U("type")).is_string())
+            {
+                const std::string type = toUtf8(item.at(U("type")).as_string());
+                if (type != "message")
+                {
+                    continue;
+                }
+            }
+            
+            const std::size_t before = chatLog.size();
+            appendMessage(readRole(item, "assistant"), extractText(item));
+            hasResponseMessage = chatLog.size() != before;
+            if (hasResponseMessage)
+            {
+                break;
+            }
+        }
+    }
+    
+    if (!hasResponseMessage && response.has_field(U("response")) && response.at(U("response")).is_string())
+    {
+        appendMessage("assistant", toUtf8(response.at(U("response")).as_string()));
+    }
+    
+    boost_fs::path p(fileName);
+    
+    if (boost_fs::exists(p.parent_path()))
+    {
+        std::ofstream outFile(fileName, std::ios::out | std::ios::trunc);
+        if (outFile.is_open())
+        {
+            outFile << chatLog;
+            
+            if (m_project)
+            {
+                m_project->saveStats();
+            }
+        }
+        else
+        {
+            std::cerr << "Failed to open file for writing: " << fileName << std::endl;
+        }
+    }
+    else
+    {
+        m_log[fileName] = chatLog;
+    }
 }
 
 void Client::flushLog()
@@ -609,8 +846,13 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
     std::string responseLog = logDir + "/response_";
     responseLog += std::to_string(m_requestId);
     responseLog += "_" + m_ctxPrompt;
-    responseLog += ".json";
-    logResponse(response, responseLog);
+    //responseLog += ".json";
+    logResponse(response, responseLog + ".json");
+    
+    if(logDir.find("/logs/debug/") != std::string::npos)
+    {
+        logChat(request, response, responseLog + ".txt");
+    }
     
     m_requestId++;
 
@@ -795,9 +1037,14 @@ int Client::initProject()
     return 0;
 }
 
-void Client::useMentorLLM()
+void Client::useDirectorLLM()
 {
     m_currentLLM = LLMRole::DIRECTOR;
+}
+
+void Client::useDebuggerLLM()
+{
+    m_currentLLM = LLMRole::DEBUGGER;
 }
 
 void Client::useExpertLLM()
@@ -835,7 +1082,10 @@ void Client::setLLM(LLMRole role)
     switch(role)
     {
         case LLMRole::DIRECTOR:
-            useMentorLLM();
+            useDirectorLLM();
+            break;
+        case LLMRole::DEBUGGER:
+            useDebuggerLLM();
             break;
         case LLMRole::EXPERT:
             useExpertLLM();

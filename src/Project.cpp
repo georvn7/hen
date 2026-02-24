@@ -760,7 +760,11 @@ namespace stdrave {
         return instrumentedMessage;
     }
 
-    bool Project::inference(Cache& cache, const std::string& message, web::json::value& schema, web::json::value& object)
+    bool Project::inference(Cache& cache,
+                            const std::string& message,
+                            web::json::value& schema,
+                            web::json::value& object,
+                            bool pushSchema)
     {
         Project* proj = Client::getInstance().project();
         
@@ -774,7 +778,7 @@ namespace stdrave {
             auto& schemasArray = schemas.as_array();
             schemasArray[0] = schema;
             
-            if(!Client::getInstance().supportsFunctionCalls())
+            if(!Client::getInstance().supportsFunctionCalls() && pushSchema)
             {
                 instrumentedMessage += getInstrumentationMessage(schema);
             }

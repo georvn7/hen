@@ -6709,7 +6709,7 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             promptNextStepMsg += "If you decide to do this, provide your justification in the motivation section.\n";
         }
         
-        project->inference(cache, promptNextStepMsg, schema, object);
+        project->inference(cache, promptNextStepMsg, schema, object, false);
         
         m_nextStep.clear();
         m_nextStep.from_json(object);
@@ -6726,7 +6726,7 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         while(!feedback.empty() && validationAttempt < maxValidationAttempts)
         {
             object = web::json::value();
-            project->inference(cache, feedback, schema, object);
+            project->inference(cache, feedback, schema, object, false);
             
             NextDebugStep prevStep = m_nextStep;
             
@@ -6814,7 +6814,7 @@ void Debugger::reviewGiHistoryForFix(CCodeProject* project)
                         {"git_history", gitHistory}
     });
     
-    project->inference(cache, reviewFixStep, schema, object);
+    project->inference(cache, reviewFixStep, schema, object, false);
     
     m_nextStep.clear();
     m_nextStep.from_json(object);
@@ -6956,12 +6956,6 @@ std::pair<bool, std::string> Debugger::debug(CCodeProject* project,
         workflowMsg += "\n" + traceDesc.str();
     }
     
-    {
-        Prompt nextStepInstruct("NextStepInstructions.txt", {});
-        
-        workflowMsg += "\n" + nextStepInstruct.str();
-    }
-    
     //Add source checklist requirements
     {
         workflowMsg += "\nPROJECT SOURCE CODE REQUIREMENTS\n\n";
@@ -6982,6 +6976,19 @@ std::pair<bool, std::string> Debugger::debug(CCodeProject* project,
     
     std::string testDescription = getTestDescription(project, test, regressionTestJsonPath);
     project->pushMessage(testDescription, "user", true);
+    
+    {
+        Prompt nextStepInstruct("NextStepInstructions.txt", {});
+        
+        std::string nextStepInstructMsg = nextStepInstruct.str();
+        
+        web::json::value schema;
+        setupSchema<NextDebugStep>(schema);
+        
+        nextStepInstructMsg += project->getInstrumentationMessage(schema);
+        
+        project->pushMessage(nextStepInstructMsg, "user", true);
+    }
     
     m_scriptsDirectory = Client::getInstance().getEnvironmentDir();
     m_scriptsDirectory += "/Debugger/Scripts";
