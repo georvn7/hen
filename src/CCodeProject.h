@@ -182,6 +182,7 @@ namespace stdrave {
         Node* setup(const std::string& projectDir) override;
         void inferenceProjDesc(CCodeNode* root);
         void inferenceProjItems(CCodeNode* root);
+        void inferenceProjPlan(CCodeNode* root);
         
         boost::optional<const DataInfo&> findData(const std::string& type, std::string& owningPath) const;
         boost::optional<const DataInfo&> findDataFromSnapshot(const std::string& type, std::string& owningPath);

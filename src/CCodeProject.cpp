@@ -193,6 +193,50 @@ namespace stdrave {
         std::cout << "Porject items saved to: " << m_projDir << "/items.json" << std::endl;
     }
 
+    void CCodeProject::inferenceProjPlan(CCodeNode* root)
+    {
+        std::cout << "Inferencing porject plan" << std::endl;
+        
+        //std::string cache = "../../plan.json";
+        
+        Client::getInstance().setLLM(LLMRole::DIRECTOR);
+        
+        root->captureContext();
+        
+        std::string testFwFile = Client::getInstance().getEnvironmentDir();
+        testFwFile += "/Prompts/TestFramework.txt";
+        std::string testFw = getFileContent(testFwFile);
+        
+        std::string test = getFileContent(m_projDir + "/tests/default/public/test.json");
+        
+        std::string checklist = source_checklist.prompt({{"function", "function_being_implemented"}});
+        
+        Prompt planing("Planing.txt", {
+            {"code_checklist", checklist},
+            {"test_framework", testFw},
+            {"max_functions", "50"},
+            {"min_functions", "30"},
+            {"test", test}});
+        
+        //TODO: Properly setup the cache!
+        Cache cache(m_projDir,"/plan.txt");
+        
+        bool truncated = false;
+        std::string plan = "review";
+        
+        inference(cache, planing.str(), plan, &truncated);
+        
+        root->popContext();
+        
+        std::ofstream planFile(m_projDir + "/plan.txt");
+        planFile << plan << std::endl;
+        planFile.close();
+        
+        std::cout << "Porject plan saved to: " << m_projDir << "/plan.txt" << std::endl;
+        
+        pushMessage(plan, "user", true);
+    }
+
 	Node* CCodeProject::setup(const std::string& projectDir)
 	{
         CCodeNode* root = shareNode<CCodeNode>(m_description.func_name, nullptr);
@@ -282,6 +326,8 @@ namespace stdrave {
         
         std::string builCache = "cache/build";
         setBuildCacheDir(builCache);
+        
+        inferenceProjPlan(root);
 
         return root;
 	}
@@ -1827,7 +1873,7 @@ namespace stdrave {
                 
                 for(int i=0; i<2; ++i)
                 {
-#if 0 //this is basically ramp up the solution space via unit tests
+#if 1 //this is basically ramp up the solution space via unit tests
                     
                     //Here we need to build/update unit tests and initially compile and link them
                     std::multimap<uint32_t, std::string, std::greater<uint32_t>> unitTests;
