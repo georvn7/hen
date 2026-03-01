@@ -5,7 +5,7 @@ using namespace utility;
 using namespace web;
 using namespace http;
 
-namespace stdrave {
+namespace hen {
 
 void Client::sendToServer(const json::value& requestBody, json::value& responseBody)
 {

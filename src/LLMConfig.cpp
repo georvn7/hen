@@ -1,7 +1,7 @@
 #include "LLMConfig.h"
 #include "IncludeBoost.h"
 
-namespace stdrave {
+namespace hen {
 
     DEFINE_TYPE(LLMConfig)
     DEFINE_FIELD(LLMConfig, provider)

@@ -1,0 +1,10 @@
+==============================================================================
+PROJECT INFORMATION COLLECTION
+
+Before proceeding to list the steps in the optimized sequence, let me know if you need additional information about the architecture and implementation of this application for better assessing how the sequence could be more optimal with less steps. We are going to use this optimized sequence for training the model, so it is important to be optimal and this is a chance to get more context information.
+
+Maybe there is another combination of actions that will lead us with a fewer steps to the same result - for example replacing a few function_info actions with the right one, or with search_source, call_graph, functions_summary. Or using function_info for a certain invocation to be able to see the traces events for this function after you know the invocation id from the logs... there might be more variants once you have more information.
+
+You can have up to [[max_requests]] information requests. If you don't need more information in order to decide leave all fields empty. Note, you must not list the optimized sequence yet. This is only a chance to receive additional information in order to find more optimal sequence. Then I will ask you to list the steps from the sequence
+==============================================================================
+

@@ -443,7 +443,7 @@ public:
     
     std::string getStackFromFile(const std::string& stackFile)
     {
-        auto line = stdrave::getFirstLine(stackFile);
+        auto line = hen::getFirstLine(stackFile);
         if(!line)
         {
             m_loadingIssus += "Unable to read stack string from file: " + stackFile + "\n";
@@ -636,7 +636,7 @@ public:
             
             bool showSection = (!conciseFrame && s->m_type != "arguments") ||
                                (conciseFrame && (s->m_type == "arguments" ||
-                                                 stdrave::startsWith(s->m_type, "breakpoint")));
+                                                 hen::startsWith(s->m_type, "breakpoint")));
             if(showSection)
             {
                 os << "\ncall stack: " << f->m_stack << "\n";
@@ -820,7 +820,7 @@ public:
         {
             for (const auto s : f->m_sections)
             {
-               if(stdrave::startsWith(s->m_type, "breakpoint"))
+               if(hen::startsWith(s->m_type, "breakpoint"))
                 {
                     if(s->m_lines.size())
                     {

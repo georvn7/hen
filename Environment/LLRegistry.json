@@ -303,7 +303,7 @@
       "provider": "openai",
       "url": "https://api.openai.com/v1/responses",
       "model": "gpt-5.3-codex",
-      "reasoning_effort": "high",
+      "reasoning_effort": "xhigh",
       "verbosity": "na",
       "context_size": 200,
       "rate_limit": -1,

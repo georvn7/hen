@@ -1,6 +1,6 @@
 #include "ClientServer.h"
 
-namespace stdrave {
+namespace hen {
 
 json::value Message::json()
 {

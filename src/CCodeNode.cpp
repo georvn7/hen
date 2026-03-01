@@ -11,7 +11,7 @@
 using namespace web;
 using namespace utility;
 
-namespace stdrave {
+namespace hen {
 
     void CCodeNode::reviewDataLoop(std::string& cache, std::string& source, const std::string& typeName,
                                    boost::optional<const DataInfo&> existingData,
@@ -1614,6 +1614,7 @@ namespace stdrave {
                 list_functions += "\nConsider using information requests to reuse existing architecture and functionality and avoid introducing extra wrapper/helper layers that increase scope.\n\n";
             }
             
+#if 0
             inference(cache, list_functions, &infoRequest);
             
             while(!infoRequest.empty() && infoRequestsCount < DECOMPOSE_MAX_INFO_REQUESTS)
@@ -1639,6 +1640,9 @@ namespace stdrave {
                 responseInfo += info;
                 responseInfo += "\n\n";
             }
+#else
+            responseInfo = proj->provideInfoLoop(list_functions, DECOMPOSE_MAX_INFO_REQUESTS);
+#endif
         }
         else
         {
@@ -2528,7 +2532,7 @@ namespace stdrave {
 
     std::string CCodeNode::exec(const std::string& cmd, const std::string& workingDir, const std::string& operation) const
     {
-        return stdrave::exec(cmd, workingDir, operation, false);
+        return hen::exec(cmd, workingDir, operation, false);
     }
 
     std::string CCodeNode::analyzeTemplatedCalls(const std::set<std::string>& unmachedFunctions) const
@@ -4898,9 +4902,9 @@ namespace stdrave {
         CompilationInfo ci;
         ci.sourceFile = srcFile;
         
-        std::string sysroot = stdrave::getSysRoot();
-        std::string resourceDir = stdrave::getClangResourceDir();
-        std::string cxxInclude  = stdrave::getCppInclude();
+        std::string sysroot = hen::getSysRoot();
+        std::string resourceDir = hen::getClangResourceDir();
+        std::string cxxInclude  = hen::getCppInclude();
         std::string cxxIncludeOpt = "-I" + cxxInclude;
          
          /*const char* clang_args[] = {
@@ -6771,14 +6775,14 @@ namespace stdrave {
         proj->setActiveContext(prevCtx);
     }
 
-    bool stdrave::CCodeNode::doesItCall(std::stack<const CCodeNode*>& path,
+    bool hen::CCodeNode::doesItCall(std::stack<const CCodeNode*>& path,
                                      const CCodeNode* callee) const
     {
         // This implementation assumes callers pass an empty path for a fresh query.
         // To be robust (and to avoid a slow/incorrect partial state), we clear it.
         while (!path.empty()) path.pop();
 
-        stdrave::CCodeProject* proj = (stdrave::CCodeProject*)Client::getInstance().project();
+        hen::CCodeProject* proj = (hen::CCodeProject*)Client::getInstance().project();
 
         // O(1) membership check for cycle detection along the current DFS path.
         std::unordered_set<const CCodeNode*> in_path;
@@ -6793,20 +6797,20 @@ namespace stdrave {
         Cache cache;
         cache.map.reserve(4096);
 
-        auto resolve = [&](const std::string& name) -> const stdrave::CCodeNode* {
+        auto resolve = [&](const std::string& name) -> const hen::CCodeNode* {
             auto itc = cache.map.find(name);
             if (itc != cache.map.end()) return itc->second;
 
             auto it = proj->nodeMap().find(name);
-            const stdrave::CCodeNode* ptr =
+            const hen::CCodeNode* ptr =
                 (it == proj->nodeMap().end()) ? nullptr
-                                              : static_cast<const stdrave::CCodeNode*>(it->second);
+                                              : static_cast<const hen::CCodeNode*>(it->second);
             cache.map.emplace(name, ptr);
             return ptr;
         };
 
         // C++14-friendly recursive lambda (no <functional> / std::function needed).
-        auto dfs = [&](const stdrave::CCodeNode* node, auto&& self) -> bool {
+        auto dfs = [&](const hen::CCodeNode* node, auto&& self) -> bool {
             if (!node) return false;
 
             // Cycle? (O(1) using in_path)
@@ -6822,7 +6826,7 @@ namespace stdrave {
             for (const auto& call : callsSnapshot) {
                 if (!call) continue;
 
-                const stdrave::CCodeNode* next = resolve(call->func_name);
+                const hen::CCodeNode* next = resolve(call->func_name);
                 if (!next) continue;
                 if (visited.find(next) != visited.end()) continue;
 

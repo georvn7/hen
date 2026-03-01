@@ -24,7 +24,7 @@
 
 #define NO_NODE_MESSAGES
 
-namespace stdrave {
+namespace hen {
 
     std::string formatJson(const std::string& inputJson, const std::string& indentChar);
     bool validateJson(const web::json::value& jsonObject, const web::json::value& jsonSchema, std::string& log);

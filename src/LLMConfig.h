@@ -7,7 +7,7 @@
 #include "UtilsCodeAnalysis.h"
 
 
-namespace stdrave {
+namespace hen {
 
     enum LLMRole
     {

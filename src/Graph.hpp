@@ -3,7 +3,7 @@
 #include <vector>
 #include <functional>
 
-namespace stdrave {
+namespace hen {
 
 template <typename T>
 DAGNode<T>* DAGNode<T>::getNextChild(std::set<DAGNode<T>*>& visited)

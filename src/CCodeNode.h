@@ -8,7 +8,7 @@
 #include "Test.h"
 #include "Utils.h"
 
-namespace stdrave {
+namespace hen {
 
 class CCodeProject;
 class DataInfo;

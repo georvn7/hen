@@ -5,7 +5,7 @@
 
 #include <set>
 
-namespace stdrave {
+namespace hen {
 
 template <typename T>
 void printSchema(std::ostream& os, Indent& indent)

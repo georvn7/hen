@@ -3,7 +3,7 @@
 #include "Client.h"
 #include "Utils.h"
 
-namespace stdrave {
+namespace hen {
 
 template <typename T>
 bool Node::inference(std::string& cache, const std::string& message, T* object)

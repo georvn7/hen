@@ -5,7 +5,7 @@
 #include "Utils.h"
 #include "Inferencing.h"
 
-namespace stdrave {
+namespace hen {
 
 class Project;
 
@@ -40,7 +40,7 @@ protected:
     void setSchema()
     {
         web::json::value schema;
-        stdrave::setupSchema<T>(schema);
+        hen::setupSchema<T>(schema);
 
         setSchemas(schema);
     }

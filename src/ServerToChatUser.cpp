@@ -42,7 +42,7 @@ void load_server_certificate(boost::asio::ssl::context& ctx, const std::string& 
     }
 }
 
-namespace stdrave {
+namespace hen {
 
 bool Server::initChatListener()
 {
@@ -66,7 +66,7 @@ bool Server::initChatListener()
         unsigned short port = std::stoul(hostInfo.second);
 
         // I/O context
-        auto ioc = stdrave::getAsioContext();
+        auto ioc = hen::getAsioContext();
 
         // Create an SSL context
         m_sslContext = std::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::tls_server);

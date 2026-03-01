@@ -4,7 +4,7 @@
 #include <iostream>
 #include <string>
 
-namespace stdrave {
+namespace hen {
 
 enum class APIKeyFlags : uint32_t
 {

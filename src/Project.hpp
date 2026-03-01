@@ -5,7 +5,7 @@
 
 using namespace utility;
 
-namespace stdrave {
+namespace hen {
 
 template <typename T>
 T* Project::shareNode(const std::string& name, const Node* parent)
@@ -13,7 +13,7 @@ T* Project::shareNode(const std::string& name, const Node* parent)
     auto it = m_nodeMap.find(name);
     if (it != m_nodeMap.end())
     {
-        //For nodes that already exists we creat new DAG node, but we reference the existing stdrave::Node
+        //For nodes that already exists we creat new DAG node, but we reference the existing hen::Node
         //Not sure how this works, but for now seems as the right thing to do
         if(parent && it->second->m_referencedBy.find(parent) == it->second->m_referencedBy.end())
         {
@@ -61,6 +61,27 @@ DAGNode<T>* Project::getNode(DAGNode<T>* parent, std::vector<std::string>& nodeN
     }
     
     return child;
+}
+
+template <typename T>
+bool Project::inference(Cache& cache, const std::string& message, T* object)
+{
+    web::json::value jsonObject;
+    web::json::value schema;
+    
+    if (object)
+    {
+        setupSchema<T>(schema);
+    }
+
+    bool result = inference(cache, message, schema, jsonObject);
+    
+    if (object)
+    {
+        object->from_json(jsonObject);
+    }
+    
+    return result;
 }
 
 }

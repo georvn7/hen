@@ -5,7 +5,7 @@
 
 using namespace web;
 
-namespace stdrave {
+namespace hen {
 
 #ifndef NO_NODE_MESSAGES
 void Node::addMessage(const web::json::value& message)
@@ -163,12 +163,12 @@ std::string Node::getNodeDirectory() const
 
 bool Node::saveJson(const web::json::value& json, const std::string& path)
 {
-    return stdrave::saveJson(json, path);
+    return hen::saveJson(json, path);
 }
 
 bool Node::loadJson(web::json::value& json, const std::string& path)
 {
-    return stdrave::loadJson(json, path);
+    return hen::loadJson(json, path);
 }
 
 void Node::cleanDirectory(const std::string& directory) {

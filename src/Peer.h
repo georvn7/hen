@@ -10,13 +10,13 @@ using namespace web;
 using namespace web::http;
 using namespace web::http::client;
 
-#define MERCH_PRODUCT_NAME "std::rave"
-#define PRODUCT_NAME "std-rave"
-#define PRODUCT_FILENAME_EX "stdrave"
+#define MERCH_PRODUCT_NAME "hen"
+#define PRODUCT_NAME "hen"
+#define PRODUCT_FILENAME_EX "hen"
 #define AUTHOR_NAME "George Raven"
 #define AUTHOR_CONTACTS "georaven7@gmail.com"
 
-namespace stdrave {
+namespace hen {
 
 	class Peer
 	{

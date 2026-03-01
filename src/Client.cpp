@@ -22,7 +22,7 @@
 using namespace web; // For convenience
 using namespace utility; // For conversions
 
-namespace stdrave {
+namespace hen {
 
 std::atomic<bool> stop_requested(false);
 

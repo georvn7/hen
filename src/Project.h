@@ -10,7 +10,7 @@
 
 using namespace utility; // For conversions
 
-namespace stdrave {
+namespace hen {
 
     class Node;
 
@@ -169,6 +169,9 @@ namespace stdrave {
         Context* switchToCompileContext();
         
         std::string getInstrumentationMessage(web::json::value& schema);
+        
+        template <typename T>
+        bool inference(Cache& cache, const std::string& message, T* object = nullptr);
         bool inference(Cache& cache,
                        const std::string& message,
                        web::json::value& schema,

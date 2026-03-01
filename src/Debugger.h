@@ -26,12 +26,14 @@
 #define LIMIT_DEBUG_NOTES_SIZE
 #define LIMIT_DESCRIPTION_SIZE
 
+#define REVIEW_GIT_COMMITS_BEFORE_FIX 3
+
 #define DEBUGGER_INTERLEAVED_TRAJECTORY
 
 #include "TraceAnalyzer.h"
 #include "LogAnalyzer.h"
 
-namespace stdrave {
+namespace hen {
 
     struct SourceLocation
     {

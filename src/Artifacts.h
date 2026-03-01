@@ -2,7 +2,7 @@
 
 #include "Reflection.h"
 
-namespace stdrave {
+namespace hen {
 
 void generateCMakeFile(const std::string& projectName,
                        const std::string& sourcesDirectory,

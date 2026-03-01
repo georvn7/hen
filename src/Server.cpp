@@ -15,7 +15,7 @@ using namespace http::experimental::listener;
 
 #define INVALID_REQUEST_ID 0xffffffff
 
-namespace stdrave {
+namespace hen {
 
 bool AgentServerEP::receive(std::shared_ptr<RemoteEP> remote, std::shared_ptr<Message> msg)
 {

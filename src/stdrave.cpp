@@ -1,4 +1,4 @@
-// stdrave.cpp : This file contains the 'main' function. Program execution begins and ends there.
+// hen.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 
 #include <iostream>
@@ -6,7 +6,7 @@
 #include "Client.h"
 #include "Utils.h"
 
-using namespace stdrave;
+using namespace hen;
 
 int main(int argc, char* argv[])
 {

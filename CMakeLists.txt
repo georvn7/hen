@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(std-rave VERSION 0.1 DESCRIPTION "std::rave is a long-horizon AI programmer" LANGUAGES CXX C)
+project(hen VERSION 0.1 DESCRIPTION "std::rave is a long-horizon AI programmer" LANGUAGES CXX C)
 
 # Force use of FindBoost module BEFORE any package calls
 cmake_policy(SET CMP0167 OLD)

@@ -2,7 +2,7 @@
 #include "Client.h"
 #include <algorithm>
 
-namespace stdrave {
+namespace hen {
 
     DEFINE_TYPE(TrajectoryAnalysis)
     DEFINE_ARRAY_FIELD(TrajectoryAnalysis, blockers)
@@ -2760,7 +2760,20 @@ namespace stdrave {
         return std::make_pair(feedback, recommendation);
     }
 
-    void Distillery::optimizeFixTrack(CCodeProject* project, Cache& cache, const std::string& trajectoryAnalysis, const std::string& fixTrack, uint32_t fixStep, EditSourceSequence& optimalSequence)
+    void Distillery::pushOptimizedFixTrack(CCodeProject* project, const std::string& message, EditSourceSequence& optimalSequence)
+    {
+        project->pushMessage(message, "user", true);
+        std::string sequenceMsg = utility::conversions::to_utf8string(optimalSequence.to_json().serialize());
+        project->pushMessage(sequenceMsg, "assistant", true);
+    }
+
+    std::string Distillery::optimizeFixTrack(CCodeProject* project,
+                                             Cache& cache,
+                                             const std::string& trajectoryAnalysis,
+                                             const std::string& fixTrack,
+                                             uint32_t fixStep,
+                                             uint32_t idealMaxCount,
+                                             EditSourceSequence& optimalSequence)
     {
         auto range = getFixTrackRange(project, fixStep);
         int runStepIndex = range.first;
@@ -2838,8 +2851,24 @@ namespace stdrave {
         
         project->captureContext(std::string());
         
+        InfoRequest infoRequest;
+    
         std::string message = promptOptimizeFixTrack.str();
-        project->inference(cache, message, schema, object);
+        
+        std::string maxInfoRequestsStr = std::to_string(OPTIMIZE_TRACK_MAX_INFO_REQUESTS);
+        Prompt promptOptimizeFixTrackInfo("OptimizeFixTrackInfo.txt",{
+            {"max_requests", maxInfoRequestsStr}
+        });
+        
+        message += promptOptimizeFixTrackInfo.str();
+        
+        std::string responseInfo = project->provideInfoLoop(message, OPTIMIZE_TRACK_MAX_INFO_REQUESTS);
+        
+        Prompt promptOptimizeFixTrackEpilog("OptimizeFixTrackEpilog.txt",{
+        });
+        responseInfo += promptOptimizeFixTrackEpilog.str();
+        
+        project->inference(cache, responseInfo, schema, object);
         
         optimalSequence.from_json(object);
         
@@ -2864,17 +2893,16 @@ namespace stdrave {
             
             attempts++;
         }
+        
+        project->popContext();
 
         if (!feedback.first.empty())
         {
             std::cout << "ERROR: Rejecting optimized sequence due to unresolved validator feedback after retries.\n";
             std::cout << summarizeFeedbackText(feedback.first) << std::endl;
             optimalSequence.clear();
-            project->popContext();
-            return;
+            return std::string();
         }
-        
-        project->popContext();
         
         // Hard cap on expansion: allow at most +2 steps over the original run->fix span.
         if ((int)optimalSequence.steps.size() > originalSize + 2)
@@ -2882,15 +2910,13 @@ namespace stdrave {
             std::cout << "ERROR: Rejecting optimized sequence due to expansion > +2. ";
             std::cout << "optimized=" << optimalSequence.steps.size();
             std::cout << ", original=" << originalSize << std::endl;
-            
             optimalSequence.clear();
-            return;
+            return std::string();
         }
         
-        project->pushMessage(message, "user", true);
-        
-        std::string sequenceMsg = utility::conversions::to_utf8string(optimalSequence.to_json().serialize());
-        project->pushMessage(sequenceMsg, "assistant", true);
+        std::string ctxMessage = promptOptimizeFixTrack.str();
+        ctxMessage += promptOptimizeFixTrackEpilog;
+        return ctxMessage;
     }
 
     json::value Distillery::buildTrainingData(CCodeProject* project,
@@ -3401,10 +3427,36 @@ namespace stdrave {
         
         std::string optimizedJson = "optimized_fix_" + testStepStr + "_" + fixStepStr + ".json";
         EditSourceSequence optimalSequence;
+        std::string optimalSequenceMsg;
         if(needsOptimization)
         {
             Cache cache(datasetDir, optimizedJson);
-            optimizeFixTrack(project, cache, trajectoryAnalysis, fixTrack, fixStep, optimalSequence);
+            for(uint32_t i = 0; i<MAX_OPTIMAL_FIX_TRACK_ROLLOUTS; ++i)
+            {
+                EditSourceSequence sequence;
+                std::string sequenceMsg = optimizeFixTrack(project, cache,
+                                                           trajectoryAnalysis,
+                                                           fixTrack, fixStep,
+                                                           (uint32_t)optimalSequence.steps.size(),
+                                                           sequence);
+                
+                if(sequence.steps.size() > 0 &&
+                   (i==0 || sequence.steps.size() < optimalSequence.steps.size()))
+                {
+                    optimalSequenceMsg = sequenceMsg;
+                    optimalSequence = sequence;
+                }
+                
+                if(optimalSequence.steps.size() < 4)
+                {
+                    break;
+                }
+            }
+            
+            if(optimalSequence.steps.size() > 0)
+            {
+                pushOptimizedFixTrack(project, optimalSequenceMsg, optimalSequence);
+            }
         }
         else
         {
@@ -3526,6 +3578,7 @@ namespace stdrave {
         std::string startStepStr = std::to_string(startStep);
         int currentStep = startStep;
         web::json::value messages = web::json::value::array();
+#if 0
         for(auto step : optimalSequence.steps)
         {
             std::string currentStepStr = std::to_string(currentStep);
@@ -3731,6 +3784,7 @@ namespace stdrave {
             
             currentStep++;
         }
+#endif
         
         project->popContext();
     }

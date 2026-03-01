@@ -73,7 +73,7 @@
 
 #define UNIT_TEST_FUNCTIONS_DEPTH 4
 
-namespace stdrave {
+namespace hen {
 
     class DataInfo
     {
@@ -327,6 +327,7 @@ namespace stdrave {
         CCodeNode* getNodeByName(const std::string& nodeName) const;
         void buildHierarchy(DAGNode<Node*>* root) final;
         std::string provideInfo(const InfoRequest& request);
+        std::string provideInfoLoop(const std::string& message, uint32_t infoRequestsMax);
         void setBuildCacheDir(const std::string& cacheDir);
         const std::string& getBuildCacheDir() const {return m_buildCacheDir;}
         size_t getCachedNodeHash(const std::string& nodeName);

@@ -41,7 +41,7 @@ using namespace utility;  // Common utilities like string conversions
 using namespace web;      // Common features like URIs
 using namespace web::json;  // JSON features
 
-namespace stdrave {
+namespace hen {
 
     std::string formatJson(const std::string& inputJson, const std::string& indentChar)
     {

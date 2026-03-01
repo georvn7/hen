@@ -1,7 +1,7 @@
 #include "Function.h"
 #include "IncludeBoost.h"
 
-namespace stdrave {
+namespace hen {
 
     DEFINE_TYPE(FunctionItem)
     DEFINE_FIELD(FunctionItem, func_name)

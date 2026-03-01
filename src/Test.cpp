@@ -1,7 +1,7 @@
 #include "Test.h"
 #include "Utils.h"
 
-namespace stdrave {
+namespace hen {
 
 
 DEFINE_TYPE(TestStep)
@@ -333,7 +333,7 @@ std::string TestDef::validate(bool isPrivate)
         bool finalResult = false;
         parsePrefixFlags(rawCmd, debug, finalResult, expectedResult, stdoutRegex, cmdOnly);
         
-        auto args = stdrave::parseCommandLine(cmdOnly);
+        auto args = hen::parseCommandLine(cmdOnly);
         
         if(args.empty())
         {
@@ -363,7 +363,7 @@ std::string TestDef::validate(bool isPrivate)
         bool finalResult = false;
         parsePrefixFlags(rawCmd, debug, finalResult, expectedResult, stdoutRegex, cmdOnly);
         
-        auto args = stdrave::parseCommandLine(cmdOnly);
+        auto args = hen::parseCommandLine(cmdOnly);
         
         if(args.empty())
         {

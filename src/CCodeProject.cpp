@@ -14,7 +14,7 @@
 
 #include "IncludeBoost.h"
 
-namespace stdrave {
+namespace hen {
 
 	DEFINE_TYPE(CCodeProject)
 	DEFINE_FIELD(CCodeProject, coding_style)
@@ -199,40 +199,45 @@ namespace stdrave {
         
         //std::string cache = "../../plan.json";
         
-        Client::getInstance().setLLM(LLMRole::DIRECTOR);
+        std::string plan = getFileContent(m_projDir + "/plan.txt");
+        if(plan.empty())
+        {
+            Client::getInstance().setLLM(LLMRole::DIRECTOR);
+            
+            root->captureContext();
+            
+            std::string testFwFile = Client::getInstance().getEnvironmentDir();
+            testFwFile += "/Prompts/TestFramework.txt";
+            std::string testFw = getFileContent(testFwFile);
+            
+            std::string test = getFileContent(m_projDir + "/tests/default/public/test.json");
+            
+            std::string checklist = source_checklist.prompt({{"function", "function_being_implemented"}});
+            
+            Prompt planing("Planing.txt", {
+                {"code_checklist", checklist},
+                {"test_framework", testFw},
+                {"max_functions", "50"},
+                {"min_functions", "30"},
+                {"test", test}});
+            
+            //TODO: Properly setup the cache!
+            Cache cache;
+            
+            bool truncated = false;
+            plan = "review";
+            inference(cache, planing.str(), plan, &truncated);
+            
+            root->popContext();
+            
+            std::ofstream planFile(m_projDir + "/plan.txt");
+            planFile << plan << std::endl;
+            planFile.close();
+            
+            std::cout << "Porject plan saved to: " << m_projDir << "/plan.txt" << std::endl;
+        }
         
-        root->captureContext();
-        
-        std::string testFwFile = Client::getInstance().getEnvironmentDir();
-        testFwFile += "/Prompts/TestFramework.txt";
-        std::string testFw = getFileContent(testFwFile);
-        
-        std::string test = getFileContent(m_projDir + "/tests/default/public/test.json");
-        
-        std::string checklist = source_checklist.prompt({{"function", "function_being_implemented"}});
-        
-        Prompt planing("Planing.txt", {
-            {"code_checklist", checklist},
-            {"test_framework", testFw},
-            {"max_functions", "50"},
-            {"min_functions", "30"},
-            {"test", test}});
-        
-        //TODO: Properly setup the cache!
-        Cache cache(m_projDir,"/plan.txt");
-        
-        bool truncated = false;
-        std::string plan = "review";
-        
-        inference(cache, planing.str(), plan, &truncated);
-        
-        root->popContext();
-        
-        std::ofstream planFile(m_projDir + "/plan.txt");
-        planFile << plan << std::endl;
-        planFile.close();
-        
-        std::cout << "Porject plan saved to: " << m_projDir << "/plan.txt" << std::endl;
+        plan = "PROJECT ARCHITECTURE PLAN\n\n" + plan;
         
         pushMessage(plan, "user", true);
     }
@@ -1648,7 +1653,7 @@ namespace stdrave {
             }
         }
         
-        stdrave::exec(command, binDir, "Link", false);
+        hen::exec(command, binDir, "Link", false);
         
         return boost_fs::exists(executable);
     }
@@ -2140,7 +2145,7 @@ namespace stdrave {
         Client::getInstance().agentToServer("\n\nDEBUGGING...\n\n");
         
         //TODO: ONLY FOR TEST
-        //synthetizeTrainingData();
+        synthetizeTrainingData();
         
         debugTests();
         
@@ -2817,7 +2822,7 @@ namespace stdrave {
         return graph;
     }
 
-    bool stdrave::CCodeProject::isADependency(std::stack<const CCodeNode*>& path,
+    bool hen::CCodeProject::isADependency(std::stack<const CCodeNode*>& path,
                                            const std::string& dependency,
                                            const std::string& dependent)
     {
@@ -3874,6 +3879,44 @@ namespace stdrave {
         }
         
         return info;
+    }
+
+    std::string CCodeProject::provideInfoLoop(const std::string& message, uint32_t infoRequestsMax)
+    {
+        std::string responseInfo;
+        InfoRequest infoRequest;
+        uint32_t infoRequestsCount = 1;
+        
+        Cache cache;
+        inference(cache, message, &infoRequest);
+        
+        std::string maxInfoRequestsStr = std::to_string(infoRequestsMax);
+        
+        while(!infoRequest.empty() && infoRequestsCount < infoRequestsMax)
+        {
+            std::string response;
+            
+            std::string info = provideInfo(infoRequest);
+            response += info;
+            
+            response += "\n\nProvided info requests " + std::to_string(infoRequestsCount);
+            response += " out of maximum " + maxInfoRequestsStr + "\n";
+            response += "Let me know if you need additional information? If you don't need more information in order to decide leave all fields empty";
+            
+            infoRequest.clear();
+            inference(cache, response, &infoRequest);
+            
+            infoRequestsCount++;
+        }
+        
+        if(infoRequestsCount > 1 && !infoRequest.empty())
+        {
+            std::string info = provideInfo(infoRequest);
+            responseInfo += info;
+            responseInfo += "\n\n";
+        }
+        
+        return responseInfo;
     }
 
     void CCodeProject::setBuildCacheDir(const std::string& cacheDir)

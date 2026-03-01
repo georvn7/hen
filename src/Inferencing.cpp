@@ -7,7 +7,7 @@
 using namespace web;
 using namespace utility;
 
-namespace stdrave {
+namespace hen {
 
 static web::json::value asJson(const std::string& utf8Str)
 {

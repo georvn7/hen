@@ -39,7 +39,7 @@
 //#define LLDB_PRINT_BREAKPOINT_HITS
 //#define LLDB_VERBOSE_BATCH_MODE
 
-namespace stdrave {
+namespace hen {
 
 DEFINE_TYPE(Breakpoint)
 DEFINE_FIELD(Breakpoint, source_line)
@@ -276,7 +276,7 @@ const std::string& Breakpoint::getInstrumentedCodeSnippet() const
 
 std::vector<std::string> Debugger::parseCommandLine(const std::string &cmdLine) const
 {
-    return stdrave::parseCommandLine(cmdLine);
+    return hen::parseCommandLine(cmdLine);
 }
 
 //Grab PID from launched/stopped/exited lines.
@@ -376,14 +376,14 @@ std::pair<std::string, std::string> Debugger::runLLDB(CCodeProject* project, std
     std::string entitlementPath = Client::getInstance().getEnvironmentDir();
     entitlementPath += "/debug.entitlements";
     std::string codesignCmd = "codesign -s - --entitlements " + entitlementPath + " " + traceExecutable;
-    stdrave::exec(codesignCmd, m_workingDirectory, "Codesign", true);
+    hen::exec(codesignCmd, m_workingDirectory, "Codesign", true);
 #endif
     
     namespace bp = boost::process::v2;  // Changed to v2
     namespace asio = boost::asio;
     
     // Create io_context for v2
-    auto ctx = stdrave::getAsioContext();
+    auto ctx = hen::getAsioContext();
     
     std::cout << "Executing lldb with the following command line:" << std::endl;
     std::cout << "/usr/bin/lldb";
@@ -634,7 +634,7 @@ std::string Debugger::runTrace(CCodeProject* project, std::string& traceLog,
     std::cout << std::endl << std::endl;
 
     // Create io_context for v2
-    auto ctx = stdrave::getAsioContext();
+    auto ctx = hen::getAsioContext();
     
     // Create pipe for capturing output
     //asio::readable_pipe lldb_stdout(*ctx);
@@ -1933,7 +1933,7 @@ std::string Debugger::getStepInfo(CCodeProject* project, const TestDef& test, in
     
     //Load the trajectory configuration json file
     web::json::value trajectoryCfg;
-    stdrave::loadJson(trajectoryCfg, tracjectoryFile);
+    hen::loadJson(trajectoryCfg, tracjectoryFile);
     
     //These properties are necessary. They must be in the json object
     if(!trajectoryCfg.has_field(U("previousSteps")))
@@ -1949,7 +1949,7 @@ std::string Debugger::getStepInfo(CCodeProject* project, const TestDef& test, in
     
     std::string requestedStepDir = trajectoryDir + stepIdDir + "/";
     info += "\n********** SUMMARIZED TRAJECTORY AT DEBUGGING STEP " + stepIdStr + " START! **********\n";
-    std::string summary = stdrave::loadFile(requestedStepDir + "summary.txt");
+    std::string summary = hen::loadFile(requestedStepDir + "summary.txt");
     info += summary + "\n";
     
     std::string runInfo = loadTestLogFromStep(project, test, stepId);
@@ -1983,7 +1983,7 @@ std::string Debugger::getStepInfo(CCodeProject* project, const TestDef& test, in
         }
     }
     
-    info += stdrave::loadFile(requestedStepDir + "info.txt");
+    info += hen::loadFile(requestedStepDir + "info.txt");
     info += "\n********** SUMMARIZED TRAJECTORY AT DEBUGGING STEP " + stepIdStr + " END! **********\n";
     
     return info;
@@ -2279,7 +2279,7 @@ bool Debugger::executeTestStep(std::ostream& log, CCodeProject* project, const T
                 entitlementPath += "/debug.entitlements";
                 std::string execPath = m_workingDirectory + "/" + extractExecutablePath(cmd);
                 std::string codesignCmd = "codesign -s - --entitlements " + entitlementPath + " " + execPath;
-                stdrave::exec(codesignCmd, m_workingDirectory, "Codesign", true);
+                hen::exec(codesignCmd, m_workingDirectory, "Codesign", true);
 #endif
                 
                 instrumentedCmd += "lldb --batch";
@@ -5029,12 +5029,12 @@ bool Debugger::saveTrajectory(CCodeProject* project, const TestDef& test)
     //Save the summary as it looks on this step
     if(!m_summary.empty())
     {
-        stdrave::saveToFile(m_summary, stepDir + "summary.txt");
+        hen::saveToFile(m_summary, stepDir + "summary.txt");
     }
     
     if(!m_lldbLog.empty())
     {
-        stdrave::saveToFile(m_lldbLog, stepDir + "lldb.log");
+        hen::saveToFile(m_lldbLog, stepDir + "lldb.log");
     }
     
     //Save the returned json
@@ -5060,7 +5060,7 @@ bool Debugger::saveTrajectory(CCodeProject* project, const TestDef& test)
         }
     }
     
-    stdrave::saveJson(nextStepJson, stepDir + "nextStep.json");
+    hen::saveJson(nextStepJson, stepDir + "nextStep.json");
     
     //Create/update the trajectory configuration file
     std::string tracjectoryFile = stepDir + "tracjectory.json";
@@ -5110,7 +5110,7 @@ bool Debugger::saveTrajectory(CCodeProject* project, const TestDef& test)
     trajectoryCfg.as_object()[U("infoStepsStart")] = json::value::number(m_infoStepsStart);
     trajectoryCfg.as_object()[U("lastRunStep")] = json::value::number(m_lastRunStep);
     
-    stdrave::saveJson(trajectoryCfg, tracjectoryFile);
+    hen::saveJson(trajectoryCfg, tracjectoryFile);
     
     return true;
 }
@@ -5340,7 +5340,7 @@ bool Debugger::loadTrajectory(CCodeProject* project, const TestDef& test)
     
     //Load the trajectory configuration json file
     web::json::value trajectoryCfg;
-    stdrave::loadJson(trajectoryCfg, tracjectoryFile);
+    hen::loadJson(trajectoryCfg, tracjectoryFile);
     
     //These properties are necessary. They must be in the json object
     if(!trajectoryCfg.has_field(U("allSteps")) || !trajectoryCfg.has_field(U("previousSteps")))
@@ -5413,7 +5413,7 @@ bool Debugger::loadTrajectory(CCodeProject* project, const TestDef& test)
         
         web::json::value jsonNextStep;
         std::string nextStepPath = stepDir + "nextStep.json";
-        stdrave::loadJson(jsonNextStep, nextStepPath);
+        hen::loadJson(jsonNextStep, nextStepPath);
         
         m_nextStep.from_json(jsonNextStep);
         
@@ -5443,9 +5443,9 @@ bool Debugger::loadTrajectory(CCodeProject* project, const TestDef& test)
             }
         }
         
-        m_summary = stdrave::loadFile(stepDir + "summary.txt");
+        m_summary = hen::loadFile(stepDir + "summary.txt");
         
-        std::string lldbLog = stdrave::loadFile(stepDir + "lldb.log");
+        std::string lldbLog = hen::loadFile(stepDir + "lldb.log");
         lldbLog = replaceAll(lldbLog, project->getProjDir(), ".");
         m_lldbLog = lldbLog;
     }
@@ -5478,7 +5478,7 @@ bool Debugger::loadTrajectory(CCodeProject* project, const TestDef& test)
             
             //Check and load breakpoints frames if the action is 'debug_function'
             web::json::value runTestObj;
-            stdrave::loadJson(runTestObj, stepDir + "dbgStep.json");
+            hen::loadJson(runTestObj, stepDir + "dbgStep.json");
             
             if(!runTestObj.has_field(U("action")) || !runTestObj.has_field(U("subject")))
             {
@@ -6714,10 +6714,12 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         m_nextStep.clear();
         m_nextStep.from_json(object);
         
+#if REVIEW_GIT_COMMITS_BEFORE_FIX
         if(m_nextStep.action_type == "fix_function")
         {
             reviewGiHistoryForFix(project);
         }
+#endif
         
         int validationAttempt = 1;
         int maxValidationAttempts = m_rewardHackingReview.empty() ? 8 : 3;
@@ -6799,7 +6801,7 @@ void Debugger::reviewGiHistoryForFix(CCodeProject* project)
     std::string functionSrcFile = ccNode->getNodeDirectory();
     functionSrcFile += "/" + ccNode->getName() + ".cpp";
     
-    std::string gitHistory = project->getGitHistory(repoFolder, functionSrcFile, 10);
+    std::string gitHistory = project->getGitHistory(repoFolder, functionSrcFile, REVIEW_GIT_COMMITS_BEFORE_FIX);
     
     web::json::value object;
     
@@ -6907,7 +6909,7 @@ std::pair<bool, std::string> Debugger::debug(CCodeProject* project,
         return std::make_pair(false, std::string());
     }
     
-    m_sdkPath = stdrave::getSysRoot();
+    m_sdkPath = hen::getSysRoot();
     
     loadTrajectory(project, test);
     

@@ -181,7 +181,7 @@ public:
                 tmp.append(ls, rawLen);
                 tmp.push_back('\n');
 
-                out += stdrave::filterJsonText(tmp);
+                out += hen::filterJsonText(tmp);
                 written += need;
                 return true;
             } else if (written < charLimit) {
@@ -198,7 +198,7 @@ public:
                     tmp.append(ls, take);
                     if (take < remain) tmp.push_back('\n'); // include '\n' if we still have room
                 }
-                out += stdrave::filterJsonText(tmp);
+                out += hen::filterJsonText(tmp);
 
                 // IMPORTANT: match original – do NOT increase 'written' here.
                 // Break the loop.
@@ -580,7 +580,7 @@ public:
                 tmp.clear();
                 tmp.append(ls, rawLen);
                 tmp.push_back('\n');
-                sectionBuf += stdrave::filterJsonText(tmp);
+                sectionBuf += hen::filterJsonText(tmp);
 
                 // If buffer reached the limit, flush including THIS line (lineEnd).
                 if (sectionBuf.size() >= sectionByteLimit) {

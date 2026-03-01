@@ -791,7 +791,7 @@ ParsedFunction parseFunctionSignature(const std::string& declaration) {
 std::string extractFunctionDeclaration(const std::string& input) {
     
     std::string removedComments;
-    std::string sourceOnly = stdrave::removeComments(input, removedComments);
+    std::string sourceOnly = hen::removeComments(input, removedComments);
     
     auto bracePos = sourceOnly.find('{');
     std::string declaration = (bracePos == std::string::npos) ? sourceOnly : sourceOnly.substr(0, bracePos);
@@ -875,9 +875,9 @@ std::string evaluateCodeForErrors(const std::string& sourceCode, bool print)
 {
     CXIndex index = clang_createIndex(0, 0);
     
-    std::string sysroot = stdrave::getSysRoot();
-    std::string resourceDir = stdrave::getClangResourceDir();
-    std::string cxxInclude  = stdrave::getCppInclude();
+    std::string sysroot = hen::getSysRoot();
+    std::string resourceDir = hen::getClangResourceDir();
+    std::string cxxInclude  = hen::getCppInclude();
     std::string cxxIncludeOpt = "-I" + cxxInclude;
     
     const char* clang_args[] = {
@@ -1067,7 +1067,7 @@ void collectIdentifiers(CXCursor cursor, std::set<std::string> &identifiers)
 
 std::set<std::string> collectCppIdentifiers(const std::string& cacheFilePath, const std::string& prologueCode)
 {
-    std::string currentVersion = "sdk: " + stdrave::getSDKVersion() + " clang: " + clangVersion();
+    std::string currentVersion = "sdk: " + hen::getSDKVersion() + " clang: " + clangVersion();
     
     std::set<std::string> libraryIdentifiers;
     
@@ -1093,9 +1093,9 @@ std::set<std::string> collectCppIdentifiers(const std::string& cacheFilePath, co
     // (B) Create index & parse translation unit
     CXIndex index = clang_createIndex(0, 0);
     
-    std::string sysroot = stdrave::getSysRoot();
-    std::string resourceDir = stdrave::getClangResourceDir();
-    std::string cxxInclude  = stdrave::getCppInclude();
+    std::string sysroot = hen::getSysRoot();
+    std::string resourceDir = hen::getClangResourceDir();
+    std::string cxxInclude  = hen::getCppInclude();
     std::string cxxIncludeOpt = "-I" + cxxInclude;
     
     const char* clang_args[] = {
@@ -1530,7 +1530,7 @@ std::string SyntaxErrorAnalyzer::onError(const std::string& code, const std::sma
         params[m_substitutes[p]] = match[p];
     }
     
-    return stdrave::buildPrompt(m_prompt, params);
+    return hen::buildPrompt(m_prompt, params);
 }
 
 bool Analyzer_StaticCastUnrelatedTypes::m_enabled = true;

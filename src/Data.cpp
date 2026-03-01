@@ -5,7 +5,7 @@
 #include "CCodeProject.h"
 #include "UtilsCodeAnalysis.h"
 
-namespace stdrave {
+namespace hen {
     DEFINE_TYPE(DataDef)
     DEFINE_FIELD(DataDef, type_name)
     DEFINE_FIELD(DataDef, description)

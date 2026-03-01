@@ -10,7 +10,10 @@
 #include "TraceAnalyzer.h"
 #include "LogAnalyzer.h"
 
-namespace stdrave {
+#define OPTIMIZE_TRACK_MAX_INFO_REQUESTS 3
+#define MAX_OPTIMAL_FIX_TRACK_ROLLOUTS 3
+
+namespace hen {
 
     class TrajectoryAnalysis : public Reflection<TrajectoryAnalysis>
     {
@@ -175,7 +178,14 @@ namespace stdrave {
         std::string getTrajectoryPrologue(CCodeProject* project, int originalRunStep, int distilledRunStep, const std::string& summary);
         std::string getOriginalTrajectory(CCodeProject* project, int stepFromIdx, int stepToIdx);
         std::pair<std::string, std::string> validateSequence(CCodeProject* project, const EditSourceSequence& optimalSequence, int originalSize, int startStep);
-        void optimizeFixTrack(CCodeProject* project, Cache& cache, const std::string& trajectoryAnalysis, const std::string& fixTrack, uint32_t fixStep, EditSourceSequence& optimalSequence);
+        std::string optimizeFixTrack(CCodeProject* project,
+                                     Cache& cache,
+                                     const std::string& trajectoryAnalysis,
+                                     const std::string& fixTrack,
+                                     uint32_t fixStep,
+                                     uint32_t idealMaxCount,
+                                     EditSourceSequence& optimalSequence);
+        void pushOptimizedFixTrack(CCodeProject* project, const std::string& message, EditSourceSequence& optimalSequence);
         
         bool checkFixTrackData(CCodeProject* project, uint32_t startStep, uint32_t fixStep);
         void removeFixTrackData(CCodeProject* project, uint32_t startStep, uint32_t fixStep);

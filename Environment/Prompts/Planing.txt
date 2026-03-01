@@ -1,0 +1,40 @@
+[[code_checklist]]
+
+[[test_framework]]
+
+PROJECT TEST:
+[[test]]
+
+PLANNING PROJECT SOFTWARE ARCHITECTURE
+
+Prepare a concise plan about the project architecture just enough to pass the final test as provided. 
+
+- The main goal is to implement the features with less code and complexity. To be easy to debug
+- Use this hierarchy only (no deeper levels): Application -> Sub-systems -> Components -> Modules -> Functions
+- Treat all levels as functions:
+    * Application, Sub-system, Component, Module are functional decomposition levels.
+    * Each node in the hierarchy must correspond to a function.
+- Keep only necessary functions (minimize total count, while satisfying test requirements).
+- The total number of functions must not exceed [[max_functions]]
+- The total number of functions is unlikely to be less than [[min_functions]]
+- Keep child-function fan-out low at each level, ideally <= 6
+- If > 6 child functions are required at any level, keep them and explicitly flag why.
+- Optimize for functionality reuse
+- For each of the tested project features, ensure you understand in which module/functions will be implemented
+- Describe project sub-systems, components, modules.
+- Explain in which component or module, each features from the project description required to pass the test should be implemented.
+- Which functionality can be shared and reused so that we write and debug less code.
+- The plan must stick to the requirements and limitations explained in PROJECT DESCRIPTION, PROBLEM DECOMPOSE, AVAILABLE LIBRARIES, PROGRAMMING LANGUAGE, NAMING CONVENTION sections.
+- The test and framework here are only for context. DO NOT MENTION any details about the test and framework. This is a private information and must not leak to the plan
+- Do not repeat in the plan information that is already available in the PROJECT DESCRIPTION, PROBLEM DECOMPOSE, AVAILABLE LIBRARIES, PROGRAMMING LANGUAGE, NAMING CONVENTION sections. Information in these sections will be available along with the plan.
+- Do not write any code snippets
+- Do not assume and advise on the file structure of the project. Focus only on sub-systems, components, modules
+- The plan should be concise. Imagine a single page.
+
+Required output (in this order):
+- Minimum-scope plan using the rules above.
+- ASCII functions call graph from entry point: include only function names
+- Describe the contract and dataflow between the sub-systems and components.
+- Explain the entire execution and data flow between sub-systems and components. Confirm it fully covers the provided test
+- Be concise and concrete.
+- Provide your response in markdown (.md) format. 

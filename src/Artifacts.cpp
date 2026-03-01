@@ -2,7 +2,7 @@
 #include "IncludeBoost.h"
 #include "Utils.h"
 
-namespace stdrave {
+namespace hen {
 
 DEFINE_TYPE(ProjectArtifact)
 DEFINE_ARRAY_FIELD(ProjectArtifact, file_groups)

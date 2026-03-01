@@ -2,7 +2,7 @@
 #include "Server.h"
 #include "Utils.h"
 
-namespace stdrave {
+namespace hen {
 
 bool createTable(sqlite3* db)
 {

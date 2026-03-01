@@ -11,7 +11,7 @@
 
 #include "Indent.h"
 
-namespace stdrave {
+namespace hen {
 
 	class ReflectionTypes
 	{

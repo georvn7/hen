@@ -14,7 +14,7 @@
 #define LOG_TRACE_SIZE (20*160)
 #define SEARCH_TRACE_SIZE (20*160)
 
-namespace stdrave
+namespace hen
 
 {
 
@@ -115,13 +115,13 @@ struct DebugStep
         json[U("subject")] = web::json::value::string(utility::conversions::to_string_t(m_subject));
         json[U("commitHash")] = web::json::value::string(utility::conversions::to_string_t(m_commitHash));
         
-        return stdrave::saveJson(json, filePath);
+        return hen::saveJson(json, filePath);
     }
 
     bool load(const std::string& filePath)
     {
         web::json::value json;
-        if(!stdrave::loadJson(json, filePath))
+        if(!hen::loadJson(json, filePath))
         {
             return false;
         }
@@ -1749,7 +1749,7 @@ public:
         }
         
         //Load the trajectory configuration json file
-        stdrave::loadJson(cfg, tracjectoryFile);
+        hen::loadJson(cfg, tracjectoryFile);
         return true;
     }
     
@@ -1781,7 +1781,7 @@ public:
         
         std::string requestedStepDir = trajectoryDir + stepIdDir + "/";
         info += "\n********** SUMMARIZED TRAJECTORY AT DEBUGGING STEP " + stepIdStr + " START! **********\n";
-        std::string summary = stdrave::loadFile(requestedStepDir + "summary.txt");
+        std::string summary = hen::loadFile(requestedStepDir + "summary.txt");
         info += summary + "\n";
         
         std::string runInfo = loadTestLogFromStep(project, test, stepId);
@@ -1815,7 +1815,7 @@ public:
             }
         }
         
-        info += stdrave::loadFile(requestedStepDir + "info.txt");
+        info += hen::loadFile(requestedStepDir + "info.txt");
         info += "\n********** SUMMARIZED TRAJECTORY AT DEBUGGING STEP " + stepIdStr + " END! **********\n";
         
         return info;

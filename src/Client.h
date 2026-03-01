@@ -20,7 +20,7 @@ using namespace web::http::client;          // HTTP client features
 using namespace concurrency::streams;       // Asynchronous streams
 using namespace http::experimental::listener;
 
-namespace stdrave {
+namespace hen {
 
     enum InferenceIntent
     {

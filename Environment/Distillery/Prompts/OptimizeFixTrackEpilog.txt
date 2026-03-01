@@ -1,0 +1,23 @@
+==============================================================================
+YOUR TASK (REPEATED FOR CLARITY)
+==============================================================================
+
+PRE-OUTPUT SELF-CHECK (MUST PASS):
+- Check first step is run_test.
+- Check last step is fix_function.
+- Check exactly one fix_function exists, and it is the last step.
+- If any check fails, regenerate internally and output only the corrected JSON.
+
+INVALID EXAMPLE (do not do this):
+- run_test -> function_info -> fix_function -> run_test
+Reason: trailing run_test is outside this segment and invalid.
+
+Now please provide an optimized version of the trajectory segment with a more efficient sequence of actions that achieves the same final result (both source code state and test outcome).
+
+Remember:
+- Keep step numbers aligned (first step matches original, rest are sequential)
+- Make motivations self-contained based only on previous steps in the optimized sequence
+- Make the final fix comprehensive, incorporating all incremental fixes from the original
+- Express analysis as abstract reasoning/intuition, not facts from skipped steps
+- Ensure the sequence is realistic and follows proper debugging workflow
+- Never reference the existence of the original trajectory
