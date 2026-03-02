@@ -1,8 +1,8 @@
 YouTube video: https://youtu.be/u4Sl35QuvAo
 
-# std::rave
+# hen
 
-std::rave is a long-horizon coding agent that, given an input project description and test cases, can synthesize complex algorithms using C++ and STL.
+hen is a long-horizon coding agent that, given an input project description and test cases, can synthesize complex algorithms using C++ and STL.
 
 The agent uses specialized chain-of-thought to decompose the problem, reason about each step, ensure consistent functional and data flow and generate syntactically correct, working code. Embodied in high-bandwidth baspoke development environment that provides a constant stream of ground-truth data, the agent accumulates knowledge during inference to maintain a reliable long trajectory.
 
@@ -16,19 +16,19 @@ Director:  A powerful model with domain-specific knowledge in the researched are
 
 The only inputs to the system are:
 
-Project description in the file (for example: "stdrave/SimpleC/Description.txt")
-Test cases (for example: "stdrave/SimpleC/test)
+Project description in the file (for example: "hen/SimpleC/Description.txt")
+Test cases (for example: "hen/SimpleC/test)
 
 Everything else is autonomously synthesized by the agent
 
-**Installing std::rave (tested only on macOS!!!)**
+**Installing hen (tested only on macOS!!!)**
 ===============
 
-To get started with std::rave, follow these steps:
+To get started with hen, follow these steps:
 
 1. **Clone the Git repository**
 
-2. **Change working directory to the cloned stdrave folder**
+2. **Change working directory to the cloned hen folder**
 
 3. **Execute the build.sh script**
 ```bash
@@ -38,42 +38,34 @@ If you don't have Homebrew installed, quit the command window and run `build.sh`
 
 4. **Open the created Xcode project**
 ```bash
-stdrave/build/std-rave.xcodeproj
+hen/build/hen.xcodeproj
 ```
 In Xcode:
 
-* Set the active target to "std-rave"
+* Set the active target to "hen"
 * Set the target device to "My Mac"
 * Press Command+B to build the project
 
 **Setting up command line with different LLM models**
 ---------------------------
 
-To use std::rave with different Large Language Models (LLMs), for example:
+To use hen with different Large Language Models (LLMs), for example:
 
 5. **Change working directory to the executable folder**
 ```bash
-cd /full/path/to/stdrave/build/Debug
+cd /full/path/to/hen/build/Debug
 ```
 
 ### OpenAI
 ```bash
-./std-rave -client -server -llmpx "localhost:8081" -proj "/full/path/to/stdrave/SimpleC" -env "/full/path/to/stdrave/Environment" -dp 10002 -llmDir openai/gpt-5 -llmExp openai/gpt-5-mini -llmDev openai/gpt-5-nano -key openai=YOUR_OPENAI_KEY
+./hen -client -server -llmpx "localhost:8081" -proj "/full/path/to/hen/SimpleC" -env "/full/path/to/hen/Environment" -dp 10002 \
+-llmDir openai/gpt-5 \
+-llmExp openai/gpt-5-mini \
+-llmDev openai/gpt-5-nano \
+-llmDbg openai/gpt-5 -key openai=YOUR_OPENAI_KEY
 ```
 
-### Anthropic
-```bash
-./std-rave -client -server -llmpx "localhost:8081" -proj "/full/path/to/stdrave/SimpleC" -env "/full/path/to/stdrave/Environment" -dp 10002 -llmDir anthropic/claude-opus-4-5-high -llmExp anthropic/claude-sonnet-4-5-high -llmDev anthropic/claude-haiku-4-5-high -key anthropic=YOUR_CLAUDE_KEY
-```
-
-Here 'high' is not that high actually, it means '8K thinking'
-
-### Google
-```bash
-./std-rave -client -server -llmpx "localhost:8081" -proj "/full/path/to/stdrave/SimpleC" -env "/full/path/to/stdrave/Environment" -dp 10002 -llmDir google/gemini-3-pro-preview -llmExp google/gemini-3-flash-preview -llmDev google/gemini-2.5-flash-lite -key google=YOUR_GEMINI_KEY
-```
-
-6. **When the std::rave prompt appear**
+6. **When the hen prompt appear**
 
 To start the project
 ```bash
@@ -91,7 +83,7 @@ continue
 ```
 
 At the end of the run two artifacts will be recorded:
-All-in single file - your_project_name.stdrave.cpp (with embedded test)
+All-in single file - your_project_name.hen.cpp (with embedded test)
 CMake project - you should be able to generate all type of project VS, VS Code, Xcode, ...
 
-Notice, due to the nature of LLMs, std::rave is non-deterministic. The output folders and their content, from the very same prompt, will vary with each run
+Notice, due to the nature of LLMs, hen is non-deterministic. The output folders and their content, from the very same prompt, will vary with each run
