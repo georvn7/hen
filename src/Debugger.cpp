@@ -1789,19 +1789,24 @@ std::string Debugger::getFileInfo(CCodeProject* project, const std::string& file
     
     if(fileName == "stdout.log")
     {
-        info += "\n//File '" + fileName + "' is not accessible. To obtain log informatin from the most recent test run use 'log_info' and 'function_info' actions.\n\n";
+        info += "\n//File '" + fileName + "' is not accessible. ";
+        info += "To obtain log information from the most recent test run use 'log_info' and 'function_info' actions. ";
+        info += "The stdout is available in the TEST SCRIPT EXECUTION LOG\n\n";
+        
         return info;
     }
     
     if(fileName == "console.log")
     {
-        info += "\n//File '" + fileName + "' is not accessible. To obtain log informatin from the most recent test run use 'log_info' and 'function_info' actions.\n\n";
+        info += "\n//File '" + fileName + "' is not accessible. ";
+        info += "To obtain log information from the most recent test run use 'log_info' and 'function_info' actions. ";
+        info += "The stdout is available in the TEST SCRIPT EXECUTION LOG\n\n";
         return info;
     }
     
     if(fileName == "trace.txt")
     {
-        info += "\n//File '" + fileName + "' is not accessible. To obtain trace informatin from the most recent test run use trace_info and function_info actions.\n\n";
+        info += "\n//File '" + fileName + "' is not accessible. To obtain trace information from the most recent test run use trace_info and function_info actions.\n\n";
         return info;
     }
     
@@ -2075,7 +2080,7 @@ std::string Debugger::getTestDescription(CCodeProject* project, const TestDef& t
             m_unitTestSource += regexContract;
             m_unitTestSource += "\n```\n";
             m_unitTestSource += "Sometimes the regex patterns from the contract contract could be different from the patterns from the test. ";
-            m_unitTestSource += "If so, use the patterns from the contract as the have been tested to fully match the provided examples in the contract\n\n";
+            m_unitTestSource += "If so, use the patterns from the contract as they have been tested to fully match the provided examples in the contract\n\n";
         }
     }
     else
@@ -2107,7 +2112,7 @@ std::string Debugger::getTestDescription(CCodeProject* project, const TestDef& t
     std::string stdoutRegex;
     parsePrefixFlags(testRawCmd, testDebug, testResult, testResultStr, stdoutRegex, testCmd);
     
-    std::string commandLine = "main " + testCmd;
+    std::string commandLine = testCmd;
     
     commands << "Test command:" << std::endl;
     commands << commandLine << std::endl;
@@ -2414,7 +2419,7 @@ bool Debugger::execTestScript(CCodeProject* project,
     parsePrefixFlags(rawCmd, testDebug, testResult, expectedResult, stdoutRegex, cmd);
     
     debugLogTest << "Test command:" << std::endl << std::endl;
-    debugLogTest << "main " << cmd << std::endl << std::endl;
+    debugLogTest << cmd << std::endl << std::endl;
     
     checkTestStepInput(debugLogTest, project, test.test.input_files, test.test.output_files, "test", true);
     
@@ -4209,7 +4214,7 @@ std::string Debugger::getTrajectory(int fromStep, int toStep, bool addCurrent, b
         return trajectory;
     }
     
-    trajectory += "Here is the current progress debugging the application:\n\n";
+    trajectory += "\nHere is the current progress debugging the application:\n\n";
     //int i = 1;
     
     if(toStep < 0)
@@ -4329,6 +4334,9 @@ void Debugger::pushTrajectory(CCodeProject* project)
 {
     //Ensure we have the correct info incorporating the modification from the last debug step
     std::string appInfo = getHighLevelAppInfo(project, m_system, PRINT_MAX_FUNCTIONS_DEPTH, PRINT_MAX_FUNCTIONS_DEPTH);
+    
+    appInfo += getTrajectory(0, 0, false, true, true);
+    
     project->pushMessage(appInfo, "user", true);
     
     //std::vector<std::string> m_rawTrajectory;
@@ -5143,7 +5151,7 @@ std::string Debugger::loadTestLogFromStep(CCodeProject* project, const TestDef& 
         //std::string expectedResultStr = std::to_string(expectedResult);
         
         log += "Test command:\n\n";
-        log += "main " + cmd + "\n\n";
+        log += cmd + "\n\n";
         
         std::string consoleLog = getFileContent(m_workingDirectory + "/console.log");
         
@@ -5766,7 +5774,7 @@ std::string Debugger::stepFunctionInfo(CCodeProject* project, const std::string&
     }
     else
     {
-        infoForCurrentStep += "Consult with the list of available functions defined in the project:\n\n";
+        infoForCurrentStep += "The function '" + functionName + "' doesn't exists. Consult with the list of available functions defined in the project:\n\n";
         infoForCurrentStep += getRequestedInfo(project, -1, 0, {}, {}, {}, {});
     }
     
@@ -6337,7 +6345,7 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         }
         else
         {
-            infoForCurrentStep += "Consult with the list of available functions defined in the project:\n\n";
+            infoForCurrentStep += "The function '" + functionName + "' doesn't exists. Consult with the list of available functions defined in the project:\n\n";
             infoForCurrentStep += getRequestedInfo(project, -1, 0, {}, {}, {}, {});
         }
         
@@ -6459,7 +6467,7 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         }
         else
         {
-            infoForCurrentStep += "Consult with the list of available functions defined in the project:\n\n";
+            infoForCurrentStep += "The function '" + functionName + "' doesn't exists. Consult with the list of available functions defined in the project:\n\n";
             infoForCurrentStep += getRequestedInfo(project, -1, 0, {}, {}, {}, {});
         }
         
@@ -6614,7 +6622,14 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
     //Ensure we have the correct info incorporating the modification from the last debug step
     m_appInfo = getHighLevelAppInfo(project, m_system, PRINT_MAX_FUNCTIONS_DEPTH, PRINT_MAX_FUNCTIONS_DEPTH);
     
-    m_rawTrajectory.push_back(std::make_pair(infoForCurrentStep, "user"));
+    if(infoForCurrentStep.empty())
+    {
+        m_rawTrajectory.push_back(std::make_pair("No new information was added for this step.", "user"));
+    }
+    else
+    {
+        m_rawTrajectory.push_back(std::make_pair(infoForCurrentStep, "user"));
+    }
     
     std::string info;
     {

@@ -666,7 +666,7 @@
     {
       "provider": "ollama",
       "url": "http://10.0.0.34:11434/v1/chat/completions",
-      "model": "gptoss120b:train_20260222_32k_chatfix3",
+      "model": "gptoss120b:prod",
       "reasoning_effort": "na",
       "verbosity": "na",
       "context_size": 128,

@@ -291,6 +291,20 @@ struct DebugVisibility
         return false;
     }
 
+    std::string logInfoKey(const std::string& function, int invocation, int lineNumber) const
+    {
+        if(invocation < 1) invocation = 1;
+        if(lineNumber < 1) lineNumber = 1;
+
+        std::string functionKey = function;
+        if(functionKey.empty() || functionKey == "none")
+        {
+            functionKey.clear();
+        }
+
+        return functionKey + ":" + std::to_string(invocation) + ":" + std::to_string(lineNumber);
+    }
+
     bool visibleData(const std::string& data)
     {
         if(m_dataTypes.find(data) == m_dataTypes.end())
@@ -338,16 +352,7 @@ struct DebugVisibility
 
     bool visibleLogInfo(const std::string& function, int invocation, int lineNumber)
     {
-        if(invocation < 1) invocation = 1;
-        if(lineNumber < 1) lineNumber = 1;
-        
-        std::string functionKey = function;
-        if(functionKey.empty() || functionKey == "none")
-        {
-            functionKey.clear();
-        }
-        
-        std::string key = functionKey + ":" + std::to_string(invocation) + ":" + std::to_string(lineNumber);
+        std::string key = logInfoKey(function, invocation, lineNumber);
         if(m_log.find(key) == m_log.end())
         {
             m_log.insert(key);
@@ -431,10 +436,7 @@ struct DebugVisibility
         }
         else if(action == "log_info")
         {
-            if(invocation < 1) invocation = 1;
-            if(lineNumber < 1) lineNumber = 1;
-            
-            std::string key = subject + ":" + std::to_string(invocation) + ":" + std::to_string(lineNumber);
+            std::string key = logInfoKey(subject, invocation, lineNumber);
             return m_log.find(key) != m_log.end();
         }
         else if(action == "step_info")
@@ -657,7 +659,7 @@ public:
         
         if(fileName == "stdout.log")
         {
-            info += "\n//File '" + fileName + "' is not accessible. To obtain log informatin from the most recent test run use 'log_info' and 'function_info' actions.\n\n";
+            info += "\n//File '" + fileName + "' is not accessible. To obtain log information from the most recent test run use 'log_info' and 'function_info' actions.\n\n";
             return info;
         }
         
@@ -1111,7 +1113,7 @@ public:
         
         if(checkFunctionExists(project, functionName, debugNotes))
         {
-            infoForCurrentStep += "Providing requested information for the function '" + functionName + "':\n\n";
+            //infoForCurrentStep += "Providing requested information for the function '" + functionName + "':\n\n";
             infoForCurrentStep += getRequestedInfo(project, 0, 0, {},
                                               {std::make_shared<std::string>(functionName)},
                                               {},{});
@@ -1213,7 +1215,7 @@ public:
         }
         else
         {
-            infoForCurrentStep += "Consult with the list of available functions defined in the project:\n\n";
+            infoForCurrentStep += "The function '" + functionName + "' doesn't exists. Consult with the list of available functions defined in the project:\n\n";
             infoForCurrentStep += getRequestedInfo(project, -1, 0, {}, {}, {}, {});
         }
         
@@ -1243,7 +1245,7 @@ public:
         auto dataInfo = project->findData(dataTypeName, owningPath);
         if(dataInfo)
         {
-            infoForCurrentStep += "Providing requested information for the data type '" + dataTypeName + "':\n\n";
+            //infoForCurrentStep += "Providing requested information for the data type '" + dataTypeName + "':\n\n";
             std::string dataTypeInfo = getRequestedInfo(project, 0, 0, {}, {},
                                               {std::make_shared<std::string>(dataTypeName)},{});
             
@@ -1321,7 +1323,7 @@ public:
         
         if(boost_fs::exists(fullPath))
         {
-            infoForCurrentStep += "Providing requested content of the file " + fileName + "\n\n";
+            //infoForCurrentStep += "Providing requested content of the file " + fileName + "\n\n";
             int maxCharacters = LOG_SECTION_SIZE;
             
             uint32_t line_number = lineNumber > 0 ? lineNumber : 1;
@@ -1405,7 +1407,7 @@ public:
             functionName = subject;
         }
         
-        infoForCurrentStep += "Providing requested list of all custom function defined in the application '" + application + "' : \n\n";
+        //infoForCurrentStep += "Providing requested list of all custom function defined in the application '" + application + "' : \n\n";
         infoForCurrentStep += getRequestedInfo(project, PRINT_MAX_FUNCTIONS_DEPTH, PRINT_MAX_FUNCTIONS_DEPTH, functionName, {}, {}, {});
         
         stepInfo.m_debugNotes = "Provide list of all custom function defined in the application '" + application + "'\n";
@@ -1434,7 +1436,7 @@ public:
             functionName = subject;
         }
         
-        infoForCurrentStep += "Providing requested functions gall graph in ASCI form for application '" + application + "' : \n\n";
+        //infoForCurrentStep += "Providing requested functions gall graph in ASCI form for application '" + application + "' : \n\n";
         infoForCurrentStep += getRequestedInfo(project, 0, PRINT_MAX_FUNCTIONS_DEPTH, functionName, {}, {}, {});
         
         stepInfo.m_debugNotes = "Provide functions gall graph in ASCI form for application '" + application + "'\n";
@@ -1548,7 +1550,7 @@ public:
             parsePrefixFlags(rawCmd, debug, testResult, expectedResult, stdoutRegex, cmd);
             
             log += "Test command:\n\n";
-            log += "main " + cmd + "\n\n";
+            log += cmd + "\n\n";
             
             std::string consoleLog = getFileContent(m_workingDirectory + "/console.log");
             
