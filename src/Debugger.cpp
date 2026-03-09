@@ -6425,6 +6425,9 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         
         m_lastRunInfo = stepInfo.fullInfo();
         
+#ifdef DEBUGGER_INTERLEAVED_TRAJECTORY
+        infoForCurrentStep = stepInfo.notes() + infoForCurrentStep;
+#endif
         m_trajectory.push_back(stepInfo);
         
         auto llmConfig = Client::getInstance().getLLMConfig(LLMRole::DIRECTOR);
