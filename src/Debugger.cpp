@@ -4897,7 +4897,7 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
             
             feedback += "\nThe requested information " + repeatedRequest + " has already been provided in the discussion. ";
             feedback += "Do not repeat the same request. Inspect the currently available information and choose a different next step. ";
-            feedback += "If you still need more evidence, request a different function/invocation or use debug_function when fresh execution/data-flow evidence is needed.\n";
+            feedback += "\n";
         }
     }
     
