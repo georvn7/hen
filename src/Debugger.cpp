@@ -4762,6 +4762,24 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
     Client::getInstance().selectLLM(InferenceIntent::DEBUG_ASSISTANT);
     
     std::string feedback;
+    auto appendInvocationFeedback = [&](const std::string& functionName, uint32_t lastInvocation, const char* actionLabel)
+    {
+        if(functionName.empty() || m_nextStep.invocation <= 0 || lastInvocation == 0)
+        {
+            return;
+        }
+        
+        if((uint32_t)m_nextStep.invocation <= lastInvocation)
+        {
+            return;
+        }
+        
+        feedback += "The requested invocation " + std::to_string(m_nextStep.invocation);
+        feedback += " for action '" + std::string(actionLabel) + "' and function '" + functionName + "' is out of range. ";
+        feedback += "The last recorded invocation is " + std::to_string(lastInvocation) + ". ";
+        feedback += "Use invocation " + std::to_string(lastInvocation) + " or another valid next step.\n";
+    };
+    
     if(m_nextStep.action_type == "debug_function")
     {
         if(!m_nextStep.breakpoints.empty())
@@ -4842,6 +4860,24 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
     }
     else if(m_nextStep.isInformationRequest())
     {
+        if(m_nextStep.action_type == "function_info")
+        {
+            uint32_t lastTraceInvocation = 0;
+            if(auto lastFrame = m_tracer.getLastInvocation(m_nextStep.action_subject))
+            {
+                lastTraceInvocation = lastFrame->m_invocation.second;
+            }
+            
+            uint32_t lastLogInvocation = m_logger.logGetLastInvocation(m_nextStep.action_subject).second;
+            uint32_t lastInvocation = lastTraceInvocation >= lastLogInvocation ? lastTraceInvocation : lastLogInvocation;
+            appendInvocationFeedback(m_nextStep.action_subject, lastInvocation, "function_info");
+        }
+        else if(m_nextStep.action_type == "log_info")
+        {
+            uint32_t lastLogInvocation = m_logger.logGetLastInvocation(m_nextStep.action_subject).second;
+            appendInvocationFeedback(m_nextStep.action_subject, lastLogInvocation, "log_info");
+        }
+        
         if(m_contextVisibility.isVisible(m_nextStep.action_type, m_nextStep.action_subject, m_nextStep.invocation, m_nextStep.line_number))
         {
             feedback += "\nThe information requested in the last debugging step '" + m_nextStep.action_type;
@@ -6744,8 +6780,25 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         
         int validationAttempt = 1;
         int maxValidationAttempts = m_rewardHackingReview.empty() ? 8 : 3;
+        int repeatedInvalidAttempts = 0;
+        auto stepRetryKey = [](const NextDebugStep& step)
+        {
+            std::string key = trim(step.action_type) + "\n";
+            key += step.action_subject + "\n";
+            key += std::to_string(step.invocation) + "\n";
+            key += std::to_string(step.line_number);
+            for(const auto& bp : step.breakpoints)
+            {
+                if(!bp) continue;
+                key += "\n" + std::to_string(bp->source_line) + "\n";
+                key += bp->condition + "\n";
+                key += bp->expression;
+            }
+            return key;
+        };
         
         std::string feedback = validateStep(project, test, validationAttempt);
+        std::string invalidStepKey = feedback.empty() ? std::string() : stepRetryKey(m_nextStep);
         while(!feedback.empty() && validationAttempt < maxValidationAttempts)
         {
             // Keep rejected next-step proposals out of the retry prompt history.
@@ -6774,6 +6827,24 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             
             validationAttempt++;
             feedback = validateStep(project, test, validationAttempt);
+            if(!feedback.empty())
+            {
+                std::string nextInvalidStepKey = stepRetryKey(m_nextStep);
+                if(nextInvalidStepKey == invalidStepKey)
+                {
+                    repeatedInvalidAttempts++;
+                    if(repeatedInvalidAttempts >= 1)
+                    {
+                        break;
+                    }
+                }
+                else
+                {
+                    repeatedInvalidAttempts = 0;
+                }
+                
+                invalidStepKey = nextInvalidStepKey;
+            }
         }
         
         if(!feedback.empty()) //Probably the LLM insists for something
