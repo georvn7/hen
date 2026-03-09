@@ -6798,6 +6798,8 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         int repeatedInvalidAttempts = 0;
         auto stepRetryKey = [](const NextDebugStep& step)
         {
+            // Retry deduplication intentionally ignores motivation.
+            // We only care whether the actionable step proposal repeats.
             std::string key = trim(step.action_type) + "\n";
             key += step.action_subject + "\n";
             key += std::to_string(step.invocation) + "\n";
