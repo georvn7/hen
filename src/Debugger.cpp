@@ -4763,10 +4763,16 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
     Client::getInstance().selectLLM(InferenceIntent::DEBUG_ASSISTANT);
     
     std::string feedback;
-    auto appendInvocationFeedback = [&](const std::string& functionName, uint32_t lastInvocation, const char* actionLabel)
+    auto repairInvocation = [&](const std::string& functionName, uint32_t lastInvocation, const char* actionLabel)
     {
         if(functionName.empty() || m_nextStep.invocation <= 0 || lastInvocation == 0)
         {
+            if(!functionName.empty() && m_nextStep.invocation > 0 && lastInvocation == 0)
+            {
+                feedback += "No recorded invocation is available for action '" + std::string(actionLabel);
+                feedback += "' and function '" + functionName + "'. ";
+                feedback += "Choose a different next step or gather fresh execution evidence.\n";
+            }
             return;
         }
         
@@ -4775,10 +4781,7 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
             return;
         }
         
-        feedback += "The requested invocation " + std::to_string(m_nextStep.invocation);
-        feedback += " for action '" + std::string(actionLabel) + "' and function '" + functionName + "' is out of range. ";
-        feedback += "The last recorded invocation is " + std::to_string(lastInvocation) + ". ";
-        feedback += "Use invocation " + std::to_string(lastInvocation) + " or another valid next step.\n";
+        m_nextStep.invocation = (int)lastInvocation;
     };
     
     if(m_nextStep.action_type == "debug_function")
@@ -4871,12 +4874,12 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
             
             uint32_t lastLogInvocation = m_logger.logGetLastInvocation(m_nextStep.action_subject).second;
             uint32_t lastInvocation = lastTraceInvocation >= lastLogInvocation ? lastTraceInvocation : lastLogInvocation;
-            appendInvocationFeedback(m_nextStep.action_subject, lastInvocation, "function_info");
+            repairInvocation(m_nextStep.action_subject, lastInvocation, "function_info");
         }
         else if(m_nextStep.action_type == "log_info")
         {
             uint32_t lastLogInvocation = m_logger.logGetLastInvocation(m_nextStep.action_subject).second;
-            appendInvocationFeedback(m_nextStep.action_subject, lastLogInvocation, "log_info");
+            repairInvocation(m_nextStep.action_subject, lastLogInvocation, "log_info");
         }
         
         if(m_contextVisibility.isVisible(m_nextStep.action_type, m_nextStep.action_subject, m_nextStep.invocation, m_nextStep.line_number))
