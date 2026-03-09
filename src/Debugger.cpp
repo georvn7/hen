@@ -4859,8 +4859,8 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
     }
     else if(trim(m_nextStep.action_type).empty())
     {
-        feedback += "The 'action_type' field is empty or contains only white spaces. ";
-        feedback += "Select a valid next action from the debugging workflow and provide it again.\n";
+        feedback += "The 'action_type' field is empty or whitespace-only. ";
+        feedback += "Return corrected JSON with one valid next action from the debugging workflow.\n";
     }
     else if(m_nextStep.isInformationRequest())
     {
