@@ -14,6 +14,155 @@ using namespace utility; // For conversions
 
 namespace hen {
 
+    static bool extractMessageContent(const web::json::value& message, utility::string_t& content)
+    {
+        if (!message.is_object() || !message.has_field(U("content")))
+        {
+            return false;
+        }
+
+        const web::json::value& contentValue = message.at(U("content"));
+        if (contentValue.is_string())
+        {
+            content = contentValue.as_string();
+            return true;
+        }
+
+        if (contentValue.is_object())
+        {
+            if (contentValue.has_field(U("text")) && contentValue.at(U("text")).is_string())
+            {
+                content = contentValue.at(U("text")).as_string();
+                return true;
+            }
+
+            if (contentValue.has_field(U("content")) && contentValue.at(U("content")).is_string())
+            {
+                content = contentValue.at(U("content")).as_string();
+                return true;
+            }
+
+            return false;
+        }
+
+        if (!contentValue.is_array())
+        {
+            return false;
+        }
+
+        std::string mergedContent;
+        for (const auto& part : contentValue.as_array())
+        {
+            if (part.is_string())
+            {
+                mergedContent += utility::conversions::to_utf8string(part.as_string());
+                continue;
+            }
+
+            if (!part.is_object())
+            {
+                continue;
+            }
+
+            if (part.has_field(U("type")) &&
+                part.at(U("type")).is_string() &&
+                part.at(U("type")).as_string() == U("thinking"))
+            {
+                continue;
+            }
+
+            if (part.has_field(U("text")) && part.at(U("text")).is_string())
+            {
+                mergedContent += utility::conversions::to_utf8string(part.at(U("text")).as_string());
+            }
+            else if (part.has_field(U("content")) && part.at(U("content")).is_string())
+            {
+                mergedContent += utility::conversions::to_utf8string(part.at(U("content")).as_string());
+            }
+        }
+
+        if (mergedContent.empty())
+        {
+            return false;
+        }
+
+        content = utility::conversions::to_string_t(mergedContent);
+        return true;
+    }
+
+    static bool extractFunctionCallObject(const web::json::value& message, web::json::value& object, std::string& name)
+    {
+        if (!message.is_object())
+        {
+            return false;
+        }
+
+        web::json::value functionCall;
+        bool hasFunctionCall = false;
+
+        if (message.has_field(U("function_call")))
+        {
+            const web::json::value& functionCallValue = message.at(U("function_call"));
+            if (functionCallValue.is_object())
+            {
+                functionCall = functionCallValue;
+                hasFunctionCall = true;
+            }
+        }
+
+        if (!hasFunctionCall &&
+            message.has_field(U("tool_calls")) &&
+            message.at(U("tool_calls")).is_array())
+        {
+            for (const auto& toolCall : message.at(U("tool_calls")).as_array())
+            {
+                if (!toolCall.is_object())
+                {
+                    continue;
+                }
+
+                if (toolCall.has_field(U("function")) && toolCall.at(U("function")).is_object())
+                {
+                    functionCall = toolCall.at(U("function"));
+                    hasFunctionCall = true;
+                    break;
+                }
+
+                if (toolCall.has_field(U("name")) && toolCall.has_field(U("arguments")))
+                {
+                    functionCall = toolCall;
+                    hasFunctionCall = true;
+                    break;
+                }
+            }
+        }
+
+        if (!hasFunctionCall ||
+            !functionCall.has_field(U("name")) ||
+            !functionCall.at(U("name")).is_string() ||
+            !functionCall.has_field(U("arguments")))
+        {
+            return false;
+        }
+
+        name = utility::conversions::to_utf8string(functionCall.at(U("name")).as_string());
+
+        const web::json::value& argumentsValue = functionCall.at(U("arguments"));
+        if (argumentsValue.is_string())
+        {
+            object = web::json::value::parse(argumentsValue.as_string());
+            return true;
+        }
+
+        if (argumentsValue.is_object() || argumentsValue.is_array())
+        {
+            object = argumentsValue;
+            return true;
+        }
+
+        return false;
+    }
+    
     DEFINE_TYPE(Project)
     
     DEFINE_TYPE(CodeProject)
@@ -180,11 +329,6 @@ namespace hen {
     {
         load();
         
-#if 0
-        //step 45 is run test, step 47 is the debug run
-        Distillery::getInstance().distillTrajectory((CCodeProject *)this, getProjDir() + "/tests/step0/public" , 0 , -1);
-#endif
-        
         m_dag.depthFirstTraversal(m_dag.m_root, [this](DAGNode<Node*>* node, DAGraph<Node*>& g) {
             if(node->m_data)
             {
@@ -297,27 +441,19 @@ namespace hen {
     {
         std::string role;
         std::string content;
-        web::json::value tool_calls;
         utility::string_t json;
 
         try {
-            web::json::value& parsedJson = response;
-
                 if (response.has_field(U("message")))
                 {
-                    if (object && response[U("message")].has_field(U("function_call"))) {
+                    const web::json::value& message = response.at(U("message"));
+                    std::string name_obj;
 
-                        tool_calls = response[U("message")][U("function_call")];
-
-                        auto uname_obj = tool_calls[U("name")].as_string();
-                        std::string name_obj = utility::conversions::to_utf8string(uname_obj);
-
-                        web::json::value objValue = tool_calls[U("arguments")];
-                        *object = web::json::value::parse(objValue.as_string());
+                    if (object && extractFunctionCallObject(message, *object, name_obj)) {
 
                         if (print)
                         {
-                            std::string objStr = utility::conversions::to_utf8string(objValue.as_string());
+                            std::string objStr = utility::conversions::to_utf8string(object->serialize());
                             std::string objIndentStr = formatJson(objStr, std::string("  "));
 
                             std::cout << std::endl << ">>object: " << name_obj << std::endl << std::endl;
@@ -332,15 +468,14 @@ namespace hen {
                         utility::string_t ucontent;
                         utility::string_t urole;
 
-                        if (response[U("message")].has_field(U("content")))
+                        if (extractMessageContent(message, ucontent))
                         {
-                            ucontent = response[U("message")][U("content")].as_string();
                             json = findJson(ucontent, true);
                         }
 
-                        if (!object && /*json.empty() &&*/ response[U("message")].has_field(U("role")))
+                        if (!object && /*json.empty() &&*/ message.has_field(U("role")) && message.at(U("role")).is_string())
                         {
-                            urole = response[U("message")][U("role")].as_string();
+                            urole = message.at(U("role")).as_string();
 
                             role = utility::conversions::to_utf8string(urole);
                         }
@@ -405,10 +540,13 @@ namespace hen {
         if (success)
         {
             if (response.has_field(U("message")) &&
-                response[U("message")].has_field(U("content")))
+                response[U("message")].is_object())
             {
-                auto ucontent = response[U("message")][U("content")].as_string();
-                content = utility::conversions::to_utf8string(ucontent);
+                utility::string_t ucontent;
+                if (extractMessageContent(response[U("message")], ucontent))
+                {
+                    content = utility::conversions::to_utf8string(ucontent);
+                }
             }
             
             bool hasObject = Client::getInstance().project()->handleResponse(response, object, false);

@@ -4835,6 +4835,11 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
             feedback += " - text files consumed or produced by the test.\n";
         }
     }
+    else if(trim(m_nextStep.action_type).empty())
+    {
+        feedback += "The 'action_type' field is empty or contains only white spaces. ";
+        feedback += "Select a valid next action from the debugging workflow and provide it again.\n";
+    }
     else if(m_nextStep.isInformationRequest())
     {
         if(m_contextVisibility.isVisible(m_nextStep.action_type, m_nextStep.action_subject, m_nextStep.invocation, m_nextStep.line_number))
@@ -4957,6 +4962,8 @@ void Debugger::optimizeTrajectory(CCodeProject* project, const TestDef& test)
     std::string remainingTrajectory = getTrajectory(step, -1, false, false);
     
     {
+        Client::getInstance().setLLM(LLMRole::DIRECTOR);
+        
         std::string application = project->getProjectName();
         
         Prompt promptSummarize("SummarizeTrajectory.txt",{
@@ -5010,6 +5017,8 @@ void Debugger::optimizeTrajectory(CCodeProject* project, const TestDef& test)
         
         m_summary = summary;
         project->popContext();
+        
+        Client::getInstance().selectLLM(InferenceIntent::DEBUG_ANALYSIS);
     }
     
     m_previousSteps += step;
@@ -6363,10 +6372,6 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         
         m_lastRunInfo = stepInfo.fullInfo();
         
-#ifdef DEBUGGER_INTERLEAVED_TRAJECTORY
-        infoForCurrentStep = m_lastRunInfo + infoForCurrentStep;
-#endif
-        
         m_trajectory.push_back(stepInfo);
         
         auto llmConfig = Client::getInstance().getLLMConfig(LLMRole::DIRECTOR);
@@ -6811,6 +6816,8 @@ void Debugger::reviewGiHistoryForFix(CCodeProject* project)
         return;
     }
     
+    Client::getInstance().setLLM(LLMRole::DIRECTOR);
+    
     std::string repoFolder = project->getProjDir() + "/dag";
     
     std::string functionSrcFile = ccNode->getNodeDirectory();
@@ -6837,6 +6844,8 @@ void Debugger::reviewGiHistoryForFix(CCodeProject* project)
     m_nextStep.from_json(object);
     
     project->popContext();
+    
+    Client::getInstance().selectLLM(InferenceIntent::DEBUG_ANALYSIS);
 }
 
 bool Debugger::saveTestToDirectory(CCodeProject* project, const std::string& testJsonDir, const std::string& testDirectory, TestDef& test)

@@ -1,5 +1,7 @@
 #include <unordered_set>
 #include <sstream>
+#include <chrono>
+#include <thread>
 
 #include "Project.hpp"
 #include "CCodeProject.h"
@@ -111,6 +113,46 @@ namespace hen {
     };
 
     std::set<std::string> CCodeProject::m_cppIentifiers;
+
+    namespace {
+        constexpr int kRemoveAllRetries = 5;
+        constexpr int kRemoveAllRetrySleepMs = 25;
+
+        bool removeAllWithRetry(const std::string& directory)
+        {
+            if(directory.empty())
+            {
+                return true;
+            }
+
+            boost::system::error_code ec;
+            for(int attempt = 0; attempt <= kRemoveAllRetries; ++attempt)
+            {
+                boost_fs::remove_all(directory, ec);
+                if(!ec)
+                {
+                    return true;
+                }
+
+                boost::system::error_code existsEc;
+                if(!boost_fs::exists(directory, existsEc))
+                {
+                    return true;
+                }
+
+                if(ec != boost::system::errc::make_error_code(boost::system::errc::directory_not_empty))
+                {
+                    break;
+                }
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(kRemoveAllRetrySleepMs));
+            }
+
+            std::cout << "Unable to remove directory tree: " << directory << std::endl;
+            std::cout << "Error: " << ec.message() << std::endl;
+            return false;
+        }
+    }
 
     void CCodeProject::inferenceProjDesc(CCodeNode* root)
     {
@@ -1787,13 +1829,19 @@ namespace hen {
         boost_fs::copy(trajectoryDir, archiveDir,
                        boost_fs::copy_options::recursive |
                        boost_fs::copy_options::overwrite_existing, ec);
-        
-        boost_fs::remove_all(trajectoryDir);
+        if(ec)
+        {
+            std::cout << "Unable to archive trajectory from: " << trajectoryDir << " to: " << archiveDir << std::endl;
+            std::cout << "Error: " << ec.message() << std::endl;
+            return archIndex + 1;//Old archives plus the current trajectory
+        }
+
+        removeAllWithRetry(trajectoryDir);
         
         //Logs
         //For now just delete logs
         std::string logsDebugDir = getProjDir() + "/logs/debug/" + unitTestDef.name;
-        boost_fs::remove_all(logsDebugDir);
+        removeAllWithRetry(logsDebugDir);
         
         return archIndex + 1;//Old archives plus the current trajectory
     }
@@ -1815,13 +1863,19 @@ namespace hen {
         boost_fs::copy(trajectoryDir, archiveDir,
                        boost_fs::copy_options::recursive |
                        boost_fs::copy_options::overwrite_existing, ec);
-        
-        boost_fs::remove_all(trajectoryDir);
+        if(ec)
+        {
+            std::cout << "Unable to archive broken trajectory from: " << trajectoryDir << " to: " << archiveDir << std::endl;
+            std::cout << "Error: " << ec.message() << std::endl;
+            return;
+        }
+
+        removeAllWithRetry(trajectoryDir);
         
         //Logs
         //For now just delete logs
         std::string logsDebugDir = getProjDir() + "/logs/debug/" + unitTestDef.name;
-        boost_fs::remove_all(logsDebugDir);
+        removeAllWithRetry(logsDebugDir);
     }
 
     void CCodeProject::debugTests()
@@ -2145,7 +2199,7 @@ namespace hen {
         Client::getInstance().agentToServer("\n\nDEBUGGING...\n\n");
         
         //TODO: ONLY FOR TEST
-        synthetizeTrainingData();
+        //synthetizeTrainingData();
         
         debugTests();
         

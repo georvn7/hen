@@ -675,6 +675,58 @@
       "roles": "director,expert,developer",
       "input_tokens_price": 0.00,
       "output_tokens_price": 0.00
+    },
+    {
+      "provider": "vllm",
+      "url": "http://10.0.0.34:8002/v1/chat/completions",
+      "model": "qwen35-9b-fullft-bf16",
+      "reasoning_effort": "na",
+      "verbosity": "na",
+      "context_size": 128,
+      "rate_limit": -1,
+      "rate_limit_rpm": -1,
+      "roles": "director,expert,developer",
+      "input_tokens_price": 0.00,
+      "output_tokens_price": 0.00
+    },
+    {
+      "provider": "alibaba",
+      "url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
+      "model": "qwen3.5-35b-a3b",
+      "reasoning_effort": "na",
+      "verbosity": "na",
+      "context_size": 128,
+      "rate_limit": -1,
+      "rate_limit_rpm": -1,
+      "roles": "director,expert,developer",
+      "input_tokens_price": 0.25,
+      "output_tokens_price": 2.00
+    },
+    {
+      "provider": "alibaba",
+      "url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
+      "model": "qwen3.5-27b",
+      "reasoning_effort": "na",
+      "verbosity": "na",
+      "context_size": 128,
+      "rate_limit": -1,
+      "rate_limit_rpm": -1,
+      "roles": "director,expert,developer",
+      "input_tokens_price": 0.25,
+      "output_tokens_price": 2.00
+    },
+    {
+      "provider": "alibaba",
+      "url": "https://coding-intl.dashscope.aliyuncs.com/v1/chat/completions",
+      "model": "qwen3-coder-next",
+      "reasoning_effort": "na",
+      "verbosity": "na",
+      "context_size": 128,
+      "rate_limit": -1,
+      "rate_limit_rpm": -1,
+      "roles": "director,expert,developer",
+      "input_tokens_price": 0.25,
+      "output_tokens_price": 2.00
     }
   ]
 }

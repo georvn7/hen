@@ -680,6 +680,11 @@ boost_bst::http::request<boost_bst::http::string_body> Server::prepareBeastReque
         req.set(boost_bst::http::field::authorization, "Bearer " + llm->api_key);
         req.set("User-Agent", PRODUCT_NAME);
     }
+    else if (llm->provider == "alibaba")
+    {
+        req.set(boost_bst::http::field::authorization, "Bearer " + llm->api_key);
+        req.set("User-Agent", PRODUCT_NAME);
+    }
 
     // Set the body
     req.body() = bodyStr;
@@ -1031,7 +1036,8 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
        llm->provider == "cerebras" ||
        llm->provider == "zai" ||
        llm->provider == "minimax" ||
-       llm->provider == "mistral")
+       llm->provider == "mistral" ||
+       llm->provider == "alibaba")
     {
         bool openai_reasoning = startsWith(llm->model, "o1") ||
                               startsWith(llm->model, "o3") ||
@@ -1321,7 +1327,8 @@ web::json::value Server::updateUsage(web::json::value& usageField,
         llm->provider == "cerebras" ||
         llm->provider == "zai" ||
         llm->provider == "minimax" ||
-        llm->provider == "mistral"
+        llm->provider == "mistral" ||
+        llm->provider == "alibaba"
         )
     {
         if (usageField.has_field(U("prompt_tokens"))) {
@@ -1370,7 +1377,7 @@ web::json::value Server::updateUsage(web::json::value& usageField,
            completion_tokens = static_cast<uint32_t>(usageField[U("candidatesTokenCount")].as_number().to_uint64());
        }
     }
-    else if (llm->provider == "ollama")
+    else //if (llm->provider == "ollama" || llm->provider == "vllm")
     {
         // Ollama uses 'prompt_eval_count' for prompt tokens
         if (usageField.has_field(U("prompt_eval_count"))) {
