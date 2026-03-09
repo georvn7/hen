@@ -4771,7 +4771,7 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
             {
                 feedback += "No recorded invocation is available for action '" + std::string(actionLabel);
                 feedback += "' and function '" + functionName + "'. ";
-                feedback += "Choose a different next step or gather fresh execution evidence.\n";
+                feedback += "Choose a different function/invocation or another valid next step.\n";
             }
             return;
         }
