@@ -14,6 +14,7 @@
 
 #define MAX_LOG_SECTIONS_PER_LOCATION 2
 #define MAX_DEBUGGING_STEPS 400
+#define MAX_NEXT_STEP_TRANSPORT_RETRY_ATTEMPTS 10
 #define MAX_REPEATED_INVALID_NEXT_STEP_ATTEMPTS 2
 #define MAX_REPEATED_INVALID_BREAKPOINT_STEP_ATTEMPTS 3
 
@@ -6773,6 +6774,26 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         
         std::string promptNextStepMsg = promptNextStep.str();
         project->captureContext(std::string());
+        auto requestNextStep = [&](const std::string& message, const std::string& stage)
+        {
+            object = web::json::value();
+            for(int attempt = 1; attempt <= MAX_NEXT_STEP_TRANSPORT_RETRY_ATTEMPTS; ++attempt)
+            {
+                if(project->inference(cache, message, schema, object, false))
+                {
+                    return true;
+                }
+            }
+            
+            if(!m_trajectory.empty())
+            {
+                m_trajectory.back().m_debugNotes += "\n[[Next step selection failed]]:\n";
+                m_trajectory.back().m_debugNotes += "Unable to query the LLM " + stage + " after ";
+                m_trajectory.back().m_debugNotes += std::to_string(MAX_NEXT_STEP_TRANSPORT_RETRY_ATTEMPTS) + " attempts.\n";
+            }
+            
+            return false;
+        };
         
         uint32_t sinceLastFix = stepIndex - m_lastFixStep;
         if(sinceLastFix >= DISCLOSE_STOP_STEPS_AFTER_FIX && m_system != "main")
@@ -6787,7 +6808,12 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             promptNextStepMsg += "If you decide to do this, provide your justification in the motivation section.\n";
         }
         
-        project->inference(cache, promptNextStepMsg, schema, object, false);
+        if(!requestNextStep(promptNextStepMsg, "for the next step"))
+        {
+            project->popContext();
+            project->popContext();
+            return false;
+        }
         
         m_nextStep.clear();
         m_nextStep.from_json(object);
@@ -6837,8 +6863,12 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             project->popContext();
             project->captureContext(std::string());
             
-            object = web::json::value();
-            project->inference(cache, feedback, schema, object, false);
+            if(!requestNextStep(feedback, "to repair the next step"))
+            {
+                project->popContext();
+                project->popContext();
+                return false;
+            }
             
             NextDebugStep prevStep = m_nextStep;
             
