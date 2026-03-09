@@ -15,6 +15,7 @@
 #define MAX_LOG_SECTIONS_PER_LOCATION 2
 #define MAX_DEBUGGING_STEPS 400
 #define MAX_REPEATED_INVALID_NEXT_STEP_ATTEMPTS 2
+#define MAX_REPEATED_INVALID_BREAKPOINT_STEP_ATTEMPTS 3
 
 #define TRACE_MAX_MEMBERS 16
 #define TRACE_MIN_MEMBERS 4
@@ -6801,6 +6802,15 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         int validationAttempt = 1;
         int maxValidationAttempts = m_rewardHackingReview.empty() ? 8 : 3;
         int repeatedInvalidAttempts = 0;
+        auto repeatedInvalidLimit = [](const NextDebugStep& step)
+        {
+            if(step.action_type == "debug_function" && !step.breakpoints.empty())
+            {
+                return MAX_REPEATED_INVALID_BREAKPOINT_STEP_ATTEMPTS;
+            }
+            
+            return MAX_REPEATED_INVALID_NEXT_STEP_ATTEMPTS;
+        };
         auto stepRetryKey = [](const NextDebugStep& step)
         {
             // Retry deduplication intentionally ignores motivation.
@@ -6855,7 +6865,7 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
                 if(nextInvalidStepKey == invalidStepKey)
                 {
                     repeatedInvalidAttempts++;
-                    if(repeatedInvalidAttempts >= MAX_REPEATED_INVALID_NEXT_STEP_ATTEMPTS)
+                    if(repeatedInvalidAttempts >= repeatedInvalidLimit(m_nextStep))
                     {
                         break;
                     }
