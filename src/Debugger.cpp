@@ -4881,9 +4881,20 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
         
         if(m_contextVisibility.isVisible(m_nextStep.action_type, m_nextStep.action_subject, m_nextStep.invocation, m_nextStep.line_number))
         {
-            feedback += "\nThe information requested in the last debugging step '" + m_nextStep.action_type;
-            feedback += "' about '" + m_nextStep.action_subject + "' has already been provided in the dscussion.";
-            feedback += " Please find this infomation in our conversation and request the next step!\n";
+            std::string repeatedRequest = m_nextStep.action_type + "('" + m_nextStep.action_subject + "'";
+            if(m_nextStep.invocation > 0)
+            {
+                repeatedRequest += ", invocation=" + std::to_string(m_nextStep.invocation);
+            }
+            if(m_nextStep.line_number > 0)
+            {
+                repeatedRequest += ", line=" + std::to_string(m_nextStep.line_number);
+            }
+            repeatedRequest += ")";
+            
+            feedback += "\nThe requested information " + repeatedRequest + " has already been provided in the discussion. ";
+            feedback += "Do not repeat the same request. Inspect the currently available information and choose a different next step. ";
+            feedback += "If you still need more evidence, request a different function/invocation or use debug_function when fresh execution/data-flow evidence is needed.\n";
         }
     }
     
