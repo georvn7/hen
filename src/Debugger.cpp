@@ -4781,6 +4781,8 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
             return;
         }
         
+        // Deterministic harness repair: for info requests we can clamp to the
+        // last recorded invocation instead of spending another LLM retry.
         m_nextStep.invocation = (int)lastInvocation;
     };
     
