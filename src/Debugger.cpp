@@ -14,6 +14,7 @@
 
 #define MAX_LOG_SECTIONS_PER_LOCATION 2
 #define MAX_DEBUGGING_STEPS 400
+#define MAX_REPEATED_INVALID_NEXT_STEP_ATTEMPTS 2
 
 #define TRACE_MAX_MEMBERS 16
 #define TRACE_MIN_MEMBERS 4
@@ -6833,7 +6834,7 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
                 if(nextInvalidStepKey == invalidStepKey)
                 {
                     repeatedInvalidAttempts++;
-                    if(repeatedInvalidAttempts >= 1)
+                    if(repeatedInvalidAttempts >= MAX_REPEATED_INVALID_NEXT_STEP_ATTEMPTS)
                     {
                         break;
                     }
