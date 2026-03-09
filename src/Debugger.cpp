@@ -6715,6 +6715,7 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         setupSchema<NextDebugStep>(schema);
         
         std::string promptNextStepMsg = promptNextStep.str();
+        project->captureContext(std::string());
         
         uint32_t sinceLastFix = stepIndex - m_lastFixStep;
         if(sinceLastFix >= DISCLOSE_STOP_STEPS_AFTER_FIX && m_system != "main")
@@ -6747,6 +6748,10 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         std::string feedback = validateStep(project, test, validationAttempt);
         while(!feedback.empty() && validationAttempt < maxValidationAttempts)
         {
+            // Keep rejected next-step proposals out of the retry prompt history.
+            project->popContext();
+            project->captureContext(std::string());
+            
             object = web::json::value();
             project->inference(cache, feedback, schema, object, false);
             
@@ -6779,6 +6784,7 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             m_nextStep.motivation = "Run the test to inspect the results and perform post-execution system analysis.";
         }
         
+        project->popContext();
         project->popContext();
     }
     
