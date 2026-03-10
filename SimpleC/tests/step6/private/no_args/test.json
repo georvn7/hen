@@ -1,0 +1,40 @@
+{
+  "name": "S6_expr_ctrlflow_pack",
+  "description": "Standalone runner with ten tests (expressions + control flow): arithmetic, relational, logical, bitwise, assignments, loops, goto, conditional, comma, else. Int‑only params. Returns bitmap of failing tests; 255/254 for no args/unknown name.",
+  "pretest": {
+    "commands": [
+      "clang -E -P ./s6.c -o ./s6_pre.c"
+    ],
+    "input_files": [
+      "s6.c"
+    ],
+    "output_files": [
+      "s6_pre.c"
+    ]
+  },
+  "test": {
+    "input_files": [
+      "s6_pre.c"
+    ],
+    "output_files": [
+      "s6.s"
+    ],
+    "command": "[[result=0]]-v -o ./s6.s ./s6_pre.c"
+  },
+  "posttest": {
+    "commands": [
+      "test -f ./s6.s || (echo '_DEBUG_COMMAND_RESULT=65535' && exit 1)",
+      "clang --target=aarch64-apple-darwin -c ./s6.s -o ./s6.o",
+      "clang --target=aarch64-apple-darwin ./s6.o -o ./s6",
+      "[[debug,result=255]]./s6"
+    ],
+    "input_files": [
+      "s6.s"
+    ],
+    "output_files": [
+      "s6.o",
+      "s6"
+    ]
+  },
+  "io_hint": "Enforce an explicit usage/error branch when inputs are missing; decide strictly from input arity, make access to later args unreachable, and keep the branch deterministic and side-effect free."
+}

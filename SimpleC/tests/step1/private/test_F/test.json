@@ -5,13 +5,21 @@
     "commands": [
       "clang -E -P ./s1.c -o ./s1_pre.c"
     ],
-    "input_files": ["s1.c"],
-    "output_files": ["s1_pre.c"]
+    "input_files": [
+      "s1.c"
+    ],
+    "output_files": [
+      "s1_pre.c"
+    ]
   },
   "test": {
     "command": "[[result=0]]-v -o ./s1.s ./s1_pre.c",
-    "input_files": ["s1_pre.c"],
-    "output_files": ["s1.s"]
+    "input_files": [
+      "s1_pre.c"
+    ],
+    "output_files": [
+      "s1.s"
+    ]
   },
   "posttest": {
     "commands": [
@@ -19,8 +27,13 @@
       "clang --target=aarch64-apple-darwin ./s1.o -o ./s1",
       "[[debug,result=70]]./s1 F"
     ],
-    "input_files": ["s1.s"],
-    "output_files": ["s1.o", "s1"]
+    "input_files": [
+      "s1.s"
+    ],
+    "output_files": [
+      "s1.o",
+      "s1"
+    ]
   },
   "io_hint": "Derive the exit status purely from the provided input via a general rule. Do not special-case known values or consult environment/time/files; the mapping must be deterministic and solely input-driven. Guard missing/empty args with a separate usage path, not hard-coded outputs."
 }

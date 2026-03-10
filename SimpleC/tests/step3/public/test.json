@@ -1,0 +1,40 @@
+{
+  "name": "S3_registry_bitmap",
+  "description": "Standalone runner: parses name[:params], looks name up in a fixed registry, sets its bit in a bitmap, returns the bitmap; 255 if no args, 254 if a name is unknown. (Params are ignored here.)",
+  "pretest": {
+    "commands": [
+      "clang -E -P ./s3.c -o ./s3_pre.c"
+    ],
+    "input_files": [
+      "s3.c"
+    ],
+    "output_files": [
+      "s3_pre.c"
+    ]
+  },
+  "test": {
+    "input_files": [
+      "s3_pre.c"
+    ],
+    "output_files": [
+      "s3.s"
+    ],
+    "command": "[[result=0]]-v -o ./s3.s ./s3_pre.c"
+  },
+  "posttest": {
+    "commands": [
+      "test -f ./s3.s || (echo '_DEBUG_COMMAND_RESULT=65535' && exit 1)",
+      "clang --target=aarch64-apple-darwin -c ./s3.s -o ./s3.o",
+      "clang --target=aarch64-apple-darwin ./s3.o -o ./s3",
+      "[[debug,result=1]]./s3 arithmetic"
+    ],
+    "input_files": [
+      "s3.s"
+    ],
+    "output_files": [
+      "s3.o",
+      "s3"
+    ]
+  },
+  "io_hint": "none"
+}

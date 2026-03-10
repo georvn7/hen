@@ -5,13 +5,21 @@
     "commands": [
       "clang -E -P ./s1.c -o ./s1_pre.c"
     ],
-    "input_files": ["s1.c"],
-    "output_files": ["s1_pre.c"]
+    "input_files": [
+      "s1.c"
+    ],
+    "output_files": [
+      "s1_pre.c"
+    ]
   },
   "test": {
     "command": "[[result=0]]-v -o ./s1.s ./s1_pre.c",
-    "input_files": ["s1_pre.c"],
-    "output_files": ["s1.s"]
+    "input_files": [
+      "s1_pre.c"
+    ],
+    "output_files": [
+      "s1.s"
+    ]
   },
   "posttest": {
     "commands": [
@@ -19,8 +27,13 @@
       "clang --target=aarch64-apple-darwin ./s1.o -o ./s1",
       "[[debug,result=65]]./s1 A"
     ],
-    "input_files": ["s1.s"],
-    "output_files": ["s1.o", "s1"]
+    "input_files": [
+      "s1.s"
+    ],
+    "output_files": [
+      "s1.o",
+      "s1"
+    ]
   },
   "io_hint": "none"
 }
