@@ -6999,13 +6999,17 @@ bool Debugger::saveTestToDirectory(CCodeProject* project, const std::string& tes
     //We need to instrument the *.json.
     //Inserting the function name, for now the only purpose is during training
     {
+        std::string sourceTestJson = testJsonDir + "/test.json";
+        std::string workingTestJson = testDirectory + "/test.json";
         web::json::value json;
-        loadJson(json, testJsonDir + "/test.json");
+        if(!loadJson(json, sourceTestJson))
+        {
+            return false;
+        }
+        
         json[U("function")] = web::json::value::string(utility::conversions::to_string_t(m_system));
-        saveJson(json, testJsonDir + "/test.json");
+        saveJson(json, workingTestJson);
     }
-    
-    boost_fs::copy(testJsonDir + "/test.json", testDirectory + "/test.json");
     
     const auto& inputFiles = test.getInputFiles();
     for(auto file : inputFiles)
