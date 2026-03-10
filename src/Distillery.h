@@ -186,6 +186,7 @@ namespace hen {
                                      uint32_t idealMaxCount,
                                      EditSourceSequence& optimalSequence);
         void pushOptimizedFixTrack(CCodeProject* project, const std::string& message, EditSourceSequence& optimalSequence);
+        EditSourceSequence buildOriginalFixTrack(int fromTrajectoryIndex, int toTrajectoryIndex);
         
         bool checkFixTrackData(CCodeProject* project, uint32_t startStep, uint32_t fixStep);
         void removeFixTrackData(CCodeProject* project, uint32_t startStep, uint32_t fixStep);

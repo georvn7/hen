@@ -2767,6 +2767,30 @@ namespace hen {
         project->pushMessage(sequenceMsg, "assistant", true);
     }
 
+    EditSourceSequence Distillery::buildOriginalFixTrack(int fromTrajectoryIndex, int toTrajectoryIndex)
+    {
+        EditSourceSequence originalSequence;
+        for(int i = fromTrajectoryIndex; i<toTrajectoryIndex; ++i)
+        {
+            const DebugStep& step = m_trajectory[i];
+            if(step.m_action.empty())
+            {
+                continue;
+            }
+            
+            OptimizedStep originalStep;
+            originalStep.action_type = step.m_action;
+            originalStep.action_subject = step.m_subject;
+            originalStep.line_number = (step.m_lineNumber == (uint32_t)-1) ? 0 : step.m_lineNumber;
+            originalStep.invocation = (step.m_invocation == 0) ? 1 : step.m_invocation;
+            originalStep.original_step = trajectoryIndexToStep(i);
+            
+            originalSequence.steps.push_back(std::make_shared<OptimizedStep>(originalStep));
+        }
+        
+        return originalSequence;
+    }
+
     std::string Distillery::optimizeFixTrack(CCodeProject* project,
                                              Cache& cache,
                                              const std::string& trajectoryAnalysis,
@@ -3414,6 +3438,15 @@ namespace hen {
         std::string fixStepStr = std::to_string(fixStep);
         
         std::string datasetDir = project->getProjDir() + "/dataset/" + m_test.name;
+        if(!boost_fs::exists(datasetDir))
+        {
+            boost_fs::create_directories(datasetDir);
+        }
+        
+        EditSourceSequence originalSequence = buildOriginalFixTrack(fixRange.first, fixRange.second);
+        std::string originalJson = "original_fix_" + testStepStr + "_" + fixStepStr + ".json";
+        saveJson(originalSequence.to_json(), datasetDir + "/" + originalJson);
+        
         std::string sysAnalysisSample = "system_" + testStepStr + "_" + fixStepStr;
         
         if(checkFixTrackData(project, startStep, fixStep))
@@ -3460,39 +3493,7 @@ namespace hen {
         }
         else
         {
-            for(int s = fixRange.first; s<fixRange.second; ++s)
-            {
-                NextDebugStep step;
-                int stepId = trajectoryIndexToStep(s);
-                std::string stepDir = project->getProjDir() + "/debug/" + m_test.name + "/trajectory/step_" + std::to_string(stepId);
-                web::json::value stepJson;
-                if(!loadJson(stepJson, stepDir + "/nextStep.json"))
-                {
-                    std::cout << "ERROR: Unable to load fallback optimized step from: ";
-                    std::cout << stepDir + "/nextStep.json" << std::endl;
-                    project->popContext();
-                    return;
-                }
-                step.from_json(stepJson);
-                
-                if(step.action_type.empty())
-                {
-                    std::cout << "ERROR: Fallback optimized step has empty action_type at step ";
-                    std::cout << stepId << std::endl;
-                    project->popContext();
-                    return;
-                }
-                
-                OptimizedStep optimizedStep;
-                
-                optimizedStep.action_type = step.action_type;
-                optimizedStep.action_subject = step.action_subject;
-                optimizedStep.line_number = (step.line_number == (uint32_t)-1) ? 0 : step.line_number;
-                optimizedStep.invocation = (step.invocation == 0) ? 1 : step.invocation;
-                optimizedStep.original_step = stepId;
-                
-                optimalSequence.steps.push_back(std::make_shared<OptimizedStep>(optimizedStep));
-            }
+            optimalSequence = originalSequence;
             
             std::string firstRunStr = std::to_string(trajectoryIndexToStep(fixRange.first));
             std::string lastRunStr = std::to_string(trajectoryIndexToStep(fixRange.second));
