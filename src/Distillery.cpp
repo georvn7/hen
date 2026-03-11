@@ -2819,6 +2819,23 @@ namespace hen {
         int summaryStepIdx = stepToTrajectoryIndex(summaryStep);
         
         int originalSize = fixStep - runStep + 1;
+        std::string idealTargetGuidance;
+        if(idealMaxCount == 0)
+        {
+            idealTargetGuidance = "This is the first optimization rollout for this fix track. ";
+            idealTargetGuidance += "Focus on finding the best valid optimized sequence. ";
+            idealTargetGuidance += "Do not force extra shortening at the expense of grounding, logical progression, or the final source-code effect. ";
+            idealTargetGuidance += "The original segment contains " + std::to_string(originalSize) + " steps.";
+        }
+        else
+        {
+            idealTargetGuidance = "Current best valid optimized sequence uses ";
+            idealTargetGuidance += std::to_string(idealMaxCount) + " steps. ";
+            idealTargetGuidance += "Soft target: try to produce a valid sequence with fewer than ";
+            idealTargetGuidance += std::to_string(idealMaxCount) + " steps if possible. ";
+            idealTargetGuidance += "If that is not possible, return the best valid sequence you can without sacrificing grounding, logical progression, or the final source-code effect. ";
+            idealTargetGuidance += "The original segment contains " + std::to_string(originalSize) + " steps.";
+        }
         
         std::string prevSteps;
         for(int s=summaryStepIdx;s<runStepIndex;++s)
@@ -2866,7 +2883,8 @@ namespace hen {
                             {"app_info", appInfo},
                             {"trajectory", trajecotry},
                             {"fix_track", fixTrack},
-                            {"disclosure_contract", disclosureContract}
+                            {"disclosure_contract", disclosureContract},
+                            {"ideal_target_guidance", idealTargetGuidance}
         });
         
         web::json::value object;
