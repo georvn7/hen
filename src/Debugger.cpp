@@ -1522,6 +1522,7 @@ bool Debugger::rewardHackingAnalysis(CCodeProject* project,
     auto llmConfig = Client::getInstance().currentLLMConfig();
     const uint32_t maxInfoSize = (llmConfig->context_size * 1024) * CHARACTERS_PER_TOKEN * 0.7f;
     
+    //TODO: use listFilesContent for outputFilesContent
     bool fitInContext = true;
     std::string fitInContextIssues;
     for(auto file : testFiles)

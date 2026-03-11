@@ -2776,5 +2776,40 @@ std::string truncateWithNoteUtf8(const std::string& s,
     return utf8TruncateBytes(s, maxBytes - note.size()) + note;
 }
 
+std::string listFilesContent(const std::set<std::string>& testFiles, const std::string& workingDirectory, uint32_t maxInfoSize)
+{
+    std::string outputFilesContent;
+    
+    bool fitInContext = true;
+    std::string fitInContextIssues;
+    for(auto file : testFiles)
+    {
+        std::string fileName = boost_fs::path(file).filename().string();
+        
+        if(!boost_fs::exists(workingDirectory + "/" + file))
+        {
+            continue;
+        }
+        
+        auto fileSize = boost_fs::file_size(workingDirectory + "/" + file);
+        if(fileSize > maxInfoSize)
+        {
+            fitInContext = false;
+            fitInContextIssues += "Size of the file: " + file + " it too big: " + std::to_string(fileSize) + "\n\n";
+            continue;
+        }
+        
+        const int maxCharacters = -1; //No limit here!!!
+        
+        std::string content = getFileContent(workingDirectory + "/" + file);
+
+        outputFilesContent += "\n//File " + fileName + " starts here\n\n";
+        outputFilesContent += content;
+        outputFilesContent += "\n//File " + fileName + " ends here\n";
+    }
+    
+    return outputFilesContent;
+}
+
 
 }

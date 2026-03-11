@@ -1067,4 +1067,7 @@ namespace hen {
 
     std::string utf8TruncateBytes(const std::string& s, size_t maxBytes);
     std::string truncateWithNoteUtf8(const std::string& s, size_t maxBytes, const std::string& note);
+    std::string listFilesContent(const std::set<std::string>& testFiles,
+                                 const std::string& workingDirectory,
+                                 uint32_t maxInfoSize);
 }

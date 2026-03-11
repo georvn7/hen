@@ -3,6 +3,7 @@
 #include <string>
 #include <iomanip>
 #include <functional>
+#include <algorithm>
 
 #ifdef _WIN32
 #include <direct.h>
@@ -46,6 +47,53 @@ void set_cout_enabled(bool enabled) {
         }
     }
 #endif
+}
+
+static bool getServingError(const json::value& response, std::string& code, std::string& message)
+{
+    if(!response.is_object() || !response.has_field(U("error")))
+    {
+        return false;
+    }
+    
+    const auto& error = response.at(U("error"));
+    if(!error.is_object())
+    {
+        return false;
+    }
+    if(error.has_field(U("code")))
+    {
+        if(error.at(U("code")).is_string())
+        {
+            code = utility::conversions::to_utf8string(error.at(U("code")).as_string());
+        }
+        else if(error.at(U("code")).is_integer())
+        {
+            code = std::to_string(error.at(U("code")).as_integer());
+        }
+    }
+    if(error.has_field(U("message")) && error.at(U("message")).is_string())
+    {
+        message = utility::conversions::to_utf8string(error.at(U("message")).as_string());
+    }
+    return true;
+}
+
+static uint32_t transientServingRetryDelayMs(const std::string& code, bool missingResponse, uint32_t attempt)
+{
+    if(code == "1305")
+    {
+        return std::min<uint32_t>(180000, 10000u << std::min<uint32_t>(attempt - 1, 4));
+    }
+    if(code == "1302")
+    {
+        return std::min<uint32_t>(300000, 60000u * attempt);
+    }
+    if(missingResponse)
+    {
+        return std::min<uint32_t>(30000, 5000u * attempt);
+    }
+    return 0;
 }
 
 int Client::init(int argc, char* argv[])
@@ -621,8 +669,34 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
         //This will be deleted on the proxy, before sending it to the LLMs,
         //we need to set it every iteration
         request[U("request_id")] = json::value::number(m_requestId);
+        response = json::value();
         
         Client::sendToServer(request, response);
+        
+        std::string errorCode;
+        std::string errorMessage;
+        bool hasServingError = getServingError(response, errorCode, errorMessage);
+        bool missingResponse = !response.has_field(U("request_id"));
+        uint32_t retryDelayMs = transientServingRetryDelayMs(errorCode, missingResponse, i + 1);
+        if(retryDelayMs > 0)
+        {
+            if(hasServingError)
+            {
+                std::cout << "Transient serving error " << errorCode;
+                if(!errorMessage.empty())
+                {
+                    std::cout << ": " << errorMessage;
+                }
+                std::cout << ". Waiting " << retryDelayMs << " ms before retry." << std::endl;
+            }
+            else
+            {
+                std::cout << "Transient serving timeout/no response. Waiting " << retryDelayMs;
+                std::cout << " ms before retry." << std::endl;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(retryDelayMs));
+            continue;
+        }
         
         if(!response.has_field(U("request_id")))
         {

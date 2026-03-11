@@ -239,7 +239,16 @@ namespace hen {
     {
         std::cout << "Inferencing porject plan" << std::endl;
         
-        //std::string cache = "../../plan.json";
+        TestDef test;
+        std::string testJsonDir = m_projDir + "/tests/default/public";
+        std::string testJsonPath = testJsonDir + "/test.json";
+        if(!test.load(testJsonPath))
+        {
+            return;
+        }
+        
+        std::set<std::string> testFiles = test.getRewardHackingTestFiles(testJsonDir);
+        std::string testFilesContent = listFilesContent(testFiles, testJsonDir, 0xffffffff);
         
         std::string plan = getFileContent(m_projDir + "/plan.txt");
         if(plan.empty())
@@ -252,7 +261,9 @@ namespace hen {
             testFwFile += "/Prompts/TestFramework.txt";
             std::string testFw = getFileContent(testFwFile);
             
-            std::string test = getFileContent(m_projDir + "/tests/default/public/test.json");
+            std::string test = getFileContent(testJsonPath);
+            test += "\n\n\n";
+            test += testFilesContent;
             
             std::string checklist = source_checklist.prompt({{"function", "function_being_implemented"}});
             
