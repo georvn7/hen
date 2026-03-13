@@ -6686,14 +6686,16 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
     //Ensure we have the correct info incorporating the modification from the last debug step
     m_appInfo = getHighLevelAppInfo(project, m_system, PRINT_MAX_FUNCTIONS_DEPTH, PRINT_MAX_FUNCTIONS_DEPTH);
     
+    std::string rawStepInfo = "STEP " + stepIndexStr + ":\n\n";
     if(infoForCurrentStep.empty())
     {
-        m_rawTrajectory.push_back(std::make_pair("No new information was added for this step.", "user"));
+        rawStepInfo += "No new information was added for this step.";
     }
     else
     {
-        m_rawTrajectory.push_back(std::make_pair(infoForCurrentStep, "user"));
+        rawStepInfo += infoForCurrentStep;
     }
+    m_rawTrajectory.push_back(std::make_pair(rawStepInfo, "user"));
     
     std::string info;
     {
@@ -7128,7 +7130,7 @@ std::pair<bool, std::string> Debugger::debug(CCodeProject* project,
     
     //Add source checklist requirements
     {
-        workflowMsg += "\nPROJECT SOURCE CODE REQUIREMENTS\n\n";
+        workflowMsg += "\n\nPROJECT SOURCE CODE REQUIREMENTS\n\n";
         workflowMsg += project->source_checklist.prompt({{"function", "<function_placeholder_name>"}});
         workflowMsg += "\n";
     }
