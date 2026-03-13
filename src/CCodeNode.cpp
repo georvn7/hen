@@ -631,6 +631,22 @@ namespace hen {
         //*****
         
         std::pair<bool, std::set<std::string>> fromEvaluation = getUnknownTypes();
+
+        // Safety net: if the local review misses a type introduced directly in the
+        // signature, seed data-definition work only for app-defined signature types
+        // that do not yet exist in the project.
+        if(!fullyDefinedNode)
+        {
+            std::set<std::string> signatureTypes = proj->getAppTypesForFunction(m_prototype.m_signature);
+            for(const auto& type : signatureTypes)
+            {
+                std::string owningPath;
+                if(!proj->findData(type, owningPath))
+                {
+                    dataTypes.insert(type);
+                }
+            }
+        }
         
         m_dataDef = web::json::value();
         

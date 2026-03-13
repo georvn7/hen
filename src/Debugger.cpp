@@ -4343,7 +4343,6 @@ void Debugger::pushTrajectory(CCodeProject* project)
     
     project->pushMessage(appInfo, "user", true);
     
-    //std::vector<std::string> m_rawTrajectory;
     for(auto step : m_rawTrajectory)
     {
         project->pushMessage(step.first, step.second, true);
