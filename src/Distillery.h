@@ -211,6 +211,7 @@ namespace hen {
         
         void addStepToMessages(CCodeProject* project,
                                const DistilledStep& step,
+                               int stepId,
                                const std::string& newInfo,
                                web::json::value& messages);
         

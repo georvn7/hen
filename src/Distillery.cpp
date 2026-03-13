@@ -2228,6 +2228,7 @@ namespace hen {
 
     void Distillery::addStepToMessages(CCodeProject*,
                                        const DistilledStep& step,
+                                       int stepId,
                                        const std::string& newInfo,
                                        web::json::value& messages)
     {
@@ -2256,7 +2257,8 @@ namespace hen {
         
         web::json::value u;
         u[U("role")] = web::json::value::string(U("user"));
-        u[U("content")] = web::json::value::string(utility::conversions::to_string_t(newInfo));
+        std::string labeledInfo = "STEP " + std::to_string(stepId) + ":\n\n" + newInfo;
+        u[U("content")] = web::json::value::string(utility::conversions::to_string_t(labeledInfo));
         arr[arr.size()] = u;
     }
 
@@ -3597,7 +3599,7 @@ namespace hen {
         std::string startStepStr = std::to_string(startStep);
         int currentStep = startStep;
         web::json::value messages = web::json::value::array();
-#if 0
+#if 1
         for(auto step : optimalSequence.steps)
         {
             std::string currentStepStr = std::to_string(currentStep);
@@ -3693,7 +3695,7 @@ namespace hen {
                 distilledStep.m_debugNotes = systemAnalysis;
                 
                 distilledTrajectory.push_back(distilledStep);
-                addStepToMessages(project, distilledStep, stepInfo.notes(), messages);
+                addStepToMessages(project, distilledStep, currentStep, stepInfo.notes(), messages);
             }
             else if(step->action_type == "debug_function")
             {
@@ -3757,7 +3759,7 @@ namespace hen {
                 
                 int newDebugStep = currentStep - startStep;
                 requestedInfo = rebuildRequestedInfo(project, distilledTrajectory, newDebugStep);
-                addStepToMessages(project, nextStep, newInfo, messages);
+                addStepToMessages(project, nextStep, currentStep, newInfo, messages);
             }
             else
             {
@@ -3797,7 +3799,7 @@ namespace hen {
                 
                 if(NextDebugStep::isInformationRequest(step->action_type))
                 {
-                    addStepToMessages(project, nextStep, newInfo, messages);
+                    addStepToMessages(project, nextStep, currentStep, newInfo, messages);
                 }
             }
             
