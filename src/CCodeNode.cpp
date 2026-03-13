@@ -1614,35 +1614,7 @@ namespace hen {
                 list_functions += "\nConsider using information requests to reuse existing architecture and functionality and avoid introducing extra wrapper/helper layers that increase scope.\n\n";
             }
             
-#if 0
-            inference(cache, list_functions, &infoRequest);
-            
-            while(!infoRequest.empty() && infoRequestsCount < DECOMPOSE_MAX_INFO_REQUESTS)
-            {
-                std::string response;
-                
-                std::string info = proj->provideInfo(infoRequest);
-                response += info;
-                
-                response += "\n\nProvided info requests " + std::to_string(infoRequestsCount);
-                response += " out of maximum " + maxInfoRequestsStr + "\n";
-                response += "Let me know if you need additional information? If you don't need more information in order to decide leave all fields empty";
-                
-                infoRequest.clear();
-                inference(cache, response, &infoRequest);
-                
-                infoRequestsCount++;
-            }
-            
-            if(infoRequestsCount > 1 && !infoRequest.empty())
-            {
-                std::string info = proj->provideInfo(infoRequest);
-                responseInfo += info;
-                responseInfo += "\n\n";
-            }
-#else
             responseInfo = proj->provideInfoLoop(list_functions, DECOMPOSE_MAX_INFO_REQUESTS);
-#endif
         }
         else
         {
@@ -4245,7 +4217,7 @@ namespace hen {
                 restoreContext(archiveId);
             }
             
-            //Remove orivinal source
+            //Remove original source
             popMessages(1);
             
             srcMessage = "```cpp\n";
@@ -5285,11 +5257,12 @@ namespace hen {
         
         bool testIsValid = false;
         
+        pushMessage(message, "user");
+        
         while(!testIsValid && atttempts < maxAttempts)
         {
             captureContext();
             
-            pushMessage(message, "user");
             std::string testDef = utility::conversions::to_utf8string(m_unitTest.definition.to_json().serialize());
             pushMessage(testDef, "assistant");
             
@@ -5315,7 +5288,6 @@ namespace hen {
             popContext();
         }
         
-        pushMessage(message, "user");
         std::string testDef = utility::conversions::to_utf8string(m_unitTest.definition.to_json().serialize());
         pushMessage(testDef, "assistant");
         
