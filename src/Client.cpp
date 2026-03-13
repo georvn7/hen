@@ -96,11 +96,24 @@ static uint32_t transientServingRetryDelayMs(const std::string& code, bool missi
     return 0;
 }
 
+static const char* llmRoleShort(LLMRole role)
+{
+    switch (role)
+    {
+        case LLMRole::DIRECTOR: return "Dir";
+        case LLMRole::EXPERT: return "Exp";
+        case LLMRole::DEVELOPER: return "Dev";
+        case LLMRole::DEBUGGER: return "Dbg";
+    }
+    return "LLM";
+}
+
 int Client::init(int argc, char* argv[])
 {
     m_supportsFunctionCalls = false;
     m_auto = false;
     m_llmLock = false;
+    m_ctxLLMRoleUsed = LLMRole::DIRECTOR;
     m_localUser = true;
     //m_agentPort = -1;
     m_projectId = "";
@@ -629,6 +642,7 @@ void Client::checkLLMContextSize(const json::value& messages, json::value& reque
     }
     
     m_ctxLLMUsed = utility::conversions::to_utf8string(uLLM);
+    m_ctxLLMRoleUsed = currentLLM;
     request[U("llm")] = json::value(uLLM);
 }
 
@@ -902,18 +916,40 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
         response[U("usage")].has_field(U("limit_credits"))
         )
     {
-        uint32_t promptTokens = (uint32_t)response[U("usage")][U("prompt_tokens")].as_number().to_uint64();
-        uint32_t completionTokens = (uint32_t)response[U("usage")][U("completion_tokens")].as_number().to_uint64();
+        uint32_t inputTokens = 0;
+        uint32_t cacheWriteTokens = 0;
+        uint32_t cacheReadTokens = 0;
+        uint32_t outputTokens = 0;
+        if(response[U("usage")].has_field(U("input_tokens")))
+        {
+            inputTokens = (uint32_t)response[U("usage")][U("input_tokens")].as_number().to_uint64();
+        }
+        else if(response[U("usage")].has_field(U("prompt_tokens")))
+        {
+            inputTokens = (uint32_t)response[U("usage")][U("prompt_tokens")].as_number().to_uint64();
+        }
+        if(response[U("usage")].has_field(U("cache_write_tokens")))
+        {
+            cacheWriteTokens = (uint32_t)response[U("usage")][U("cache_write_tokens")].as_number().to_uint64();
+        }
+        if(response[U("usage")].has_field(U("cache_read_tokens")))
+        {
+            cacheReadTokens = (uint32_t)response[U("usage")][U("cache_read_tokens")].as_number().to_uint64();
+        }
+        if(response[U("usage")].has_field(U("output_tokens")))
+        {
+            outputTokens = (uint32_t)response[U("usage")][U("output_tokens")].as_number().to_uint64();
+        }
+        else if(response[U("usage")].has_field(U("completion_tokens")))
+        {
+            outputTokens = (uint32_t)response[U("usage")][U("completion_tokens")].as_number().to_uint64();
+        }
         
         float lastStep = (float)response[U("usage")][U("step_credits")].as_number().to_double();
         float consumed = (float)response[U("usage")][U("consumed_credits")].as_number().to_double();
         uint32_t limit = (uint32_t)response[U("usage")][U("limit_credits")].as_number().to_uint64();
-        
-        std::string llmCfgStr = utility::conversions::to_utf8string(request[U("llm")].as_string());
-        auto llmCfg = splitByFirstOccurence(llmCfgStr, '/');
-        auto usedLLM = findLLM(llmCfg.first, llmCfg.second);
-        
-        setStepCost(usedLLM, lastStep, consumed, limit);
+
+        setStepCost(inputTokens, cacheWriteTokens, cacheReadTokens, outputTokens, lastStep, consumed, limit);
         sendStepLog();
     }
 
@@ -1218,9 +1254,19 @@ void Client::setStepHint(const std::string& stepHint)
     m_stepHint = stepHint;
 }
 
-void Client::setStepCost(std::shared_ptr<LLMConfig> usedLLM, float lastStep, float consumed, uint32_t limit)
+void Client::setStepCost(uint32_t inputTokens,
+                         uint32_t cacheWriteTokens,
+                         uint32_t cacheReadTokens,
+                         uint32_t outputTokens,
+                         float lastStep,
+                         float consumed,
+                         uint32_t limit)
 {
     m_creditsState.m_lastStep = lastStep;
+    m_creditsState.m_inputTokens = inputTokens;
+    m_creditsState.m_cacheWriteTokens = cacheWriteTokens;
+    m_creditsState.m_cacheReadTokens = cacheReadTokens;
+    m_creditsState.m_outputTokens = outputTokens;
     if(limit == 0) {
         m_creditsState.m_limit = 100;
     }
@@ -1234,12 +1280,15 @@ void Client::setStepCost(std::shared_ptr<LLMConfig> usedLLM, float lastStep, flo
     else {
         m_creditsState.m_consumed = consumed;
     }
-    
+    const uint32_t cachedTokens = m_creditsState.m_cacheWriteTokens + m_creditsState.m_cacheReadTokens;
     std::stringstream ss;
-    ss << std::fixed << std::setprecision(4) << m_creditsState.m_lastStep << "/";
-    ss << std::fixed << std::setprecision(2) << m_creditsState.m_consumed << "/";
-    ss << m_creditsState.m_limit;
-    
+    ss << "llm:" << llmRoleShort(m_ctxLLMRoleUsed) << ", $";
+    ss << std::fixed << std::setprecision(4) << m_creditsState.m_lastStep;
+    ss << " | " << m_creditsState.m_inputTokens << " in";
+    ss << ", " << cachedTokens << " cached";
+    ss << ", " << m_creditsState.m_outputTokens << " out";
+    ss << " | $" << std::fixed << std::setprecision(2) << m_creditsState.m_consumed;
+    ss << "/$" << m_creditsState.m_limit;
     m_creditsHint = ss.str();
 }
 
@@ -1260,7 +1309,7 @@ void Client::sendStepLog()
     }
     else
     {
-        stepMessage = "Step " + std::to_string(m_requestId) + " (credit: " + m_creditsHint + "): " + m_stepHint + "\n";
+        stepMessage = "Step " + std::to_string(m_requestId) + " (" + m_creditsHint + "): " + m_stepHint + "\n";
     }
     
     set_cout_enabled(true);

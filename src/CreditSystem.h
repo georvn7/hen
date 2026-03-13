@@ -16,6 +16,10 @@ struct AccountState
     float       m_lastStep;
     float       m_consumed;
     uint32_t    m_limit;
+    uint32_t    m_inputTokens;
+    uint32_t    m_cacheWriteTokens;
+    uint32_t    m_cacheReadTokens;
+    uint32_t    m_outputTokens;
     
     APIKeyFlags m_keyFlags;
     std::string m_apiKey;
@@ -23,7 +27,11 @@ struct AccountState
     AccountState():
     m_lastStep(.0f),
     m_consumed(.0f),
-    m_limit(100) //TODO: Fake for now!
+    m_limit(100), //TODO: Fake for now!
+    m_inputTokens(0),
+    m_cacheWriteTokens(0),
+    m_cacheReadTokens(0),
+    m_outputTokens(0)
     {
         
     }

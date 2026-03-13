@@ -1301,10 +1301,10 @@ web::json::value Server::updateUsage(web::json::value& usageField,
     json::value usage = json::value::object();
 
     // Default values
-    uint32_t prompt_tokens = 0;
-    uint32_t completion_tokens = 0;
+    uint32_t input_tokens = 0;
+    uint32_t output_tokens = 0;
     
-    uint32_t cache_creation_tokens = 0;
+    uint32_t cache_write_tokens = 0;
     uint32_t cache_read_tokens = 0;
     
     //TODO: I'm not quite sure how to properly handle the thinking tokens here
@@ -1312,9 +1312,16 @@ web::json::value Server::updateUsage(web::json::value& usageField,
     // Make sure usageField is valid
     if (!usageField.is_object()) {
         // Return with zeros if usageField is not an object
-        usage[U("prompt_tokens")]   = json::value::number(prompt_tokens);
-        usage[U("completion_tokens")] = json::value::number(completion_tokens);
-        usage[U("total_tokens")]    = json::value::number(prompt_tokens + completion_tokens);
+        usage[U("input_tokens")] = json::value::number(input_tokens);
+        usage[U("cache_write_tokens")] = json::value::number(cache_write_tokens);
+        usage[U("cache_read_tokens")] = json::value::number(cache_read_tokens);
+        usage[U("output_tokens")] = json::value::number(output_tokens);
+        usage[U("prompt_tokens")] = json::value::number(input_tokens + cache_write_tokens + cache_read_tokens);
+        usage[U("completion_tokens")] = json::value::number(output_tokens);
+        usage[U("total_tokens")] = json::value::number(input_tokens + cache_write_tokens + cache_read_tokens + output_tokens);
+        usage[U("step_credits")] = json::value::number(0);
+        usage[U("consumed_credits")] = json::value::number(0);
+        usage[U("limit_credits")] = json::value::number(0);
         return usage;
     }
 
@@ -1332,79 +1339,111 @@ web::json::value Server::updateUsage(web::json::value& usageField,
         )
     {
         if (usageField.has_field(U("prompt_tokens"))) {
-            prompt_tokens = static_cast<uint32_t>(usageField[U("prompt_tokens")].as_number().to_uint64());
+            input_tokens = static_cast<uint32_t>(usageField[U("prompt_tokens")].as_number().to_uint64());
         }
         if (usageField.has_field(U("completion_tokens"))) {
-            completion_tokens = static_cast<uint32_t>(usageField[U("completion_tokens")].as_number().to_uint64());
+            output_tokens = static_cast<uint32_t>(usageField[U("completion_tokens")].as_number().to_uint64());
         }
         
-        if (prompt_tokens == 0 && completion_tokens == 0)
+        if (input_tokens == 0 && output_tokens == 0)
         {
             if (usageField.has_field(U("input_tokens"))) {
-                prompt_tokens = static_cast<uint32_t>(usageField[U("input_tokens")].as_number().to_uint64());
+                input_tokens = static_cast<uint32_t>(usageField[U("input_tokens")].as_number().to_uint64());
             }
             if (usageField.has_field(U("output_tokens"))) {
-                completion_tokens = static_cast<uint32_t>(usageField[U("output_tokens")].as_number().to_uint64());
+                output_tokens = static_cast<uint32_t>(usageField[U("output_tokens")].as_number().to_uint64());
+            }
+        }
+        
+        if (usageField.has_field(U("prompt_tokens_details")) &&
+            usageField[U("prompt_tokens_details")].is_object() &&
+            usageField[U("prompt_tokens_details")].has_field(U("cached_tokens")))
+        {
+            cache_read_tokens = static_cast<uint32_t>(usageField[U("prompt_tokens_details")][U("cached_tokens")].as_number().to_uint64());
+            if(cache_read_tokens <= input_tokens)
+            {
+                input_tokens -= cache_read_tokens;
+            }
+            else
+            {
+                input_tokens = 0;
             }
         }
     }
     else if (llm->provider == "anthropic")
     {
         if (usageField.has_field(U("input_tokens"))) {
-            prompt_tokens = static_cast<uint32_t>(usageField[U("input_tokens")].as_number().to_uint64());
+            input_tokens = static_cast<uint32_t>(usageField[U("input_tokens")].as_number().to_uint64());
         }
         if (usageField.has_field(U("output_tokens"))) {
-            completion_tokens = static_cast<uint32_t>(usageField[U("output_tokens")].as_number().to_uint64());
+            output_tokens = static_cast<uint32_t>(usageField[U("output_tokens")].as_number().to_uint64());
         }
         
         // Prompt caching token fields
         if (usageField.has_field(U("cache_creation_input_tokens"))) {
-            cache_creation_tokens = static_cast<uint32_t>(usageField[U("cache_creation_input_tokens")].as_number().to_uint64());
+            cache_write_tokens = static_cast<uint32_t>(usageField[U("cache_creation_input_tokens")].as_number().to_uint64());
         }
         if (usageField.has_field(U("cache_read_input_tokens"))) {
             cache_read_tokens = static_cast<uint32_t>(usageField[U("cache_read_input_tokens")].as_number().to_uint64());
         }
-        
-        prompt_tokens += cache_creation_tokens + cache_read_tokens;  // HERE
     }
     else if (llm->provider == "google")
     {
        // Google uses 'promptTokenCount' and 'candidatesTokenCount'
        if (usageField.has_field(U("promptTokenCount"))) {
-           prompt_tokens = static_cast<uint32_t>(usageField[U("promptTokenCount")].as_number().to_uint64());
+           input_tokens = static_cast<uint32_t>(usageField[U("promptTokenCount")].as_number().to_uint64());
        }
        if (usageField.has_field(U("candidatesTokenCount"))) {
-           completion_tokens = static_cast<uint32_t>(usageField[U("candidatesTokenCount")].as_number().to_uint64());
+           output_tokens = static_cast<uint32_t>(usageField[U("candidatesTokenCount")].as_number().to_uint64());
        }
     }
     else //if (llm->provider == "ollama" || llm->provider == "vllm")
     {
         // Ollama uses 'prompt_eval_count' for prompt tokens
         if (usageField.has_field(U("prompt_eval_count"))) {
-            prompt_tokens = static_cast<uint32_t>(usageField[U("prompt_eval_count")].as_number().to_uint64());
+            input_tokens = static_cast<uint32_t>(usageField[U("prompt_eval_count")].as_number().to_uint64());
         }
 
         // And 'eval_count' for completion tokens
         if (usageField.has_field(U("eval_count"))) {
-            completion_tokens = static_cast<uint32_t>(usageField[U("eval_count")].as_number().to_uint64());
+            output_tokens = static_cast<uint32_t>(usageField[U("eval_count")].as_number().to_uint64());
         }
     }
     // else if (...) for other providers
 
+    const uint32_t prompt_tokens = input_tokens + cache_write_tokens + cache_read_tokens;
+    const uint32_t completion_tokens = output_tokens;
+    usage[U("input_tokens")] = json::value::number(input_tokens);
+    usage[U("cache_write_tokens")] = json::value::number(cache_write_tokens);
+    usage[U("cache_read_tokens")] = json::value::number(cache_read_tokens);
+    usage[U("output_tokens")] = json::value::number(output_tokens);
     usage[U("prompt_tokens")] = json::value::number(prompt_tokens);
     usage[U("completion_tokens")] = json::value::number(completion_tokens);
     usage[U("total_tokens")] = json::value::number(prompt_tokens + completion_tokens);
     
-    float credits;
-    if (cache_creation_tokens > 0 || cache_read_tokens > 0) {
-        credits = (prompt_tokens / 1000000.0f) * llm->input_tokens_price +
-        (cache_creation_tokens / 1000000.0f) * llm->input_tokens_price * 1.25f +
-        (cache_read_tokens / 1000000.0f) * llm->input_tokens_price * 0.1f +
-        (completion_tokens / 1000000.0f) * llm->output_tokens_price;
-    } else {
-        credits = (prompt_tokens / 1000000.0f) * llm->input_tokens_price +
-        (completion_tokens / 1000000.0f) * llm->output_tokens_price;
+    float cacheWriteMultiplier = 1.0f;
+    float cacheReadMultiplier = 1.0f;
+    if(llm->provider == "anthropic")
+    {
+        cacheWriteMultiplier = 1.25f;
+        cacheReadMultiplier = 0.1f;
     }
+    else if(llm->provider == "openai")
+    {
+        if(startsWith(llm->model, "gpt-5"))
+        {
+            cacheReadMultiplier = 0.1f;
+        }
+        else if(llm->model == "codex-mini-latest")
+        {
+            cacheReadMultiplier = 0.25f;
+        }
+    }
+    float credits =
+        (input_tokens / 1000000.0f) * llm->input_tokens_price +
+        (cache_write_tokens / 1000000.0f) * llm->input_tokens_price * cacheWriteMultiplier +
+        (cache_read_tokens / 1000000.0f) * llm->input_tokens_price * cacheReadMultiplier +
+        (output_tokens / 1000000.0f) * llm->output_tokens_price;
     
     float creditsConsumed = 0;
     uint32_t creditsLimit = 0;
@@ -1425,7 +1464,10 @@ web::json::value Server::updateUsage(web::json::value& usageField,
         {
             APIKeyFlags keyFlags;
             getValues(m_db, apiKey, creditsConsumed, creditsLimit, keyFlags);
-            consumeCredits(m_db, apiKey, credits);
+            if(consumeCredits(m_db, apiKey, credits))
+            {
+                creditsConsumed += credits;
+            }
         }
     }
     
@@ -1584,6 +1626,10 @@ json::value Server::handleResponse(json::value& json_response, std::shared_ptr<L
     {
         // If usage was not present, you could still expose a zeroed usage block
         json::value usage = json::value::object();
+        usage[U("input_tokens")]        = json::value::number(0);
+        usage[U("cache_write_tokens")]  = json::value::number(0);
+        usage[U("cache_read_tokens")]   = json::value::number(0);
+        usage[U("output_tokens")]       = json::value::number(0);
         usage[U("prompt_tokens")]       = json::value::number(0);
         usage[U("completion_tokens")]   = json::value::number(0);
         usage[U("total_tokens")]        = json::value::number(0);

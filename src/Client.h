@@ -75,6 +75,7 @@ namespace hen {
         std::string m_ctxPrompt;
         std::string m_ctxLLMRequested;
         std::string m_ctxLLMUsed;
+        LLMRole m_ctxLLMRoleUsed;
         
         std::map<std::string, std::string>  m_log;
         bool                                m_logEnabled;
@@ -148,7 +149,13 @@ namespace hen {
         void flushLog();
         
         void setStepHint(const std::string& stepHint);
-        void setStepCost(std::shared_ptr<LLMConfig> usedLLM, float lastStep, float consumed, uint32_t limit);
+        void setStepCost(uint32_t inputTokens,
+                         uint32_t cacheWriteTokens,
+                         uint32_t cacheReadTokens,
+                         uint32_t outputTokens,
+                         float lastStep,
+                         float consumed,
+                         uint32_t limit);
         void sendStepLog();
         void agentToServer(const std::string& message);
         
