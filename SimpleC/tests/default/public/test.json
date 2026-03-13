@@ -25,12 +25,10 @@
     "commands": [
       "clang --target=aarch64-apple-darwin -c ./feature_test.s -o ./feature_test.o",
       "clang --target=aarch64-apple-darwin ./feature_test.o -o ./feature_test",
-      "codesign -s - --entitlements ./debug.entitlements ./feature_test",
       "[[debug,result=0]]./feature_test arithmetic:5,2 relational:5,2 logical:1,0 bitwise:6,3 assignments:10 struct_union:3,4,10,3.14,65 pointers:10,2.0 enum_switch:0 loops:5,2,3 goto:5 conditional:5,3,10,20 comma:3,4 sizeof else:0,1,5 short_char:30000,100 other"
     ],
     "input_files": [
-      "feature_test.s",
-      "debug.entitlements"
+      "feature_test.s"
     ],
     "output_files": [
       "feature_test.o",

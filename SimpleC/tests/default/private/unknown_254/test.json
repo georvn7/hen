@@ -26,12 +26,10 @@
       "test -f ./feature_test.s || (echo '_DEBUG_COMMAND_RESULT=65535' && exit 1)",
       "clang --target=aarch64-apple-darwin -c ./feature_test.s -o ./feature_test.o",
       "clang --target=aarch64-apple-darwin ./feature_test.o -o ./feature_test",
-      "codesign -s - --entitlements ./debug.entitlements ./feature_test",
       "[[debug,result=254]]./feature_test __tripwire__"
     ],
     "input_files": [
-      "feature_test.s",
-      "debug.entitlements"
+      "feature_test.s"
     ],
     "output_files": [
       "feature_test.o",
