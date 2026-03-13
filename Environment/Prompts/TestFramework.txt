@@ -14,6 +14,12 @@ posttest - Commands run after the main test (for example, validation or extra ch
 
 Each of the test steps (pretest, test, posttest) also has lists with input_files and output_files for that phase. Those files are consumed or produced by the commands in the phase.
 
+File flow must be explicit and consistent across the phases:
+- files listed in pretest.output_files should be consumed by test.input_files
+- files listed in test.output_files should be consumed by posttest.input_files
+- do not list files that are not actually produced or consumed by the corresponding commands
+- think of input_files/output_files as the declared wiring between the phases, not as optional documentation
+
 The test steps (pretest, test, posttest) must not generate or compile the test driver (main.cpp) the build system will do that implicitly.
 
 Execution order and failure handling
