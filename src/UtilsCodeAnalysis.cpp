@@ -2440,13 +2440,14 @@ std::set<std::string> extractUnknownTypes(const std::string& diagnostics) {
     // 1) Regex patterns to capture relevant lines
     //    a) "Location: Line X, Column Y"
     //    b) "Source line: Some code snippet"
-    //    c) "Error: unknown type name 'XYZ'" or "Error: use of undeclared identifier 'XYZ'"
-    //    d) "Error: no member named 'SomeMember' in 'SomeType'"
+    //    c) "Error/Fatal: unknown type name 'XYZ'" or "Error/Fatal: use of undeclared identifier 'XYZ'"
+    //    d) "Error/Fatal: no member named 'SomeMember' in 'SomeType'"
+    //    e) "type 'XYZ' is undeclared" or "type XYZ is not declared anywhere visible"
     std::regex locationRegex(R"(Location:\s*Line\s+(\d+),\s*Column\s+(\d+))");
     std::regex sourceLineRegex(R"(Source line:\s*(.*))");
-    std::regex errorRegex(R"(Error:\s*(?:unknown type name|use of undeclared identifier)\s*'([^']+)')");
-    // New regex to capture: "Error: no member named 'tokens' in 'MacroDefinition'"
-    std::regex noMemberRegex(R"(Error:\s*no member named\s*'([^']+)'\s*in\s*'([^']+)')");
+    std::regex errorRegex(R"((?:Error|Fatal):\s*(?:unknown type name|use of undeclared identifier)\s*'([^']+)')");
+    std::regex noMemberRegex(R"((?:Error|Fatal):\s*no member named\s*'([^']+)'\s*in\s*'([^']+)')");
+    std::regex undeclaredTypeRegex(R"(type\s+'?([A-Za-z_][A-Za-z0-9_:]*)'?\s+is\s+(?:undeclared|not declared anywhere visible))");
 
     // 2) Track the current location and source line
     int currentLine = -1;
@@ -2528,7 +2529,7 @@ std::set<std::string> extractUnknownTypes(const std::string& diagnostics) {
             continue;
         }
 
-        // d) Check if this line reports: "Error: no member named 'tokens' in 'MacroDefinition'"
+        // d) Check if this line reports: "Error/Fatal: no member named 'tokens' in 'MacroDefinition'"
         if (std::regex_search(line, match, noMemberRegex) && match.size() > 2) {
             // The second capture group is the type in question, e.g. "MacroDefinition"
             std::string ident = match[2].str();
@@ -2543,6 +2544,19 @@ std::set<std::string> extractUnknownTypes(const std::string& diagnostics) {
             }
 
             // Reset for the next block
+            currentLine = -1;
+            currentCol  = -1;
+            currentSourceLine.clear();
+        }
+
+        // e) Check if this line reports: "type 'DiagnosticsConfig' is undeclared"
+        //    or "type DiagnosticsConfig is not declared anywhere visible"
+        if (std::regex_search(line, match, undeclaredTypeRegex) && match.size() > 1) {
+            std::string ident = match[1].str();
+            if (!isAllLowercase(ident) && !isAllUppercase(ident)) {
+                unknownTypes.insert(ident);
+            }
+
             currentLine = -1;
             currentCol  = -1;
             currentSourceLine.clear();
@@ -3449,5 +3463,4 @@ std::string extractBrief(std::string& source) {
 
     return brief;
 }
-
 
