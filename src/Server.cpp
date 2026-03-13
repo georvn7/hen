@@ -1219,17 +1219,40 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
         auto& msgs = requestFromClientBody[U("messages")].as_array();
         for (int i = (int)msgs.size() - 1; i >= 0; --i) {
             if (msgs[i][U("role")].as_string() == U("user")) {
-                auto content = msgs[i][U("content")].as_string();
+                if(msgs[i][U("content")].is_string())
+                {
+                    auto content = msgs[i][U("content")].as_string();
+                    
+                    auto contentBlock = json::value::object();
+                    contentBlock[U("type")] = json::value::string(U("text"));
+                    contentBlock[U("text")] = json::value::string(content);
+                    auto contentArray = json::value::array();
+                    contentArray[0] = contentBlock;
+                    msgs[i][U("content")] = contentArray;
+                }
                 
-                auto contentBlock = json::value::object();
-                contentBlock[U("type")] = json::value::string(U("text"));
-                contentBlock[U("text")] = json::value::string(content);
-                contentBlock[U("cache_control")] = json::value::object();
-                contentBlock[U("cache_control")][U("type")] = json::value::string(U("ephemeral"));
-                
-                auto contentArray = json::value::array();
-                contentArray[0] = contentBlock;
-                msgs[i][U("content")] = contentArray;
+                if(msgs[i][U("content")].is_array() && msgs[i][U("content")].as_array().size() > 0)
+                {
+                    auto& contentArray = msgs[i][U("content")].as_array();
+                    int lastTextBlock = -1;
+                    for(int j = (int)contentArray.size() - 1; j >= 0; --j)
+                    {
+                        if(contentArray[j].is_object() &&
+                           contentArray[j].has_field(U("type")) &&
+                           contentArray[j][U("type")].is_string() &&
+                           contentArray[j][U("type")].as_string() == U("text"))
+                        {
+                            lastTextBlock = j;
+                            break;
+                        }
+                    }
+                    
+                    if(lastTextBlock >= 0)
+                    {
+                        contentArray[lastTextBlock][U("cache_control")] = json::value::object();
+                        contentArray[lastTextBlock][U("cache_control")][U("type")] = json::value::string(U("ephemeral"));
+                    }
+                }
                 break;
             }
         }

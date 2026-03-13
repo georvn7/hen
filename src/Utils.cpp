@@ -2498,44 +2498,74 @@ bool fullRegexMatch(const std::string& logRaw,
     }
 }
 
+namespace {
+
+void appendAnthropicContentBlock(json::value& contentBlocks, const json::value& content)
+{
+    if(content.is_string())
+    {
+        json::value textBlock = json::value::object();
+        textBlock[U("type")] = json::value::string(U("text"));
+        textBlock[U("text")] = json::value::string(content.as_string());
+        auto size = contentBlocks.size();
+        contentBlocks[size] = textBlock;
+        return;
+    }
+    
+    if(content.is_array())
+    {
+        for(const auto& block : content.as_array())
+        {
+            auto size = contentBlocks.size();
+            contentBlocks[size] = block;
+        }
+        return;
+    }
+    
+    if(content.is_object())
+    {
+        auto size = contentBlocks.size();
+        contentBlocks[size] = content;
+    }
+}
+
+}
+
 void alternateRoles(json::value& body)
 {
     uint32_t messagesCount = (uint32_t)body[U("messages")].as_array().size();
     
     string_t currentRole;
-    string_t currentContent;
+    json::value currentContent = json::value::array();
     auto messages = json::value::array();
     for(uint32_t i=0; i<messagesCount; ++i)
     {
-        auto content = body[U("messages")].as_array()[i][U("content")].as_string();
-        auto role = body[U("messages")].as_array()[i][U("role")].as_string();
-        if(role == currentRole || currentRole.empty())
+        const auto& message = body[U("messages")].as_array()[i];
+        auto role = message.at(U("role")).as_string();
+        if(role != currentRole && !currentRole.empty())
         {
-            currentRole = role;
-            currentContent += content;
-        }
-        else
-        {
-            json::value message;
-            message[U("role")] = json::value::string(currentRole);
-            message[U("content")] = json::value::string(currentContent);
+            json::value mergedMessage;
+            mergedMessage[U("role")] = json::value::string(currentRole);
+            mergedMessage[U("content")] = currentContent;
             
             auto size = messages.size();
-            messages[size] = message;
+            messages[size] = mergedMessage;
             
-            currentRole = role;
-            currentContent = content;
+            currentContent = json::value::array();
         }
+        
+        currentRole = role;
+        appendAnthropicContentBlock(currentContent, message.at(U("content")));
     }
     
-    if(!currentRole.empty() && !currentContent.empty())
+    if(!currentRole.empty() && currentContent.size() > 0)
     {
-        json::value message;
-        message[U("role")] = json::value::string(currentRole);
-        message[U("content")] = json::value::string(currentContent);
+        json::value mergedMessage;
+        mergedMessage[U("role")] = json::value::string(currentRole);
+        mergedMessage[U("content")] = currentContent;
         
         auto size = messages.size();
-        messages[size] = message;
+        messages[size] = mergedMessage;
     }
     
     body[U("messages")] = messages;
