@@ -10,9 +10,10 @@ Future agents working in this repo should treat it as a stateful agent system, n
 
 - The most important subsystem is the debugger pipeline in [`src/Debugger.cpp`](src/Debugger.cpp).
 - The inference and provider-normalization boundary is mainly in [`src/Project.cpp`](src/Project.cpp) and [`src/Client.cpp`](src/Client.cpp).
+- Function decomposition and compile-repair behavior are mainly in [`src/CCodeNode.cpp`](src/CCodeNode.cpp).
 - The concrete project pipeline is implemented in [`src/CCodeProject.cpp`](src/CCodeProject.cpp).
 - Prompt files live under [`Environment/`](Environment), especially [`Environment/Debugger/Prompts`](Environment/Debugger/Prompts).
-- Repo-generated state under [`SimpleC/`](SimpleC) can be large, noisy, and intentionally persistent.
+- Repo-generated state under [`SimpleC/`](SimpleC) and top-level build artifacts under [`build/`](build) can be large, noisy, and intentionally persistent.
 
 ## High-Level Architecture
 
@@ -35,10 +36,12 @@ Future agents working in this repo should treat it as a stateful agent system, n
 When starting work, prioritize these files:
 
 - [`README.md`](README.md)
+- [`src/CCodeNode.cpp`](src/CCodeNode.cpp)
 - [`src/Project.cpp`](src/Project.cpp)
 - [`src/Client.cpp`](src/Client.cpp)
 - [`src/CCodeProject.cpp`](src/CCodeProject.cpp)
 - [`src/Debugger.cpp`](src/Debugger.cpp)
+- [`src/Inferencing.cpp`](src/Inferencing.cpp)
 - [`docs/future-debugger-notes.md`](docs/future-debugger-notes.md)
 
 ## Session Start Checklist
@@ -46,12 +49,13 @@ When starting work, prioritize these files:
 At the start of a session:
 
 1. Run `git status --short` and classify the dirty state before editing anything.
-2. Read [`docs/future-debugger-notes.md`](docs/future-debugger-notes.md) if the task touches debugging, inference, context handling, or build switching.
+2. Read [`docs/future-debugger-notes.md`](docs/future-debugger-notes.md) if the task touches debugging, inference, context handling, build switching, decomposition, or compile repair.
 3. Determine which boundary the task is really about:
    - provider/response parsing
    - prompt/context handling
    - debugger state machine
    - instrumentation/build mode
+   - decomposition / compile-repair
    - code generation/project graph
 4. Prefer the smallest reproduction path available.
 5. Avoid mixing architectural cleanup with bug fixing unless the task explicitly requires both.
@@ -98,6 +102,9 @@ Use this as the default ownership map when narrowing a problem.
 
 - [`src/CCodeProject.cpp`](src/CCodeProject.cpp)
   Concrete C++ project workflow, build flow, test/debug entrypoints, DAG repo commit/revert helpers.
+
+- [`src/CCodeNode.cpp`](src/CCodeNode.cpp)
+  Function-level decomposition, source generation, compile-fix loops, refactoring, and local data-definition updates.
 
 - [`src/Debugger.cpp`](src/Debugger.cpp)
   Debug action loop, LLDB/test execution, trace/log analysis, instrumentation, trajectory persistence.
@@ -175,6 +182,34 @@ Notes:
 - Some debugger recovery paths revert the DAG repo to a prior commit.
 - Be careful with any change that broadens or automates destructive reset behavior.
 
+### 6. Decomposition and compile-repair control flow
+
+Files:
+
+- [`src/CCodeNode.cpp`](src/CCodeNode.cpp)
+- [`Environment/Prompts`](Environment/Prompts)
+
+Notes:
+
+- `CCodeNode::decompose()` is effectively the node construction pipeline, not just a call-listing step.
+- `CCodeNode::reviewCompilation()` can widen scope by creating new helper functions while fixing compile errors.
+- Changes here can silently affect graph shape, prompt context, persistence, and downstream debugger behavior.
+
+### 7. Hidden mutable runtime state
+
+Files:
+
+- [`src/Inferencing.cpp`](src/Inferencing.cpp)
+- [`src/Project.cpp`](src/Project.cpp)
+- [`src/CCodeProject.cpp`](src/CCodeProject.cpp)
+- [`src/Debugger.cpp`](src/Debugger.cpp)
+
+Notes:
+
+- Active context selection, prompt search paths, build mode, and trajectory state are ambient mutable state.
+- Prefer scoped guards or explicit session objects over new manual state transitions.
+- If a change introduces one more place that must “remember to restore” state, it is probably increasing risk.
+
 ## Incident Workflow
 
 When the system is failing and the cause is unclear, use this order.
@@ -251,6 +286,8 @@ Use [`docs/future-debugger-notes.md`](docs/future-debugger-notes.md) as the curr
 - what should be preserved
 - what is brittle
 - what should be refactored first
+- how hidden mutable state currently shows up in the code
+- which refactors reduce cleanup/restore risk by construction
 
 Update that document when making significant debugger or inference-stack changes.
 
@@ -311,6 +348,9 @@ Use this matrix to choose the minimum acceptable validation for a change.
 - `src/CCodeProject.cpp`
   Rebuild, then validate project build flow or test/debug entry flow, depending on the touched area.
 
+- `src/CCodeNode.cpp`
+  Rebuild, then validate the touched boundary directly: decomposition changes should exercise at least one decompose/build path; compile-repair changes should exercise at least one real compile-fix loop.
+
 - `src/Inferencing.cpp`
   Rebuild, then verify prompt resolution and context restoration in at least one debugger or codegen flow.
 
@@ -348,6 +388,7 @@ Do not revert unrelated user changes.
 
 Generated-state directories are often diagnostically useful:
 
+- [`build`](build)
 - [`SimpleC/build`](SimpleC/build)
 - [`SimpleC/build_instrumented`](SimpleC/build_instrumented)
 - [`SimpleC/debug`](SimpleC/debug)
