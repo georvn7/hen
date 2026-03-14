@@ -15,6 +15,7 @@ Use it when touching:
 ## What To Preserve
 
 - The persisted debugger action loop in [`src/Debugger.cpp`](../src/Debugger.cpp): `run_test` -> gather evidence -> choose constrained next action -> `fix_function` -> forced `run_test`.
+- The small explicit action vocabulary. Keep the debugger constrained around actions such as `run_test`, `debug_function`, `fix_function`, `function_info`, `data_info`, `call_graph`, and `log_info` rather than flattening it into freeform inspection and editing.
 - Trajectory persistence under `debug/<test>/trajectory/step_N/`, including resumability and compact summarization.
 - The separation of responsibilities between decomposition, compile repair, and runtime debugging:
   - `CCodeNode::decompose()`
@@ -41,6 +42,24 @@ These are the main ambient state channels today:
 
 The practical consequence is that many failures can be caused by stale or mis-restored state rather than by model behavior.
 
+### Provider Normalization Boundary
+
+Provider transport and response normalization are still too entangled with agent logic.
+
+The critical boundary is centered around:
+
+- [`src/Project.cpp`](../src/Project.cpp): `inference()`, `sendRequest()`, and `handleResponse()`
+- [`src/Client.cpp`](../src/Client.cpp): request routing and session-level request metadata
+
+Problems here can present as debugger failures even when the model produced a valid answer. Different providers can vary in:
+
+- `message.content` shape
+- tool / function call fields
+- JSON embedded in strings
+- structured content arrays
+
+This should remain a first-class refactor target separate from debugger policy changes.
+
 ### Oversized Control Functions
 
 These functions carry too much responsibility and are high-risk edit points:
@@ -57,6 +76,17 @@ These functions carry too much responsibility and are high-risk edit points:
 ## Refactor Direction
 
 The right direction is additive hardening, not flattening `hen` into a generic coding agent.
+
+### Do Not Flatten Away The Debugger
+
+Do not refactor `hen` into a generic single-shot coding agent. The debugger is not incidental glue. The core value is:
+
+- runtime-evidence-driven debugging
+- constrained step selection
+- forced verification after edits
+- persisted step-by-step state
+
+The goal is to harden the existing debugger-centered architecture, not to replace it with a looser chat-style loop.
 
 ### Prefer Explicit State Ownership
 
@@ -99,6 +129,20 @@ Good splits would look like:
 
 Keep the behavior the same while reducing the amount of state any single function has to manage.
 
+### Make Debugger Actions First-Class Units
+
+The debugger already behaves like a set of action handlers. The code should move in that direction explicitly.
+
+Useful extraction targets include:
+
+- `RunTestAction`
+- `DebugFunctionAction`
+- `FixFunctionAction`
+- `FunctionInfoAction`
+- `DataInfoAction`
+
+The initial goal is not a framework rewrite. It is to reduce the amount of unrelated mutable state any one action implementation has to coordinate.
+
 ## Specific Risks To Watch
 
 ### Prompt Cache Behavior
@@ -113,9 +157,15 @@ Manual `captureContext()` / `popContext()` pairing is fragile. Early returns in 
 
 Debugger instrumentation currently depends on moving directory names around. If a failure happens between rename steps, subsequent compile or test flows can run against the wrong tree.
 
-### Test Workflow Rollback
+### Repo Recovery And Rollback
 
-`CCodeProject::debugTests()` intentionally uses destructive DAG reset when it decides a unit test is broken. Keep that behavior narrowly scoped and evidence-driven.
+`CCodeProject::debugTests()` intentionally uses destructive DAG reset when it decides a unit test is broken. More broadly, repo recovery after failed fixes is a high-risk boundary.
+
+Keep destructive rollback:
+
+- narrowly scoped
+- evidence-driven
+- separated from ordinary hot-path repair when possible
 
 ## Recommended First Refactors
 
