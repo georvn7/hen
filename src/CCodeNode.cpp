@@ -6508,6 +6508,10 @@ namespace hen {
             return "";
         }
         
+        Client& client = Client::getInstance();
+        LLMRole savedLLM = client.getLLM();
+        client.selectLLM(InferenceIntent::REASON_BREAKDOWN);
+        
         std::string sourceBeforeRefactoring = source;
         
         captureContext();
@@ -6560,6 +6564,8 @@ namespace hen {
                                [&newFunction](const std::shared_ptr<FunctionItem>& funct_ptr) {
             return funct_ptr->func_name == newFunction.func_name;
         });
+        
+        client.selectLLM(InferenceIntent::REASON_BREAKDOWN);
         
         if(itCall == m_calls.items.end())
         {
@@ -6636,6 +6642,7 @@ namespace hen {
             //Revert to the initial version of the source
             source = sourceBeforeRefactoring;
             //We can't do much :(
+            client.setLLM(savedLLM);
             return "";
         }
         
@@ -6679,6 +6686,8 @@ namespace hen {
         refactoredMsg += newFunction.func_name + "' Here is a brief description of " + newFunction.func_name + ":\n";
         refactoredMsg += newFunction.brief;
         pushMessage(refactoredMsg, "user");
+        
+        client.setLLM(savedLLM);
         
         return newFunction.func_name;
     }
