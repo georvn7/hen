@@ -1510,7 +1510,7 @@ namespace hen {
         return true;
     }
 
-    bool CCodeNode::breakdown(bool addLibCalls, bool skipReasoning)
+    bool CCodeNode::breakdown(bool addLibCalls, bool skipReviews, bool skipReasoning)
     {
         Client& client = Client::getInstance();
         CCodeProject* proj = (CCodeProject*)client.project();
@@ -1569,7 +1569,7 @@ namespace hen {
         bool infoRequestsByDepth = depth > ENABLE_INFO_REQUESTS_AFTER_NODE_DEPTH;
         bool enableInfoRequests = infoRequestsByNodeCount || infoRequestsByDepth;
         
-        if(!skipReasoning && enableInfoRequests)
+        if(!skipReviews && enableInfoRequests)
         {
             //Let's give the model a chance to build contextural information
 
@@ -1648,17 +1648,6 @@ namespace hen {
             listDataOnConflict = false;
         }
         
-        if(skipReasoning)
-        {
-            if(m_calls.motivation.empty())
-            {
-                std::cout << "Empty motivation for node!" << std::endl;
-            }
-            
-            return !m_calls.items.empty();
-        }
-        
-        bool wasOnAuto = client.run();
         std::string excludeCalls;
         if(!m_excludeCalls.empty())
         {
@@ -1699,15 +1688,6 @@ namespace hen {
             }
         }
         
-        std::string reviewListFunctions = proj->review_list_functions.prompt({
-            {"caller", m_brief.func_name},
-            {"exclude", excludeCalls}
-        });
-        
-        bool selfReviewPass = inference(cache, reviewListFunctions, true);
-        
-        if(!wasOnAuto) client.stop();
-        
         std::string tooManyFunctions;
         if(m_calls.items.size() > 8)
         {
@@ -1718,7 +1698,32 @@ namespace hen {
             tooManyFunctions += "' in 3 to 6 functoins and then we will further decompose those functions.\n";
         }
         
-        if(!selfReviewPass || !tooManyFunctions.empty())
+        if(skipReviews)
+        {
+            if(m_calls.motivation.empty())
+            {
+                std::cout << "Empty motivation for node!" << std::endl;
+            }
+            
+            return !m_calls.items.empty();
+        }
+        
+        bool wasOnAuto = client.run();
+        
+        std::string reviewListFunctions = proj->review_list_functions.prompt({
+            {"caller", m_brief.func_name},
+            {"exclude", excludeCalls}
+        });
+        
+        bool selfReviewPass = true;
+        if(!skipReasoning)
+        {
+            selfReviewPass = inference(cache, reviewListFunctions, true);
+        }
+        
+        if(!wasOnAuto) client.stop();
+        
+        if(!selfReviewPass || !tooManyFunctions.empty() || !conflictMessage.empty())
         {
             client.selectLLM(InferenceIntent::REASON_BREAKDOWN);
             
@@ -2044,7 +2049,7 @@ namespace hen {
             
             if(noFurtherDecompose || //In case when noFurtherDecompose is true we still want this function to be able to call functions from the library
                functionsCount < PREDICTIVE_BREAKDOWN_AFTER_NODE_COUNT || //Avoid next breakdown condition. Inferencing braekdwon is more expensive than lib search
-               breakdown(false, true)) //From the first breakdown attempt it seems this function calls app-defined functions
+               breakdown(false, true, true)) //From the first breakdown attempt it seems this function calls app-defined functions
             {
                 //We don't want history of the previous breakdown call
                 popContext();
@@ -2062,7 +2067,14 @@ namespace hen {
                     //This time including found library functions for consideration.
                     if(!noFurtherDecompose)
                     {
-                        breakdown(true, false);
+                        //Under certain node depth and count we shouldn't worry too much
+                        //and rely on the project plan to hint the breakdown
+                        
+                        bool skipReasoning =
+                        depth < BREAKDOWN_SKIP_REASONING_BEFORE_NODE_DEPTH &&
+                        functionsCount < BREAKDOWN_SKIP_REASONING_BEFORE_NODE_COUNT;
+                        
+                        breakdown(true, false, skipReasoning);
                     }
                 }
             }

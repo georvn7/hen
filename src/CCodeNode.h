@@ -389,7 +389,7 @@ public:
     void reviewLibFunctions(const std::string& functionList);
     bool isFromLibrary(const std::string& functionName) const;
     const std::shared_ptr<FunctionItem> callsFunction(const std::string& functionName) const;
-    bool breakdown(bool addLibCalls, bool skipReasoning);
+    bool breakdown(bool addLibCalls, bool skipReviews, bool skipReasoning);
     bool resolveName(const CCodeNode* existingFuncNode, FunctionItem& brief);
     std::set<std::string> getCalledFunctions() const;
     std::string refactorTruncatedSource(std::string& source, CodeType srcType);
