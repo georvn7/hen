@@ -1509,8 +1509,12 @@ namespace hen {
         
         return true;
     }
-
-    bool CCodeNode::breakdown(bool addLibCalls, bool skipReviews, bool skipReasoning)
+    
+    // Pressure ladder:
+    // 1. Probe whether app-defined calls are needed.
+    // 2. Add library context and do a fast accept for shallow/small graphs.
+    // 3. Escalate to self-review and revision only when conflicts/size pressure appear.
+    bool CCodeNode::breakdown(bool addLibCalls, bool probeOnly, bool skipSelfReview)
     {
         Client& client = Client::getInstance();
         CCodeProject* proj = (CCodeProject*)client.project();
@@ -1569,7 +1573,7 @@ namespace hen {
         bool infoRequestsByDepth = depth > ENABLE_INFO_REQUESTS_AFTER_NODE_DEPTH;
         bool enableInfoRequests = infoRequestsByNodeCount || infoRequestsByDepth;
         
-        if(!skipReviews && enableInfoRequests)
+        if(!probeOnly && enableInfoRequests)
         {
             //Let's give the model a chance to build contextural information
 
@@ -1698,7 +1702,7 @@ namespace hen {
             tooManyFunctions += "' in 3 to 6 functoins and then we will further decompose those functions.\n";
         }
         
-        if(skipReviews)
+        if(probeOnly)
         {
             if(m_calls.motivation.empty())
             {
@@ -1716,7 +1720,7 @@ namespace hen {
         });
         
         bool selfReviewPass = true;
-        if(!skipReasoning)
+        if(!skipSelfReview)
         {
             selfReviewPass = inference(cache, reviewListFunctions, true);
         }
@@ -2070,11 +2074,11 @@ namespace hen {
                         //Under certain node depth and count we shouldn't worry too much
                         //and rely on the project plan to hint the breakdown
                         
-                        bool skipReasoning =
-                        depth < BREAKDOWN_SKIP_REASONING_BEFORE_NODE_DEPTH &&
-                        functionsCount < BREAKDOWN_SKIP_REASONING_BEFORE_NODE_COUNT;
+                        bool skipSelfReview =
+                        depth < BREAKDOWN_SKIP_SELF_REVIEW_BEFORE_NODE_DEPTH &&
+                        functionsCount < BREAKDOWN_SKIP_SELF_REVIEW_BEFORE_NODE_COUNT;
                         
-                        breakdown(true, false, skipReasoning);
+                        breakdown(true, false, skipSelfReview);
                     }
                 }
             }
