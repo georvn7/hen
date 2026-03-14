@@ -103,6 +103,7 @@ namespace hen {
         FunctionItem m_items;
         
         std::string m_buildCacheDir;
+        std::string m_plan;
         
         void clear();
         
@@ -182,7 +183,8 @@ namespace hen {
         Node* setup(const std::string& projectDir) override;
         void inferenceProjDesc(CCodeNode* root);
         void inferenceProjItems(CCodeNode* root);
-        void inferenceProjPlan(CCodeNode* root);
+        void inferenceProjPlan();
+        const std::string& whatsThePlan() const {return m_plan;}
         
         boost::optional<const DataInfo&> findData(const std::string& type, std::string& owningPath) const;
         boost::optional<const DataInfo&> findDataFromSnapshot(const std::string& type, std::string& owningPath);

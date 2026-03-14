@@ -1545,6 +1545,7 @@ namespace hen {
         
         std::string list_functions = "\n";
         list_functions += proj->list_functions.prompt({
+            {"plan", proj->whatsThePlan()},
             {"abstract", proj->abstract_programming.prompt()},
             {"caller", m_brief.func_name},
             {"library", libraryFunctions},

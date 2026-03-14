@@ -235,27 +235,27 @@ namespace hen {
         std::cout << "Porject items saved to: " << m_projDir << "/items.json" << std::endl;
     }
 
-    void CCodeProject::inferenceProjPlan(CCodeNode* root)
+    void CCodeProject::inferenceProjPlan()
     {
         std::cout << "Inferencing porject plan" << std::endl;
         
-        TestDef test;
+        std::string testFilesContent;
+        
+        TestDef testCase;
         std::string testJsonDir = m_projDir + "/tests/default/public";
         std::string testJsonPath = testJsonDir + "/test.json";
-        if(!test.load(testJsonPath))
+        if(testCase.load(testJsonPath))
         {
-            return;
+            std::set<std::string> testFiles = testCase.getRewardHackingTestFiles(testJsonDir);
+            testFilesContent = listFilesContent(testFiles, testJsonDir, 0xffffffff);
         }
-        
-        std::set<std::string> testFiles = test.getRewardHackingTestFiles(testJsonDir);
-        std::string testFilesContent = listFilesContent(testFiles, testJsonDir, 0xffffffff);
         
         std::string plan = getFileContent(m_projDir + "/plan.txt");
         if(plan.empty())
         {
             Client::getInstance().setLLM(LLMRole::DIRECTOR);
             
-            root->captureContext();
+            captureContext(std::string());
             
             std::string testFwFile = Client::getInstance().getEnvironmentDir();
             testFwFile += "/Prompts/TestFramework.txt";
@@ -266,6 +266,11 @@ namespace hen {
             test += testFilesContent;
             
             std::string checklist = source_checklist.prompt({{"function", "function_being_implemented"}});
+            
+            //TODO: First we need a prompt to compare the current project with 2 or 3 sample projects
+            //to try to estimate the complexity! The current values for max_functions and min_functions
+            //work only for the test use case the simple C compiler.
+            //We need to find those (and other attributes) comparing projects relative complexity
             
             Prompt planing("Planing.txt", {
                 {"code_checklist", checklist},
@@ -281,7 +286,11 @@ namespace hen {
             plan = "review";
             inference(cache, planing.str(), plan, &truncated);
             
-            root->popContext();
+            //TODO: We need another prompt to get a structure data in JSON how many functions
+            //(and other attributes) we have in the proposed plan and to reason about.
+            //But for now for the testing use case (simple C compiler) is fine
+            
+            popContext();
             
             std::ofstream planFile(m_projDir + "/plan.txt");
             planFile << plan << std::endl;
@@ -290,9 +299,7 @@ namespace hen {
             std::cout << "Porject plan saved to: " << m_projDir << "/plan.txt" << std::endl;
         }
         
-        plan = "PROJECT ARCHITECTURE PLAN\n\n" + plan;
-        
-        pushMessage(plan, "user", true);
+        m_plan = "PROJECT ARCHITECTURE PLAN\n\n" + plan;
     }
 
 	Node* CCodeProject::setup(const std::string& projectDir)
@@ -384,8 +391,6 @@ namespace hen {
         
         std::string builCache = "cache/build";
         setBuildCacheDir(builCache);
-        
-        inferenceProjPlan(root);
 
         return root;
 	}
@@ -2719,6 +2724,8 @@ namespace hen {
 
     void CCodeProject::load()
     {
+        inferenceProjPlan();
+        
         if(m_cache)
         {
             m_tempGraph = loadDataDefinitions();
