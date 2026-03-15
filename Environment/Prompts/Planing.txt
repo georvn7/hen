@@ -15,6 +15,7 @@ Prepare a concise plan about the project architecture just enough to pass the fi
     * Application, Sub-system, Component, Module are functional decomposition levels.
     * Each node in the hierarchy must correspond to a function.
 - Keep only necessary functions (minimize total count, while satisfying test requirements).
+- Every optional intermediate subsystem must be justified by concrete reductions in total implementation and debugging complexity for the required features only.
 - The total number of functions must not exceed [[max_functions]]
 - The total number of functions is unlikely to be less than [[min_functions]]
 - Keep child-function fan-out low at each level, ideally <= 6
