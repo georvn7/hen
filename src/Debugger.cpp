@@ -4872,6 +4872,9 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
     }
     else if(m_nextStep.isInformationRequest())
     {
+        //For now I will disable this as it doen't leave traces in the trajectory
+        //for wrong info request and the model will keep asking
+#if 0
         if(m_nextStep.action_type == "function_info")
         {
             uint32_t lastTraceInvocation = 0;
@@ -4889,6 +4892,7 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
             uint32_t lastLogInvocation = m_logger.logGetLastInvocation(m_nextStep.action_subject).second;
             repairInvocation(m_nextStep.action_subject, lastLogInvocation, "log_info");
         }
+#endif
         
         if(m_contextVisibility.isVisible(m_nextStep.action_type, m_nextStep.action_subject, m_nextStep.invocation, m_nextStep.line_number))
         {
