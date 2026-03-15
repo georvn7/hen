@@ -17,6 +17,133 @@ using namespace http::experimental::listener;
 
 namespace hen {
 
+namespace {
+
+bool isOpenAICompatibleUsageProvider(const std::string& provider)
+{
+    return provider == "groq" ||
+           provider == "openai" ||
+           provider == "deepinfra" ||
+           provider == "deepseek" ||
+           provider == "xAI" ||
+           provider == "cerebras" ||
+           provider == "zai" ||
+           provider == "minimax" ||
+           provider == "mistral" ||
+           provider == "alibaba";
+}
+
+uint32_t readUIntField(const web::json::value& object, const utility::string_t& field)
+{
+    if (!object.is_object() || !object.has_field(field)) {
+        return 0;
+    }
+
+    const web::json::value& value = object.at(field);
+    if (!value.is_number()) {
+        return 0;
+    }
+
+    return static_cast<uint32_t>(value.as_number().to_uint64());
+}
+
+uint32_t readNestedUIntField(const web::json::value& object,
+                             const utility::string_t& parent,
+                             const utility::string_t& field)
+{
+    if (!object.is_object() || !object.has_field(parent)) {
+        return 0;
+    }
+
+    const web::json::value& parentValue = object.at(parent);
+    if (!parentValue.is_object()) {
+        return 0;
+    }
+
+    return readUIntField(parentValue, field);
+}
+
+float anthropicCacheWriteCredits(const web::json::value& usageField,
+                                 float inputTokenPrice,
+                                 uint32_t& normalizedCacheWriteTokens)
+{
+    const uint32_t cacheWrite5mTokens = readNestedUIntField(usageField,
+                                                            U("cache_creation"),
+                                                            U("ephemeral_5m_input_tokens"));
+    const uint32_t cacheWrite1hTokens = readNestedUIntField(usageField,
+                                                            U("cache_creation"),
+                                                            U("ephemeral_1h_input_tokens"));
+
+    if (cacheWrite5mTokens == 0 && cacheWrite1hTokens == 0) {
+        return -1.0f;
+    }
+
+    normalizedCacheWriteTokens = cacheWrite5mTokens + cacheWrite1hTokens;
+
+    return
+        (cacheWrite5mTokens / 1000000.0f) * inputTokenPrice * 1.25f +
+        (cacheWrite1hTokens / 1000000.0f) * inputTokenPrice * 2.0f;
+}
+
+void splitCachedPromptTokens(uint32_t totalPromptTokens,
+                             uint32_t cachedTokens,
+                             uint32_t& uncachedPromptTokens,
+                             uint32_t& normalizedCachedTokens)
+{
+    normalizedCachedTokens = cachedTokens;
+    if (normalizedCachedTokens <= totalPromptTokens) {
+        uncachedPromptTokens = totalPromptTokens - normalizedCachedTokens;
+    }
+    else {
+        uncachedPromptTokens = 0;
+        normalizedCachedTokens = totalPromptTokens;
+    }
+}
+
+float inferredCacheWritePrice(const LLMConfig& llm)
+{
+    if (llm.provider == "anthropic") {
+        return llm.input_tokens_price * 1.25f;
+    }
+
+    // Unknown models should prefer explicit registry prices over guessed write discounts.
+    return llm.input_tokens_price;
+}
+
+float inferredCacheReadPrice(const LLMConfig& llm)
+{
+    if (llm.provider == "anthropic") {
+        return llm.input_tokens_price * 0.1f;
+    }
+
+    if (llm.provider == "groq") {
+        return llm.input_tokens_price * 0.5f;
+    }
+
+    // OpenAI-family cached pricing is model-specific. Use explicit registry prices there.
+    return llm.input_tokens_price;
+}
+
+float effectiveCacheWritePrice(const LLMConfig& llm)
+{
+    if (llm.cache_write_tokens_price >= 0.0f) {
+        return llm.cache_write_tokens_price;
+    }
+
+    return inferredCacheWritePrice(llm);
+}
+
+float effectiveCacheReadPrice(const LLMConfig& llm)
+{
+    if (llm.cache_read_tokens_price >= 0.0f) {
+        return llm.cache_read_tokens_price;
+    }
+
+    return inferredCacheReadPrice(llm);
+}
+
+} // namespace
+
 bool AgentServerEP::receive(std::shared_ptr<RemoteEP> remote, std::shared_ptr<Message> msg)
 {
     bool found = false;
@@ -1329,6 +1456,7 @@ web::json::value Server::updateUsage(web::json::value& usageField,
     
     uint32_t cache_write_tokens = 0;
     uint32_t cache_read_tokens = 0;
+    float cache_write_credits = -1.0f;
     
     //TODO: I'm not quite sure how to properly handle the thinking tokens here
 
@@ -1349,88 +1477,52 @@ web::json::value Server::updateUsage(web::json::value& usageField,
     }
 
     // Distinguish by provider
-    if (llm->provider == "groq" ||
-        llm->provider == "openai" ||
-        llm->provider == "deepinfra" ||
-        llm->provider == "deepseek" ||
-        llm->provider == "xAI" ||
-        llm->provider == "cerebras" ||
-        llm->provider == "zai" ||
-        llm->provider == "minimax" ||
-        llm->provider == "mistral" ||
-        llm->provider == "alibaba"
-        )
+    if (isOpenAICompatibleUsageProvider(llm->provider))
     {
-        if (usageField.has_field(U("prompt_tokens"))) {
-            input_tokens = static_cast<uint32_t>(usageField[U("prompt_tokens")].as_number().to_uint64());
+        const uint32_t prompt_tokens = readUIntField(usageField, U("prompt_tokens"));
+        const uint32_t completion_tokens = readUIntField(usageField, U("completion_tokens"));
+        const uint32_t response_input_tokens = readUIntField(usageField, U("input_tokens"));
+        const uint32_t response_output_tokens = readUIntField(usageField, U("output_tokens"));
+
+        input_tokens = response_input_tokens > 0 ? response_input_tokens : prompt_tokens;
+        output_tokens = response_output_tokens > 0 ? response_output_tokens : completion_tokens;
+
+        cache_read_tokens = readNestedUIntField(usageField, U("input_tokens_details"), U("cached_tokens"));
+        if (cache_read_tokens == 0) {
+            cache_read_tokens = readNestedUIntField(usageField, U("prompt_tokens_details"), U("cached_tokens"));
         }
-        if (usageField.has_field(U("completion_tokens"))) {
-            output_tokens = static_cast<uint32_t>(usageField[U("completion_tokens")].as_number().to_uint64());
-        }
-        
-        if (input_tokens == 0 && output_tokens == 0)
-        {
-            if (usageField.has_field(U("input_tokens"))) {
-                input_tokens = static_cast<uint32_t>(usageField[U("input_tokens")].as_number().to_uint64());
-            }
-            if (usageField.has_field(U("output_tokens"))) {
-                output_tokens = static_cast<uint32_t>(usageField[U("output_tokens")].as_number().to_uint64());
-            }
-        }
-        
-        if (usageField.has_field(U("prompt_tokens_details")) &&
-            usageField[U("prompt_tokens_details")].is_object() &&
-            usageField[U("prompt_tokens_details")].has_field(U("cached_tokens")))
-        {
-            cache_read_tokens = static_cast<uint32_t>(usageField[U("prompt_tokens_details")][U("cached_tokens")].as_number().to_uint64());
-            if(cache_read_tokens <= input_tokens)
-            {
-                input_tokens -= cache_read_tokens;
-            }
-            else
-            {
-                input_tokens = 0;
-            }
-        }
+
+        splitCachedPromptTokens(input_tokens, cache_read_tokens, input_tokens, cache_read_tokens);
     }
     else if (llm->provider == "anthropic")
     {
-        if (usageField.has_field(U("input_tokens"))) {
-            input_tokens = static_cast<uint32_t>(usageField[U("input_tokens")].as_number().to_uint64());
-        }
-        if (usageField.has_field(U("output_tokens"))) {
-            output_tokens = static_cast<uint32_t>(usageField[U("output_tokens")].as_number().to_uint64());
-        }
+        input_tokens = readUIntField(usageField, U("input_tokens"));
+        output_tokens = readUIntField(usageField, U("output_tokens"));
         
         // Prompt caching token fields
-        if (usageField.has_field(U("cache_creation_input_tokens"))) {
-            cache_write_tokens = static_cast<uint32_t>(usageField[U("cache_creation_input_tokens")].as_number().to_uint64());
-        }
-        if (usageField.has_field(U("cache_read_input_tokens"))) {
-            cache_read_tokens = static_cast<uint32_t>(usageField[U("cache_read_input_tokens")].as_number().to_uint64());
-        }
+        cache_write_tokens = readUIntField(usageField, U("cache_creation_input_tokens"));
+        cache_read_tokens = readUIntField(usageField, U("cache_read_input_tokens"));
+        cache_write_credits = anthropicCacheWriteCredits(usageField,
+                                                        llm->input_tokens_price,
+                                                        cache_write_tokens);
     }
     else if (llm->provider == "google")
     {
-       // Google uses 'promptTokenCount' and 'candidatesTokenCount'
-       if (usageField.has_field(U("promptTokenCount"))) {
-           input_tokens = static_cast<uint32_t>(usageField[U("promptTokenCount")].as_number().to_uint64());
-       }
-       if (usageField.has_field(U("candidatesTokenCount"))) {
-           output_tokens = static_cast<uint32_t>(usageField[U("candidatesTokenCount")].as_number().to_uint64());
-       }
+       // Google uses usageMetadata with prompt, cached, candidate and thinking buckets.
+       input_tokens = readUIntField(usageField, U("promptTokenCount"));
+       cache_read_tokens = readUIntField(usageField, U("cachedContentTokenCount"));
+       splitCachedPromptTokens(input_tokens, cache_read_tokens, input_tokens, cache_read_tokens);
+
+       output_tokens = readUIntField(usageField, U("candidatesTokenCount"));
+       output_tokens += readUIntField(usageField, U("thoughtsTokenCount"));
     }
     else //if (llm->provider == "ollama" || llm->provider == "vllm")
     {
         // Ollama uses 'prompt_eval_count' for prompt tokens
-        if (usageField.has_field(U("prompt_eval_count"))) {
-            input_tokens = static_cast<uint32_t>(usageField[U("prompt_eval_count")].as_number().to_uint64());
-        }
+        input_tokens = readUIntField(usageField, U("prompt_eval_count"));
 
         // And 'eval_count' for completion tokens
-        if (usageField.has_field(U("eval_count"))) {
-            output_tokens = static_cast<uint32_t>(usageField[U("eval_count")].as_number().to_uint64());
-        }
+        output_tokens = readUIntField(usageField, U("eval_count"));
     }
     // else if (...) for other providers
 
@@ -1444,28 +1536,15 @@ web::json::value Server::updateUsage(web::json::value& usageField,
     usage[U("completion_tokens")] = json::value::number(completion_tokens);
     usage[U("total_tokens")] = json::value::number(prompt_tokens + completion_tokens);
     
-    float cacheWriteMultiplier = 1.0f;
-    float cacheReadMultiplier = 1.0f;
-    if(llm->provider == "anthropic")
-    {
-        cacheWriteMultiplier = 1.25f;
-        cacheReadMultiplier = 0.1f;
-    }
-    else if(llm->provider == "openai")
-    {
-        if(startsWith(llm->model, "gpt-5"))
-        {
-            cacheReadMultiplier = 0.1f;
-        }
-        else if(llm->model == "codex-mini-latest")
-        {
-            cacheReadMultiplier = 0.25f;
-        }
+    const float cacheWritePrice = effectiveCacheWritePrice(*llm);
+    const float cacheReadPrice = effectiveCacheReadPrice(*llm);
+    if (cache_write_credits < 0.0f) {
+        cache_write_credits = (cache_write_tokens / 1000000.0f) * cacheWritePrice;
     }
     float credits =
         (input_tokens / 1000000.0f) * llm->input_tokens_price +
-        (cache_write_tokens / 1000000.0f) * llm->input_tokens_price * cacheWriteMultiplier +
-        (cache_read_tokens / 1000000.0f) * llm->input_tokens_price * cacheReadMultiplier +
+        cache_write_credits +
+        (cache_read_tokens / 1000000.0f) * cacheReadPrice +
         (output_tokens / 1000000.0f) * llm->output_tokens_price;
     
     float creditsConsumed = 0;

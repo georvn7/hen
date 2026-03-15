@@ -10,8 +10,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 3.50,
-      "output_tokens_price": 11.00
+      "input_tokens_price": 2.50,
+      "cache_read_tokens_price": 1.25,
+      "output_tokens_price": 10.00
     },
     {
       "provider": "openai",
@@ -23,8 +24,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "developer",
-      "input_tokens_price": 1.150,
-      "output_tokens_price": 1.600
+      "input_tokens_price": 0.15,
+      "cache_read_tokens_price": 0.075,
+      "output_tokens_price": 0.60
     },
     {
       "provider": "openai",
@@ -36,8 +38,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director",
-      "input_tokens_price": 16.00,
-      "output_tokens_price": 61.00
+      "input_tokens_price": 15.00,
+      "cache_read_tokens_price": 7.50,
+      "output_tokens_price": 60.00
     },
     {
       "provider": "openai",
@@ -49,8 +52,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director",
-      "input_tokens_price": 16.00,
-      "output_tokens_price": 61.00
+      "input_tokens_price": 15.00,
+      "cache_read_tokens_price": 7.50,
+      "output_tokens_price": 60.00
     },
     {
       "provider": "openai",
@@ -62,8 +66,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 2.10,
-      "output_tokens_price": 5.40
+      "input_tokens_price": 1.10,
+      "cache_read_tokens_price": 0.55,
+      "output_tokens_price": 4.40
     },
     {
       "provider": "openai",
@@ -75,8 +80,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 2.10,
-      "output_tokens_price": 5.40
+      "input_tokens_price": 1.10,
+      "cache_read_tokens_price": 0.55,
+      "output_tokens_price": 4.40
     },
     {
       "provider": "openai",
@@ -88,8 +94,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 2.10,
-      "output_tokens_price": 5.40
+      "input_tokens_price": 1.10,
+      "cache_read_tokens_price": 0.55,
+      "output_tokens_price": 4.40
     },
     {
       "provider": "openai",
@@ -101,8 +108,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 2.10,
-      "output_tokens_price": 5.40
+      "input_tokens_price": 1.10,
+      "cache_read_tokens_price": 0.55,
+      "output_tokens_price": 4.40
     },
     {
       "provider": "openai",
@@ -114,8 +122,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 2.10,
-      "output_tokens_price": 5.40
+      "input_tokens_price": 1.10,
+      "cache_read_tokens_price": 0.275,
+      "output_tokens_price": 4.40
     },
     {
       "provider": "openai",
@@ -127,8 +136,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 2.10,
-      "output_tokens_price": 5.40
+      "input_tokens_price": 1.10,
+      "cache_read_tokens_price": 0.275,
+      "output_tokens_price": 4.40
     },
     {
       "provider": "openai",
@@ -140,8 +150,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 2.10,
-      "output_tokens_price": 5.40
+      "input_tokens_price": 1.10,
+      "cache_read_tokens_price": 0.275,
+      "output_tokens_price": 4.40
     },
     {
       "provider": "openai",
@@ -153,8 +164,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 10.00,
-      "output_tokens_price": 40.00
+      "input_tokens_price": 2.00,
+      "cache_read_tokens_price": 0.50,
+      "output_tokens_price": 8.00
     },
     {
       "provider": "openai",
@@ -166,8 +178,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert",
-      "input_tokens_price": 3.00,
-      "output_tokens_price": 9.00
+      "input_tokens_price": 2.00,
+      "cache_read_tokens_price": 0.50,
+      "output_tokens_price": 8.00
     },
     {
       "provider": "openai",
@@ -179,8 +192,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "expert,developer",
-      "input_tokens_price": 1.40,
-      "output_tokens_price": 2.60
+      "input_tokens_price": 0.40,
+      "cache_read_tokens_price": 0.10,
+      "output_tokens_price": 1.60
     },
     {
       "provider": "openai",
@@ -192,8 +206,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "developer",
-      "input_tokens_price": 1.10,
-      "output_tokens_price": 1.40
+      "input_tokens_price": 0.10,
+      "cache_read_tokens_price": 0.025,
+      "output_tokens_price": 0.40
     },
     {
       "provider": "openai",
@@ -206,6 +221,7 @@
       "rate_limit_rpm": -1,
       "roles": "director",
       "input_tokens_price": 1.25,
+      "cache_read_tokens_price": 0.125,
       "output_tokens_price": 10.00
     },
     {
@@ -219,6 +235,7 @@
       "rate_limit_rpm": -1,
       "roles": "director",
       "input_tokens_price": 1.25,
+      "cache_read_tokens_price": 0.125,
       "output_tokens_price": 10.00
     },
     {
@@ -232,6 +249,7 @@
       "rate_limit_rpm": -1,
       "roles": "director",
       "input_tokens_price": 1.75,
+      "cache_read_tokens_price": 0.175,
       "output_tokens_price": 14.00
     },
     {
@@ -245,6 +263,7 @@
       "rate_limit_rpm": -1,
       "roles": "director",
       "input_tokens_price": 2.50,
+      "cache_read_tokens_price": 0.25,
       "output_tokens_price": 15.00
     },
     {
@@ -258,6 +277,7 @@
       "rate_limit_rpm": -1,
       "roles": "director, expert, developer",
       "input_tokens_price": 0.25,
+      "cache_read_tokens_price": 0.025,
       "output_tokens_price": 2.00
     },
     {
@@ -271,6 +291,7 @@
       "rate_limit_rpm": -1,
       "roles": "expert, developer",
       "input_tokens_price": 0.25,
+      "cache_read_tokens_price": 0.025,
       "output_tokens_price": 2.00
     },
     {
@@ -284,6 +305,7 @@
       "rate_limit_rpm": -1,
       "roles": "developer",
       "input_tokens_price": 0.05,
+      "cache_read_tokens_price": 0.005,
       "output_tokens_price": 0.40
     },
     {
@@ -297,6 +319,7 @@
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
       "input_tokens_price": 1.50,
+      "cache_read_tokens_price": 0.375,
       "output_tokens_price": 6.00
     },
     {
@@ -310,6 +333,7 @@
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
       "input_tokens_price": 1.75,
+      "cache_read_tokens_price": 0.175,
       "output_tokens_price": 14.00
     },
     {
@@ -323,6 +347,7 @@
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
       "input_tokens_price": 1.75,
+      "cache_read_tokens_price": 0.175,
       "output_tokens_price": 14.00
     },
     {
@@ -335,8 +360,10 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 4.00,
-      "output_tokens_price": 16.00
+      "input_tokens_price": 3.00,
+      "cache_write_tokens_price": 3.75,
+      "cache_read_tokens_price": 0.30,
+      "output_tokens_price": 15.00
     },
     {
       "provider": "anthropic",
@@ -348,8 +375,10 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 4.00,
-      "output_tokens_price": 16.00
+      "input_tokens_price": 3.00,
+      "cache_write_tokens_price": 3.75,
+      "cache_read_tokens_price": 0.30,
+      "output_tokens_price": 15.00
     },
     {
       "provider": "anthropic",
@@ -361,8 +390,10 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 4.00,
-      "output_tokens_price": 16.00
+      "input_tokens_price": 3.00,
+      "cache_write_tokens_price": 3.75,
+      "cache_read_tokens_price": 0.30,
+      "output_tokens_price": 15.00
     },
     {
       "provider": "anthropic",
@@ -374,8 +405,10 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 4.00,
-      "output_tokens_price": 16.00
+      "input_tokens_price": 3.00,
+      "cache_write_tokens_price": 3.75,
+      "cache_read_tokens_price": 0.30,
+      "output_tokens_price": 15.00
     },
     {
       "provider": "anthropic",
@@ -388,6 +421,8 @@
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
       "input_tokens_price": 3.00,
+      "cache_write_tokens_price": 3.75,
+      "cache_read_tokens_price": 0.30,
       "output_tokens_price": 15.00
     },
     {
@@ -400,8 +435,10 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 16.00,
-      "output_tokens_price": 76.00
+      "input_tokens_price": 15.00,
+      "cache_write_tokens_price": 18.75,
+      "cache_read_tokens_price": 1.50,
+      "output_tokens_price": 75.00
     },
     {
       "provider": "anthropic",
@@ -413,8 +450,10 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 16.00,
-      "output_tokens_price": 76.00
+      "input_tokens_price": 15.00,
+      "cache_write_tokens_price": 18.75,
+      "cache_read_tokens_price": 1.50,
+      "output_tokens_price": 75.00
     },
     {
       "provider": "anthropic",
@@ -426,8 +465,10 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 6.00,
-      "output_tokens_price": 26.00
+      "input_tokens_price": 5.00,
+      "cache_write_tokens_price": 6.25,
+      "cache_read_tokens_price": 0.50,
+      "output_tokens_price": 25.00
     },
     {
       "provider": "anthropic",
@@ -439,8 +480,10 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 2.00,
-      "output_tokens_price": 6.00
+      "input_tokens_price": 1.00,
+      "cache_write_tokens_price": 1.25,
+      "cache_read_tokens_price": 0.10,
+      "output_tokens_price": 5.00
     },
     {
       "provider": "anthropic",
@@ -452,8 +495,10 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "expert,developer",
-      "input_tokens_price": 1.80,
-      "output_tokens_price": 5.00
+      "input_tokens_price": 0.80,
+      "cache_write_tokens_price": 1.00,
+      "cache_read_tokens_price": 0.08,
+      "output_tokens_price": 4.00
     },
     {
       "provider": "anthropic",
@@ -465,8 +510,10 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "developer",
-      "input_tokens_price": 1.25,
-      "output_tokens_price": 2.25
+      "input_tokens_price": 0.25,
+      "cache_write_tokens_price": 0.30,
+      "cache_read_tokens_price": 0.03,
+      "output_tokens_price": 1.25
     },
     {
       "provider": "google",
@@ -478,8 +525,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert",
-      "input_tokens_price": 3,
-      "output_tokens_price": 13.00
+      "input_tokens_price": 2.00,
+      "cache_read_tokens_price": 0.20,
+      "output_tokens_price": 12.00
     },
     {
       "provider": "google",
@@ -491,8 +539,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 1.50,
-      "output_tokens_price": 4.00
+      "input_tokens_price": 0.50,
+      "cache_read_tokens_price": 0.05,
+      "output_tokens_price": 3.00
     },
     {
       "provider": "google",
@@ -504,8 +553,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "director,expert",
-      "input_tokens_price": 2.25,
-      "output_tokens_price": 11.00
+      "input_tokens_price": 1.25,
+      "cache_read_tokens_price": 0.125,
+      "output_tokens_price": 10.00
     },
     {
       "provider": "google",
@@ -517,8 +567,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "expert,developer",
-      "input_tokens_price": 1.30,
-      "output_tokens_price": 3.50
+      "input_tokens_price": 0.30,
+      "cache_read_tokens_price": 0.03,
+      "output_tokens_price": 2.50
     },
     {
       "provider": "google",
@@ -530,8 +581,9 @@
       "rate_limit": -1,
       "rate_limit_rpm": -1,
       "roles": "expert,developer",
-      "input_tokens_price": 1.10,
-      "output_tokens_price": 1.40
+      "input_tokens_price": 0.10,
+      "cache_read_tokens_price": 0.01,
+      "output_tokens_price": 0.40
     },
     {
       "provider": "xAI",
@@ -583,6 +635,7 @@
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
       "input_tokens_price": 0.15,
+      "cache_read_tokens_price": 0.075,
       "output_tokens_price": 0.60
     },
     {
@@ -596,6 +649,7 @@
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
       "input_tokens_price": 0.075,
+      "cache_read_tokens_price": 0.037,
       "output_tokens_price": 0.30
     },
     {

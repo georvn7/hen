@@ -14,6 +14,8 @@ namespace hen {
     DEFINE_FIELD(LLMConfig, context_size)
     DEFINE_FIELD(LLMConfig, roles)
     DEFINE_FIELD(LLMConfig, input_tokens_price)
+    DEFINE_FIELD(LLMConfig, cache_write_tokens_price)
+    DEFINE_FIELD(LLMConfig, cache_read_tokens_price)
     DEFINE_FIELD(LLMConfig, output_tokens_price)
 
     DEFINE_TYPE(LLMRegistry)

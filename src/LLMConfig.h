@@ -33,6 +33,8 @@ namespace hen {
         DECLARE_FIELD(int, context_size, "Size of the context window in KB")
         DECLARE_FIELD(std::string, roles, "description")
         DECLARE_FIELD(float, input_tokens_price, "description")
+        DECLARE_FIELD(float, cache_write_tokens_price, "Optional per-1M token cache write price. Negative means use provider fallback logic.")
+        DECLARE_FIELD(float, cache_read_tokens_price, "Optional per-1M token cache read price. Negative means use provider fallback logic.")
         DECLARE_FIELD(float, output_tokens_price, "description")
         
         std::string api_key;
@@ -45,7 +47,12 @@ namespace hen {
         void findRolesMask();
         bool takesOnRole(LLMRole role) const { return m_rolesMask & role; }
         
-        LLMConfig():tokens_last_infer(0) {}
+        LLMConfig():
+        input_tokens_price(0.0f),
+        cache_write_tokens_price(-1.0f),
+        cache_read_tokens_price(-1.0f),
+        output_tokens_price(0.0f),
+        tokens_last_infer(0) {}
     };
 
     class LLMRegistry : public Reflection<LLMRegistry>

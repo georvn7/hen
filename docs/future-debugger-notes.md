@@ -60,6 +60,66 @@ Problems here can present as debugger failures even when the model produced a va
 
 This should remain a first-class refactor target separate from debugger policy changes.
 
+### Token Accounting And Vendor Pricing
+
+`hen`'s request-cost display is normalized in [`src/Server.cpp`](../src/Server.cpp) and rendered in [`src/Client.cpp`](../src/Client.cpp). That normalization is currently too weak to reflect vendor pricing accurately.
+
+Current limitations:
+
+- [`LLMConfig`](../src/LLMConfig.h) only stores `input_tokens_price` and `output_tokens_price`.
+- [`Server::updateUsage()`](../src/Server.cpp) hardcodes a few provider/model cache multipliers instead of using explicit per-model cache prices.
+- [`Client::setStepCost()`](../src/Client.cpp) may keep the `cached` display bucket combined, but the internal accounting still needs to distinguish cache reads from cache writes.
+- Some vendors bill reasoning / thinking tokens as output. Those tokens must be included in billed output even if the visible response text is shorter.
+
+What needs to be fixed to correctly reflect vendor pricing for the currently important providers:
+
+- OpenAI
+  - Support both response shapes:
+    - Chat Completions style: `prompt_tokens`, `completion_tokens`, `prompt_tokens_details.cached_tokens`
+    - Responses style: `input_tokens`, `output_tokens`, `input_tokens_details.cached_tokens`, `output_tokens_details.reasoning_tokens`
+  - Do not rely on provider-wide heuristics for cached pricing. Cached input price is model-specific.
+  - Treat reasoning tokens as billed output. For OpenAI this is already part of billed output usage even when broken out separately in `output_tokens_details.reasoning_tokens`.
+
+- Anthropic
+  - Continue reading `input_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`, `output_tokens`.
+  - Also parse the cache-creation breakdown object so 5-minute and 1-hour cache writes can be billed correctly. A single `cache_write_tokens` bucket is not enough for Anthropic pricing.
+  - Treat extended-thinking usage as billed output even when the visible response contains only a summary of the thinking content.
+
+- Google
+  - Parse `cachedContentTokenCount` as cached prompt usage.
+  - Parse `thoughtsTokenCount` and add it to billed output. `candidatesTokenCount` alone undercounts request cost on thinking models.
+  - Distinguish explicit context-caching request charges from cache-storage charges. Google explicit caching has both reduced-price cached tokens and a separate storage fee, so `step_credits` is incomplete if it only uses per-request tokens.
+  - Keep in mind that implicit caching and explicit caching are different products and should not be normalized as if they were the same billing mechanism.
+
+- Groq
+  - Keep using the OpenAI-compatible usage shape when available (`prompt_tokens`, `completion_tokens`, `prompt_tokens_details.cached_tokens`).
+  - Apply cached-input discounts when cache hits are actually reported. Groq prompt caching is not a write-priced system like Anthropic or Google explicit caching.
+  - Do not assume prompt caching exists uniformly across all Groq models; apply the discount based on actual cached-token usage rather than provider name alone.
+
+Recommended data-model change:
+
+- Add explicit cached-pricing fields to [`LLMConfig`](../src/LLMConfig.h) and [`Environment/LLRegistry.json`](../Environment/LLRegistry.json) instead of inferring cached prices from `input_tokens_price`.
+- At minimum:
+  - `cache_read_tokens_price`
+  - `cache_write_tokens_price`
+- If needed for Anthropic and Google explicit caching:
+  - `cache_write_5m_tokens_price`
+  - `cache_write_1h_tokens_price`
+  - `cache_storage_price_per_mtok_hour`
+
+Implementation note:
+
+- The user-visible step hint can still show `in / cached / out`.
+- The pricing path in [`src/Server.cpp`](../src/Server.cpp) should nevertheless charge:
+  - uncached input
+  - cache writes
+  - cache reads
+  - output, including reasoning / thinking tokens where the vendor bills them as output
+
+Verification note:
+
+- Pricing references for these vendors change over time. When updating token accounting, re-check the official pricing and usage-field docs for OpenAI, Anthropic, Google, and Groq before changing [`Environment/LLRegistry.json`](../Environment/LLRegistry.json).
+
 ### Oversized Control Functions
 
 These functions carry too much responsibility and are high-risk edit points:
