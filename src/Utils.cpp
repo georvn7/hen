@@ -693,9 +693,9 @@ ExecResult exec_with_timeout(const std::string& cmd,
     shellCmd += "'";
     for (char c : workingDirectory) shellCmd += (c == '\'' ? std::string("'\\''") : std::string(1, c));
     shellCmd += "'";
-    shellCmd += " && ";
+    shellCmd += " && ( ";
     shellCmd += cmd;
-    shellCmd += " > ";
+    shellCmd += " ) > ";
     shellCmd += "'";
     for (char c : outputFilePath) shellCmd += (c == '\'' ? std::string("'\\''") : std::string(1, c));
     shellCmd += "'";
@@ -777,8 +777,8 @@ std::string exec(const std::string& cmd, const std::string& workingDir, const st
     // Redirecting output to a file and then reading it might be one approach
     std::string workingDirectory = boost_fs::absolute(workingDir).string();
     std::string outputFilePath = workingDirectory + "/" + operation + "Output.txt";
-    std::string command = "cd " + workingDirectory + "/; ";
-    command += cmd + " > " + outputFilePath + " 2>&1";
+    std::string command = "cd " + workingDirectory + "/; ( ";
+    command += cmd + " ) > " + outputFilePath + " 2>&1";
     
     //We don't want to return something from previouse execution
     if(boost_fs::exists(outputFilePath)) {

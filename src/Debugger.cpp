@@ -2306,7 +2306,11 @@ bool Debugger::executeTestStep(std::ostream& log, CCodeProject* project, const T
             else if(finalResult)
             {
                 instrumentedCmd = cmd;
-                instrumentedCmd += R"( >/dev/null 2>&1; printf '_DEBUG_COMMAND_RESULT=%d\n' $?)";
+                if(stdoutRegex.empty())
+                {
+                    instrumentedCmd += R"( >/dev/null 2>&1)";
+                }
+                instrumentedCmd += R"(; printf '\n_DEBUG_COMMAND_RESULT=%d\n' $?)";
             }
             else
             {
@@ -2362,7 +2366,7 @@ bool Debugger::executeTestStep(std::ostream& log, CCodeProject* project, const T
             
             if(finalResult && !stdoutRegex.empty())
             {
-                std::string consoleLog = result;//getFileContent(m_workingDirectory + "/console.log");
+                std::string consoleLog = stripTestResultMarkers(result);
                 
                 std::string regexErr;
                 if (!fullRegexMatch(consoleLog, stdoutRegex, regexErr)) {
@@ -5354,7 +5358,7 @@ std::string Debugger::loadTestLogForStep(CCodeProject* project, const TestDef& t
             
             if(finalResult && !stdoutRegex.empty())
             {
-                std::string stdoutLog = testCommandResult;//getFileContent(directoryForThisStep + "/console.log");
+                std::string stdoutLog = stripTestResultMarkers(testCommandResult);
                 
                 std::string regexErr;
                 if (!fullRegexMatch(stdoutLog, stdoutRegex, regexErr)) {

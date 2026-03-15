@@ -586,6 +586,13 @@ inline std::string getTestResult(const std::string& result)
     return resultStr;
 }
 
+inline std::string stripTestResultMarkers(const std::string& result)
+{
+    const std::string filtered = cleanLldbPrompts(result);
+    static const std::regex pattern(R"(\n?_DEBUG_COMMAND_RESULT=[^\r\n]*\n?)");
+    return std::regex_replace(filtered, pattern, std::string());
+}
+
 class DebugContextProvider
 {
     DebugVisibility m_contextVisibility;
@@ -1669,10 +1676,16 @@ public:
                 log += testStepName + " command " + testCommandIndexStr + ": ";
                 log += cmd + "\n\n";
                 
-                log += testStepName + " output " + testCommandIndexStr + ":\n";
-                if(!testCommandResult.empty())
+                std::string displayedOutput = testCommandResult;
+                if(finalResult && !stdoutRegex.empty())
                 {
-                    std::string consoleLogLimited = testCommandResult.length() > 2048 ? testCommandResult.substr(0, 2048) + "...[[truncated]]": testCommandResult;
+                    displayedOutput = stripTestResultMarkers(displayedOutput);
+                }
+
+                log += testStepName + " output " + testCommandIndexStr + ":\n";
+                if(!displayedOutput.empty())
+                {
+                    std::string consoleLogLimited = displayedOutput.length() > 2048 ? displayedOutput.substr(0, 2048) + "...[[truncated]]": displayedOutput;
                     log += consoleLogLimited + "\n\n";
                 }
                 else
@@ -1690,7 +1703,7 @@ public:
                 
                 if(finalResult && !stdoutRegex.empty())
                 {
-                    std::string stdoutLog = testCommandResult;//getFileContent(directoryForThisStep + "/console.log");
+                    std::string stdoutLog = stripTestResultMarkers(testCommandResult);
                     
                     std::string regexErr;
                     if (!fullRegexMatch(stdoutLog, stdoutRegex, regexErr)) {
