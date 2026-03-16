@@ -1280,11 +1280,12 @@ void Client::setStepCost(uint32_t inputTokens,
     else {
         m_creditsState.m_consumed = consumed;
     }
-    const uint32_t cachedTokens = m_creditsState.m_cacheWriteTokens + m_creditsState.m_cacheReadTokens;
+    const uint32_t displayInputTokens = m_creditsState.m_inputTokens + m_creditsState.m_cacheWriteTokens;
+    const uint32_t cachedTokens = m_creditsState.m_cacheReadTokens;
     std::stringstream ss;
     ss << "llm:" << llmRoleShort(m_ctxLLMRoleUsed) << ", $";
     ss << std::fixed << std::setprecision(4) << m_creditsState.m_lastStep;
-    ss << " | " << m_creditsState.m_inputTokens << " in";
+    ss << " | " << displayInputTokens << " in";
     ss << ", " << cachedTokens << " cached";
     ss << ", " << m_creditsState.m_outputTokens << " out";
     ss << " | $" << std::fixed << std::setprecision(2) << m_creditsState.m_consumed;
