@@ -2500,10 +2500,34 @@ bool fullRegexMatch(const std::string& logRaw,
 
 namespace {
 
+bool isEmptyAnthropicTextBlock(const json::value& content)
+{
+    if(!content.is_object() ||
+       !content.has_field(U("type")) ||
+       !content.at(U("type")).is_string())
+    {
+        return false;
+    }
+
+    if(content.at(U("type")).as_string() != U("text"))
+    {
+        return false;
+    }
+
+    return !content.has_field(U("text")) ||
+           !content.at(U("text")).is_string() ||
+           content.at(U("text")).as_string().empty();
+}
+
 void appendAnthropicContentBlock(json::value& contentBlocks, const json::value& content)
 {
     if(content.is_string())
     {
+        if(content.as_string().empty())
+        {
+            return;
+        }
+
         json::value textBlock = json::value::object();
         textBlock[U("type")] = json::value::string(U("text"));
         textBlock[U("text")] = json::value::string(content.as_string());
@@ -2516,14 +2540,18 @@ void appendAnthropicContentBlock(json::value& contentBlocks, const json::value& 
     {
         for(const auto& block : content.as_array())
         {
-            auto size = contentBlocks.size();
-            contentBlocks[size] = block;
+            appendAnthropicContentBlock(contentBlocks, block);
         }
         return;
     }
     
     if(content.is_object())
     {
+        if(isEmptyAnthropicTextBlock(content))
+        {
+            return;
+        }
+
         auto size = contentBlocks.size();
         contentBlocks[size] = content;
     }
@@ -2544,12 +2572,15 @@ void alternateRoles(json::value& body)
         auto role = message.at(U("role")).as_string();
         if(role != currentRole && !currentRole.empty())
         {
-            json::value mergedMessage;
-            mergedMessage[U("role")] = json::value::string(currentRole);
-            mergedMessage[U("content")] = currentContent;
-            
-            auto size = messages.size();
-            messages[size] = mergedMessage;
+            if(currentContent.size() > 0)
+            {
+                json::value mergedMessage;
+                mergedMessage[U("role")] = json::value::string(currentRole);
+                mergedMessage[U("content")] = currentContent;
+                
+                auto size = messages.size();
+                messages[size] = mergedMessage;
+            }
             
             currentContent = json::value::array();
         }

@@ -428,6 +428,21 @@
     {
       "provider": "anthropic",
       "url": "https://api.anthropic.com/v1/messages",
+      "model": "claude-sonnet-4-6",
+      "reasoning_effort": "medium",
+      "verbosity": "na",
+      "context_size": 200,
+      "rate_limit": -1,
+      "rate_limit_rpm": -1,
+      "roles": "director,expert,developer",
+      "input_tokens_price": 3.00,
+      "cache_write_tokens_price": 3.75,
+      "cache_read_tokens_price": 0.30,
+      "output_tokens_price": 15.00
+    },
+    {
+      "provider": "anthropic",
+      "url": "https://api.anthropic.com/v1/messages",
       "model": "claude-opus-4-0",
       "reasoning_effort": "na",
       "verbosity": "na",

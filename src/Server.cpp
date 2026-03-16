@@ -142,6 +142,23 @@ float effectiveCacheReadPrice(const LLMConfig& llm)
     return inferredCacheReadPrice(llm);
 }
 
+bool isAnthropicCacheableContentBlock(const web::json::value& block)
+{
+    if (!block.is_object() ||
+        !block.has_field(U("type")) ||
+        !block.at(U("type")).is_string())
+    {
+        return false;
+    }
+
+    const auto type = block.at(U("type")).as_string();
+    return type == U("text") ||
+           type == U("image") ||
+           type == U("document") ||
+           type == U("tool_use") ||
+           type == U("tool_result");
+}
+
 } // namespace
 
 bool AgentServerEP::receive(std::shared_ptr<RemoteEP> remote, std::shared_ptr<Message> msg)
@@ -1285,9 +1302,17 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
         {
             requestFromClientBody[U("max_tokens")] = json::value::number(6000);
             auto thinking = json::value::object();
-            //thinking[U("type")] = json::value::string(U("adaptive"));
-            thinking[U("type")] = json::value::string(U("enabled"));
-            thinking[U("budget_tokens")] = json::value::number(2000);
+            if(startsWith(llm->model, "claude-sonnet-4-6"))
+            {
+                thinking[U("type")] = json::value::string(U("adaptive"));
+                requestFromClientBody[U("output_config")][U("effort")] =
+                    json::value::string(utility::conversions::to_string_t(llm->reasoning_effort));
+            }
+            else
+            {
+                thinking[U("type")] = json::value::string(U("enabled"));
+                thinking[U("budget_tokens")] = json::value::number(2000);
+            }
             requestFromClientBody[U("thinking")] = thinking;
             requestFromClientBody[U("temperature")] = json::value::number(1);
         }
@@ -1326,21 +1351,57 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
             if(role == U("system"))
             {
                 auto systemText = requestFromClientBody[U("messages")].as_array()[0][U("content")].as_string();
-                auto systemBlock = json::value::object();
-                systemBlock[U("type")] = json::value::string(U("text"));
-                systemBlock[U("text")] = json::value::string(systemText);
-                systemBlock[U("cache_control")] = json::value::object();
-                systemBlock[U("cache_control")][U("type")] = json::value::string(U("ephemeral"));
+                if(!systemText.empty())
+                {
+                    auto systemBlock = json::value::object();
+                    systemBlock[U("type")] = json::value::string(U("text"));
+                    systemBlock[U("text")] = json::value::string(systemText);
+                    systemBlock[U("cache_control")] = json::value::object();
+                    systemBlock[U("cache_control")][U("type")] = json::value::string(U("ephemeral"));
 
-                auto systemArray = json::value::array();
-                systemArray[0] = systemBlock;
-                requestFromClientBody[U("system")] = systemArray;
+                    auto systemArray = json::value::array();
+                    systemArray[0] = systemBlock;
+                    requestFromClientBody[U("system")] = systemArray;
+                }
                 
                 requestFromClientBody[U("messages")].as_array().erase(0);
             }
         }
         
         alternateRoles(requestFromClientBody);
+        {
+            auto sanitizedMessages = json::value::array();
+            for(const auto& message : requestFromClientBody[U("messages")].as_array())
+            {
+                if(!message.is_object() || !message.has_field(U("content")))
+                {
+                    continue;
+                }
+
+                const auto& content = message.at(U("content"));
+                bool keepMessage = false;
+                if(content.is_string())
+                {
+                    keepMessage = !content.as_string().empty();
+                }
+                else if(content.is_array())
+                {
+                    keepMessage = content.as_array().size() > 0;
+                }
+                else if(content.is_object())
+                {
+                    keepMessage = true;
+                }
+
+                if(keepMessage)
+                {
+                    auto size = sanitizedMessages.size();
+                    sanitizedMessages[size] = message;
+                }
+            }
+
+            requestFromClientBody[U("messages")] = sanitizedMessages;
+        }
         
         // Mark the last user message content for caching
         auto& msgs = requestFromClientBody[U("messages")].as_array();
@@ -1349,35 +1410,34 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
                 if(msgs[i][U("content")].is_string())
                 {
                     auto content = msgs[i][U("content")].as_string();
-                    
-                    auto contentBlock = json::value::object();
-                    contentBlock[U("type")] = json::value::string(U("text"));
-                    contentBlock[U("text")] = json::value::string(content);
                     auto contentArray = json::value::array();
-                    contentArray[0] = contentBlock;
+                    if(!content.empty())
+                    {
+                        auto contentBlock = json::value::object();
+                        contentBlock[U("type")] = json::value::string(U("text"));
+                        contentBlock[U("text")] = json::value::string(content);
+                        contentArray[0] = contentBlock;
+                    }
                     msgs[i][U("content")] = contentArray;
                 }
                 
                 if(msgs[i][U("content")].is_array() && msgs[i][U("content")].as_array().size() > 0)
                 {
                     auto& contentArray = msgs[i][U("content")].as_array();
-                    int lastTextBlock = -1;
+                    int lastCacheableBlock = -1;
                     for(int j = (int)contentArray.size() - 1; j >= 0; --j)
                     {
-                        if(contentArray[j].is_object() &&
-                           contentArray[j].has_field(U("type")) &&
-                           contentArray[j][U("type")].is_string() &&
-                           contentArray[j][U("type")].as_string() == U("text"))
+                        if(isAnthropicCacheableContentBlock(contentArray[j]))
                         {
-                            lastTextBlock = j;
+                            lastCacheableBlock = j;
                             break;
                         }
                     }
                     
-                    if(lastTextBlock >= 0)
+                    if(lastCacheableBlock >= 0)
                     {
-                        contentArray[lastTextBlock][U("cache_control")] = json::value::object();
-                        contentArray[lastTextBlock][U("cache_control")][U("type")] = json::value::string(U("ephemeral"));
+                        contentArray[lastCacheableBlock][U("cache_control")] = json::value::object();
+                        contentArray[lastCacheableBlock][U("cache_control")][U("type")] = json::value::string(U("ephemeral"));
                     }
                 }
                 break;
