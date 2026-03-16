@@ -1645,6 +1645,11 @@ json::value Server::handleResponse(json::value& json_response, std::shared_ptr<L
     //TODO: Log the json_response since it has useful info - tokens count etc
     
     json::value reply;
+    if (json_response.has_field(U("error")))
+    {
+        reply[U("error")] = json_response.at(U("error"));
+    }
+
     if (json_response.has_field(U("output")) && json_response[U("output")].is_array())
     {
         std::string fullContent;
@@ -1723,36 +1728,83 @@ json::value Server::handleResponse(json::value& json_response, std::shared_ptr<L
         auto contentArray = json_response[U("content")].as_array();
         auto role = json_response[U("role")].as_string();
         reply[U("message")][U("role")] = json::value::string(role);
-        
+
+        if (json_response.has_field(U("stop_reason")))
+        {
+            reply[U("stop_reason")] = json_response.at(U("stop_reason"));
+        }
+        if (json_response.has_field(U("stop_sequence")))
+        {
+            reply[U("stop_sequence")] = json_response.at(U("stop_sequence"));
+        }
+
         std::string fullContent;
-        std::string thinkingContent;
+        std::vector<utility::string_t> contentTypes;
         
         for (auto& contentItem : contentArray)
         {
-            if (contentItem.has_field(U("type")) && contentItem.has_field(U("text")))
+            if (contentItem.has_field(U("type")) && contentItem[U("type")].is_string())
             {
                 auto type = contentItem[U("type")].as_string();
-                auto text = contentItem[U("text")].as_string();
-                
-                if (type == U("text"))
+                contentTypes.push_back(type);
+
+                if (contentItem.has_field(U("text")) && contentItem[U("text")].is_string())
                 {
-                    // Regular response content
-                    fullContent += text;
-                }
-                else if (type == U("thinking"))
-                {
-                    // Thinking content (you might want to store this separately or ignore it)
-                    thinkingContent += text;
+                    auto text = contentItem[U("text")].as_string();
+
+                    if (type == U("text"))
+                    {
+                        // Regular response content
+                        fullContent += text;
+                    }
                 }
             }
-            else if (contentItem.has_field(U("text")))
+            else if (contentItem.has_field(U("text")) && contentItem[U("text")].is_string())
             {
                 // Fallback for older format without explicit type
                 fullContent += contentItem[U("text")].as_string();
             }
         }
-        
+
         reply[U("message")][U("content")] = json::value::string(fullContent);
+
+        if (fullContent.empty())
+        {
+            json::value contentTypesArray = json::value::array();
+            for (size_t i = 0; i < contentTypes.size(); ++i)
+            {
+                contentTypesArray[i] = json::value::string(contentTypes[i]);
+            }
+            if (!contentTypes.empty())
+            {
+                reply[U("provider_content_types")] = contentTypesArray;
+            }
+
+            utility::string_t message = U("Anthropic response contained no text content");
+            if (reply.has_field(U("stop_reason")) && reply[U("stop_reason")].is_string())
+            {
+                message += U(" (stop_reason=");
+                message += reply[U("stop_reason")].as_string();
+                message += U(")");
+            }
+            if (!contentTypes.empty())
+            {
+                message += U(", content types: ");
+                for (size_t i = 0; i < contentTypes.size(); ++i)
+                {
+                    if (i > 0)
+                    {
+                        message += U(", ");
+                    }
+                    message += contentTypes[i];
+                }
+            }
+
+            json::value error = json::value::object();
+            error[U("type")] = json::value::string(U("empty_text_response"));
+            error[U("message")] = json::value::string(message);
+            reply[U("error")] = error;
+        }
     }
     else
     {

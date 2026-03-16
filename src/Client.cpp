@@ -57,6 +57,11 @@ static bool getServingError(const json::value& response, std::string& code, std:
     }
     
     const auto& error = response.at(U("error"));
+    if(error.is_string())
+    {
+        message = utility::conversions::to_utf8string(error.as_string());
+        return true;
+    }
     if(!error.is_object())
     {
         return false;
@@ -710,6 +715,21 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(retryDelayMs));
             continue;
+        }
+
+        if(hasServingError)
+        {
+            std::cout << "Serving/provider error";
+            if(!errorCode.empty())
+            {
+                std::cout << " " << errorCode;
+            }
+            if(!errorMessage.empty())
+            {
+                std::cout << ": " << errorMessage;
+            }
+            std::cout << std::endl;
+            return false;
         }
         
         if(!response.has_field(U("request_id")))
