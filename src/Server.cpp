@@ -159,6 +159,57 @@ bool isAnthropicCacheableContentBlock(const web::json::value& block)
            type == U("tool_result");
 }
 
+void setAnthropicEphemeralCacheControl(web::json::value& block)
+{
+    block[U("cache_control")] = json::value::object();
+    block[U("cache_control")][U("type")] = json::value::string(U("ephemeral"));
+}
+
+struct AnthropicCacheBlockCandidate
+{
+    int messageIndex = -1;
+    int blockIndex = -1;
+    std::string fingerprint;
+};
+
+std::string fingerprintAnthropicCacheBlock(const web::json::value& message,
+                                           const web::json::value& block)
+{
+    web::json::value fingerprintBlock = block;
+    if(fingerprintBlock.is_object() &&
+       fingerprintBlock.has_field(U("cache_control")))
+    {
+        fingerprintBlock.erase(U("cache_control"));
+    }
+
+    utility::string_t role;
+    if(message.is_object() &&
+       message.has_field(U("role")) &&
+       message.at(U("role")).is_string())
+    {
+        role = message.at(U("role")).as_string();
+    }
+
+    std::string fingerprint = utility::conversions::to_utf8string(role);
+    fingerprint += "\n";
+    fingerprint += utility::conversions::to_utf8string(fingerprintBlock.serialize());
+    return fingerprint;
+}
+
+size_t longestCommonPrefixSize(const std::vector<std::string>& left,
+                               const std::vector<std::string>& right)
+{
+    size_t common = 0;
+    while(common < left.size() &&
+          common < right.size() &&
+          left[common] == right[common])
+    {
+        common++;
+    }
+
+    return common;
+}
+
 } // namespace
 
 bool AgentServerEP::receive(std::shared_ptr<RemoteEP> remote, std::shared_ptr<Message> msg)
@@ -1298,27 +1349,59 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
     }
     else if(llm->provider == "anthropic")
     {
-        if(llm->reasoning_effort != "na")
+        utility::string_t reasoningEffort;
+        bool enableReasoning = false;
+        if(requestFromClientBody.has_field(U("reasoning_effort")) &&
+           requestFromClientBody[U("reasoning_effort")].is_string())
         {
-            requestFromClientBody[U("max_tokens")] = json::value::number(6000);
+            reasoningEffort = requestFromClientBody[U("reasoning_effort")].as_string();
+            requestFromClientBody.erase(U("reasoning_effort"));
+            enableReasoning = reasoningEffort != U("na");
+        }
+        else if(llm->reasoning_effort != "na")
+        {
+            reasoningEffort = utility::conversions::to_string_t(llm->reasoning_effort);
+            enableReasoning = true;
+        }
+
+        uint32_t maxTokens = enableReasoning ? 6000 : 4096;
+        const bool hasRequestMaxTokens =
+            requestFromClientBody.has_field(U("max_tokens")) &&
+            requestFromClientBody[U("max_tokens")].is_number();
+
+        if(hasRequestMaxTokens)
+        {
+            maxTokens = static_cast<uint32_t>(requestFromClientBody[U("max_tokens")].as_number().to_uint64());
+        }
+
+        if(enableReasoning)
+        {
             auto thinking = json::value::object();
+            
             if(startsWith(llm->model, "claude-sonnet-4-6"))
             {
+                if(!hasRequestMaxTokens)
+                {
+                    maxTokens = 8192;
+                }
+                
                 thinking[U("type")] = json::value::string(U("adaptive"));
                 requestFromClientBody[U("output_config")][U("effort")] =
-                    json::value::string(utility::conversions::to_string_t(llm->reasoning_effort));
+                    json::value::string(reasoningEffort);
             }
             else
             {
                 thinking[U("type")] = json::value::string(U("enabled"));
                 thinking[U("budget_tokens")] = json::value::number(2000);
             }
+            
             requestFromClientBody[U("thinking")] = thinking;
             requestFromClientBody[U("temperature")] = json::value::number(1);
+            requestFromClientBody[U("max_tokens")] = json::value::number(maxTokens);
         }
         else
         {
-            requestFromClientBody[U("max_tokens")] = json::value::number(4096);
+            requestFromClientBody[U("max_tokens")] = json::value::number(maxTokens);
             requestFromClientBody[U("temperature")] = json::value::number(0);
         }
         
@@ -1403,45 +1486,129 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
             requestFromClientBody[U("messages")] = sanitizedMessages;
         }
         
-        // Mark the last user message content for caching
+        // Anthropic prompt caching works best when we keep a deterministic
+        // final breakpoint and add explicit earlier breakpoints at stable shared
+        // prefixes. Detect the largest shared block prefix against the previous
+        // Anthropic request for the same project/model, then fall back to
+        // 20-block spacing for longer prompts.
+        requestFromClientBody[U("cache_control")] = json::value::object();
+        requestFromClientBody[U("cache_control")][U("type")] = json::value::string(U("ephemeral"));
+
         auto& msgs = requestFromClientBody[U("messages")].as_array();
-        for (int i = (int)msgs.size() - 1; i >= 0; --i) {
-            if (msgs[i][U("role")].as_string() == U("user")) {
-                if(msgs[i][U("content")].is_string())
-                {
-                    auto content = msgs[i][U("content")].as_string();
-                    auto contentArray = json::value::array();
-                    if(!content.empty())
-                    {
-                        auto contentBlock = json::value::object();
-                        contentBlock[U("type")] = json::value::string(U("text"));
-                        contentBlock[U("text")] = json::value::string(content);
-                        contentArray[0] = contentBlock;
-                    }
-                    msgs[i][U("content")] = contentArray;
-                }
-                
-                if(msgs[i][U("content")].is_array() && msgs[i][U("content")].as_array().size() > 0)
-                {
-                    auto& contentArray = msgs[i][U("content")].as_array();
-                    int lastCacheableBlock = -1;
-                    for(int j = (int)contentArray.size() - 1; j >= 0; --j)
-                    {
-                        if(isAnthropicCacheableContentBlock(contentArray[j]))
-                        {
-                            lastCacheableBlock = j;
-                            break;
-                        }
-                    }
-                    
-                    if(lastCacheableBlock >= 0)
-                    {
-                        contentArray[lastCacheableBlock][U("cache_control")] = json::value::object();
-                        contentArray[lastCacheableBlock][U("cache_control")][U("type")] = json::value::string(U("ephemeral"));
-                    }
-                }
-                break;
+        std::vector<AnthropicCacheBlockCandidate> cacheCandidates;
+        std::vector<std::string> currentFingerprints;
+        for (int i = 0; i < (int)msgs.size(); ++i)
+        {
+            if(!msgs[i].is_object() ||
+               !msgs[i].has_field(U("content")) ||
+               !msgs[i][U("content")].is_array())
+            {
+                continue;
             }
+
+            auto& contentArray = msgs[i][U("content")].as_array();
+            for(int j = 0; j < (int)contentArray.size(); ++j)
+            {
+                if(isAnthropicCacheableContentBlock(contentArray[j]))
+                {
+                    AnthropicCacheBlockCandidate candidate;
+                    candidate.messageIndex = i;
+                    candidate.blockIndex = j;
+                    candidate.fingerprint = fingerprintAnthropicCacheBlock(msgs[i], contentArray[j]);
+                    cacheCandidates.push_back(candidate);
+                    currentFingerprints.push_back(candidate.fingerprint);
+                }
+            }
+        }
+
+        std::string anthropicCacheStateKey = projectId;
+        if(anthropicCacheStateKey.empty())
+        {
+            anthropicCacheStateKey = "__global__";
+        }
+        anthropicCacheStateKey += "|" + llm->model;
+        anthropicCacheStateKey += "|";
+        anthropicCacheStateKey += enableReasoning ?
+            utility::conversions::to_utf8string(reasoningEffort) : "na";
+
+        size_t sharedPrefixBlocks = 0;
+        {
+            std::lock_guard<std::mutex> guard(m_anthropicCacheStateMutex);
+            auto stateIt = m_lastAnthropicCacheableBlocks.find(anthropicCacheStateKey);
+            if(stateIt != m_lastAnthropicCacheableBlocks.end())
+            {
+                sharedPrefixBlocks = longestCommonPrefixSize(stateIt->second, currentFingerprints);
+            }
+            m_lastAnthropicCacheableBlocks[anthropicCacheStateKey] = currentFingerprints;
+        }
+
+        constexpr uint32_t c_anthropicCacheLookbackBlocks = 20;
+        constexpr uint32_t c_anthropicMaxBreakpointSlots = 4;
+        const bool hasSystemBreakpoint =
+            requestFromClientBody.has_field(U("system")) &&
+            requestFromClientBody[U("system")].is_array() &&
+            requestFromClientBody[U("system")].as_array().size() > 0;
+        const uint32_t explicitBreakpointBudget = c_anthropicMaxBreakpointSlots - 1; // automatic caching uses one slot
+        const uint32_t usedExplicitBreakpoints = hasSystemBreakpoint ? 1u : 0u;
+        const uint32_t maxMessageBreakpoints =
+            explicitBreakpointBudget > usedExplicitBreakpoints ?
+            explicitBreakpointBudget - usedExplicitBreakpoints : 0u;
+        std::vector<int> selectedCandidateIndexes;
+        auto markCandidateIndex = [&](int idx)
+        {
+            if(idx < 0 || idx >= (int)cacheCandidates.size())
+            {
+                return;
+            }
+
+            if(std::find(selectedCandidateIndexes.begin(),
+                         selectedCandidateIndexes.end(),
+                         idx) == selectedCandidateIndexes.end())
+            {
+                selectedCandidateIndexes.push_back(idx);
+            }
+        };
+
+        if(maxMessageBreakpoints > 0 &&
+           sharedPrefixBlocks > 0 &&
+           sharedPrefixBlocks < cacheCandidates.size())
+        {
+            // Anchor the largest reusable prefix shared with the previous
+            // Anthropic request for this project/model.
+            markCandidateIndex((int)sharedPrefixBlocks - 1);
+        }
+
+        uint32_t blocksSinceLastBreakpoint = 0;
+        uint32_t selectedBreakpoints = (uint32_t)selectedCandidateIndexes.size();
+        int candidateIndex = (int)cacheCandidates.size() - 1;
+        if(sharedPrefixBlocks > 0 && sharedPrefixBlocks <= cacheCandidates.size())
+        {
+            candidateIndex = (int)sharedPrefixBlocks - 2;
+        }
+        else if(candidateIndex >= 0)
+        {
+            // Top-level automatic caching anchors the final cacheable block.
+            candidateIndex--;
+        }
+
+        for (; candidateIndex >= 0 && selectedBreakpoints < maxMessageBreakpoints;
+             --candidateIndex)
+        {
+            blocksSinceLastBreakpoint++;
+            if(blocksSinceLastBreakpoint >= c_anthropicCacheLookbackBlocks)
+            {
+                markCandidateIndex(candidateIndex);
+                selectedBreakpoints++;
+                blocksSinceLastBreakpoint = 0;
+            }
+        }
+
+        for(int idx : selectedCandidateIndexes)
+        {
+            auto& block =
+                msgs[cacheCandidates[idx].messageIndex][U("content")].as_array()
+                    [cacheCandidates[idx].blockIndex];
+            setAnthropicEphemeralCacheControl(block);
         }
     }
     else if(llm->provider == "google")

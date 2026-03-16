@@ -101,6 +101,95 @@ static uint32_t transientServingRetryDelayMs(const std::string& code, bool missi
     return 0;
 }
 
+static bool isAnthropicRequest(const json::value& request)
+{
+    if(!request.is_object() || !request.has_field(U("llm")) || !request.at(U("llm")).is_string())
+    {
+        return false;
+    }
+
+    const std::string llm = utility::conversions::to_utf8string(request.at(U("llm")).as_string());
+    return startsWith(llm, "anthropic/");
+}
+
+static bool isAnthropicThinkingOnlyMaxTokensFailure(const json::value& response)
+{
+    if(!response.is_object())
+    {
+        return false;
+    }
+    if(!response.has_field(U("stop_reason")) || !response.at(U("stop_reason")).is_string())
+    {
+        return false;
+    }
+    if(response.at(U("stop_reason")).as_string() != U("max_tokens"))
+    {
+        return false;
+    }
+    if(!response.has_field(U("error")) || !response.at(U("error")).is_object())
+    {
+        return false;
+    }
+
+    const auto& error = response.at(U("error"));
+    if(!error.has_field(U("type")) || !error.at(U("type")).is_string())
+    {
+        return false;
+    }
+    if(error.at(U("type")).as_string() != U("empty_text_response"))
+    {
+        return false;
+    }
+    if(!response.has_field(U("provider_content_types")) ||
+       !response.at(U("provider_content_types")).is_array())
+    {
+        return false;
+    }
+
+    bool sawThinkingType = false;
+    for(const auto& typeValue : response.at(U("provider_content_types")).as_array())
+    {
+        if(!typeValue.is_string())
+        {
+            return false;
+        }
+
+        const utility::string_t type = typeValue.as_string();
+        if(type != U("thinking") && type != U("redacted_thinking"))
+        {
+            return false;
+        }
+        sawThinkingType = true;
+    }
+
+    return sawThinkingType;
+}
+
+static uint32_t anthropicThinkingFallbackMaxTokens(const json::value& request)
+{
+    if(!request.is_object() ||
+       !request.has_field(U("llm")) ||
+       !request.at(U("llm")).is_string())
+    {
+        return 6000;
+    }
+
+    const std::string llmCfgStr = utility::conversions::to_utf8string(request.at(U("llm")).as_string());
+    const auto llmCfg = splitByFirstOccurence(llmCfgStr, '/');
+    std::shared_ptr<LLMConfig> llm = Client::getInstance().findLLM(llmCfg.first, llmCfg.second);
+    if(!llm)
+    {
+        return 6000;
+    }
+
+    if(startsWith(llm->model, "claude-sonnet-4-6"))
+    {
+        return 8192;
+    }
+
+    return 6000;
+}
+
 static const char* llmRoleShort(LLMRole role)
 {
     switch (role)
@@ -681,6 +770,9 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
     auto& messagesArray = request[U("messages")].as_array();
     auto responseMessageIndex = messagesArray.size();
     auto errorMessageIndex = responseMessageIndex + 1;
+    const bool anthropicRequest = isAnthropicRequest(request);
+    bool retriedAnthropicLowThinking = false;
+    bool retriedAnthropicNoThinking = false;
 
     bool finished = false;
     for(uint32_t i=0; i<10; ++i)
@@ -715,6 +807,27 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(retryDelayMs));
             continue;
+        }
+
+        if(hasServingError &&
+           anthropicRequest &&
+           isAnthropicThinkingOnlyMaxTokensFailure(response))
+        {
+            request[U("max_tokens")] = json::value::number(anthropicThinkingFallbackMaxTokens(request));
+            if(!retriedAnthropicLowThinking)
+            {
+                request[U("reasoning_effort")] = json::value::string(U("low"));
+                retriedAnthropicLowThinking = true;
+                std::cout << "Anthropic exhausted output budget on thinking. Retrying with low adaptive thinking." << std::endl;
+                continue;
+            }
+            if(!retriedAnthropicNoThinking)
+            {
+                request[U("reasoning_effort")] = json::value::string(U("na"));
+                retriedAnthropicNoThinking = true;
+                std::cout << "Anthropic exhausted output budget again. Retrying with thinking disabled." << std::endl;
+                continue;
+            }
         }
 
         if(hasServingError)

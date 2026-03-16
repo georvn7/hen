@@ -13,7 +13,7 @@ If you decided to scan in the data type and function source files, via the 'sear
 
 When investigating an issue and suggesting a fix, considering the tradeoff required "Structural vs. Local" changes based on which is likely to reach a passing test in the fewest steps.
 
-If you decide to fix a function source via 'fix_function' action, ensure the exact fix is explained with implementation details in the 'motivation' field.
+If you decide to fix a function source via 'fix_function' action, ensure the exact fix is explained with implementation guidelines in the 'motivation' field but do not write the code yet.
 
 If you need information for struct or enum use data_info action.
 

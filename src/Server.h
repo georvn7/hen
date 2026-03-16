@@ -102,6 +102,8 @@ namespace hen {
         sqlite3* m_db;
         
         std::chrono::time_point<std::chrono::high_resolution_clock> m_lasACTime;
+        std::mutex m_anthropicCacheStateMutex;
+        std::map<std::string, std::vector<std::string>> m_lastAnthropicCacheableBlocks;
         
         bool initLLMProxyListener();
         bool initChatListener();
