@@ -102,6 +102,22 @@ class ActionKey:
         )
 
 
+@dataclass(frozen=True)
+class StepSignature:
+    action_type: str = ""
+    action_subject: str = ""
+    invocation: int = 1
+    line_number: int = 0
+
+    @property
+    def normalized_type(self) -> str:
+        return self.action_type.strip()
+
+    @property
+    def normalized_subject(self) -> str:
+        return self.action_subject.strip()
+
+
 @dataclass
 class TrackStepMeta:
     start_step: int
@@ -111,6 +127,10 @@ class TrackStepMeta:
     inserted: bool
     compression_ratio: float
     final_fix_subject: str = ""
+    original_track_present: bool = False
+    mapped_original_signature: Optional[StepSignature] = None
+    original_info_signatures: Tuple[StepSignature, ...] = ()
+    original_fix_subjects: Tuple[str, ...] = ()
 
 
 @dataclass
@@ -120,6 +140,9 @@ class Candidate:
     parsed: Optional[dict]
     reasons: List[str] = field(default_factory=list)
     score: int = 0
+    signature: Optional[StepSignature] = None
+    matches_original_step_exact: bool = False
+    matches_original_fix_subject: bool = False
 
 
 @dataclass
@@ -247,6 +270,78 @@ def parse_action_from_text(text: str) -> Tuple[Optional[dict], ActionKey]:
     )
 
 
+def normalize_int(value, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def parse_signature_from_step(step: dict) -> Optional[StepSignature]:
+    if not isinstance(step, dict):
+        return None
+    action_type = str(step.get("action_type", "")).strip()
+    action_subject = str(step.get("action_subject", "")).strip()
+    if not action_type:
+        return None
+    invocation = normalize_int(step.get("invocation", 1), 1)
+    line_number = normalize_int(step.get("line_number", 0), 0)
+    if invocation <= 0:
+        invocation = 1
+    if line_number < 0:
+        line_number = 0
+    return StepSignature(
+        action_type=action_type,
+        action_subject=action_subject,
+        invocation=invocation,
+        line_number=line_number,
+    )
+
+
+def parse_candidate_signature(parsed: Optional[dict]) -> Optional[StepSignature]:
+    if not isinstance(parsed, dict):
+        return None
+    required = ("action_type", "action_subject", "invocation", "line_number")
+    if any(field not in parsed for field in required):
+        return None
+    return parse_signature_from_step(parsed)
+
+
+def load_original_track_meta(path: Path) -> Tuple[Dict[int, StepSignature], Tuple[StepSignature, ...], Tuple[str, ...], bool]:
+    payload = load_json(path)
+    raw_steps = payload.get("steps", [])
+    if not isinstance(raw_steps, list) or not raw_steps:
+        return {}, (), (), False
+
+    by_original_step: Dict[int, StepSignature] = {}
+    original_info_signatures: List[StepSignature] = []
+    original_fix_subjects: List[str] = []
+
+    for step in raw_steps:
+        if not isinstance(step, dict):
+            continue
+        signature = parse_signature_from_step(step)
+        if signature is None:
+            continue
+
+        original_step = normalize_int(step.get("original_step", -1), -1)
+        if original_step > 0:
+            by_original_step[original_step] = signature
+
+        if signature.normalized_type in INFO_ACTIONS:
+            original_info_signatures.append(signature)
+
+        if signature.normalized_type == "fix_function" and signature.normalized_subject:
+            original_fix_subjects.append(signature.normalized_subject)
+
+    return (
+        by_original_step,
+        tuple(original_info_signatures),
+        tuple(sorted(set(original_fix_subjects))),
+        True,
+    )
+
+
 def discover_leaf_dirs(root: Path) -> List[Path]:
     if any(STEP_RE.match(p.name) for p in root.iterdir() if p.is_file()):
         return [root]
@@ -269,6 +364,21 @@ def build_track_index(leaf_dir: Path) -> Dict[str, TrackStepMeta]:
 
         start_step = int(match.group(1))
         fix_step = int(match.group(2))
+        original_path = leaf_dir / f"original_fix_{start_step}_{fix_step}.json"
+        (
+            original_by_step,
+            original_info_signatures,
+            original_fix_subjects,
+            original_track_present,
+        ) = ({}, (), (), False)
+        if original_path.exists():
+            (
+                original_by_step,
+                original_info_signatures,
+                original_fix_subjects,
+                original_track_present,
+            ) = load_original_track_meta(original_path)
+
         payload = load_json(path)
         raw_steps = payload.get("steps", [])
         if not isinstance(raw_steps, list) or not raw_steps:
@@ -308,6 +418,10 @@ def build_track_index(leaf_dir: Path) -> Dict[str, TrackStepMeta]:
                 inserted=inserted,
                 compression_ratio=compression_ratio,
                 final_fix_subject=final_fix_subject,
+                original_track_present=original_track_present,
+                mapped_original_signature=original_by_step.get(original_step),
+                original_info_signatures=original_info_signatures,
+                original_fix_subjects=original_fix_subjects,
             )
 
     return step_meta
@@ -358,7 +472,12 @@ def score_candidate(
     keep_invalid_rejects: bool,
 ) -> Tuple[Optional[Candidate], str]:
     parsed, action = parse_action_from_text(candidate_text)
-    candidate = Candidate(raw_content=candidate_text, action=action, parsed=parsed)
+    candidate = Candidate(
+        raw_content=candidate_text,
+        action=action,
+        parsed=parsed,
+        signature=parse_candidate_signature(parsed),
+    )
 
     if parsed is None:
         if not keep_invalid_rejects:
@@ -378,6 +497,20 @@ def score_candidate(
         and action.normalized_subject == track_meta.final_fix_subject
     ):
         return None, "grounded_shortcut_to_final_fix"
+
+    if track_meta is not None and candidate.signature is not None:
+        if candidate.signature == track_meta.mapped_original_signature:
+            candidate.matches_original_step_exact = True
+        if (
+            candidate.signature.normalized_type in INFO_ACTIONS
+            and candidate.signature in track_meta.original_info_signatures
+        ):
+            return None, "valid_original_info_alternative"
+        if (
+            candidate.signature.normalized_type == "fix_function"
+            and candidate.signature.normalized_subject in track_meta.original_fix_subjects
+        ):
+            candidate.matches_original_fix_subject = True
 
     schema_reasons = has_bad_schema(parsed)
     candidate.reasons.extend(schema_reasons)
@@ -598,6 +731,9 @@ def process_step_file(
         "rejected_action_subject": reject.action.normalized_subject,
         "reject_reasons": reject.reasons,
         "reject_score": reject.score,
+        "original_track_present": track_meta.original_track_present if track_meta is not None else False,
+        "matches_original_step_exact": reject.matches_original_step_exact,
+        "matches_original_fix_subject": reject.matches_original_fix_subject,
     }
     if track_meta is not None:
         meta.update(
