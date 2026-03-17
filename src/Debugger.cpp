@@ -4935,7 +4935,7 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
             {
                 feedback += "If you are sure there are enough evidences that ";
                 feedback += "the unit test mian function source is the only reason for the test to fail ";
-                feedback += "you can requets stop of the test by requesting next action 'stop_unit_test' ";
+                feedback += "you can requets stop of the test by requesting next action type 'stop_unit_test' ";
                 feedback += "and I will try to fix the test sources and resume the debugging. ";
                 feedback += "If you decide to do this, provide the justification in the motivation section\n";
             }
@@ -6813,7 +6813,7 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             promptNextStepMsg += m_system + "') there is a chance the unit test itself is broken. ";
             promptNextStepMsg += "If you are sure there is enough evidence that ";
             promptNextStepMsg += "the unit test main function source is the only reason for the test to fail, ";
-            promptNextStepMsg += "you can request a stop of the test by requesting next action 'stop_unit_test' ";
+            promptNextStepMsg += "you can request a stop of the test by requesting next action type 'stop_unit_test' ";
             promptNextStepMsg += "and I will try to fix the test sources and resume the debugging. ";
             promptNextStepMsg += "If you decide to do this, provide your justification in the motivation section.\n";
         }
