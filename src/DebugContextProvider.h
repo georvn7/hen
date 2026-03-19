@@ -597,7 +597,8 @@ class DebugContextProvider
 {
     DebugVisibility m_contextVisibility;
     std::string m_workingDirectory;
-    
+    std::string m_recordedTrajectoryDir;
+
     LogAnalyzer m_logger;
     TraceAnalyzer m_tracer;
     std::string m_system;
@@ -639,7 +640,27 @@ public:
         //auto memoFrame = m_memo.getLastFrame(true);
         auto memoFrames = m_tracer.loadStackTrace(memoFile, workingDirectory + "/stack");
     }
-    
+
+    void setRecordedTrajectoryDir(const std::string& trajectoryDir)
+    {
+        m_recordedTrajectoryDir = trajectoryDir;
+    }
+
+    void clearRecordedTrajectoryDir()
+    {
+        m_recordedTrajectoryDir.clear();
+    }
+
+    std::string recordedTrajectoryDir(CCodeProject* project, const TestDef& test) const
+    {
+        if(!m_recordedTrajectoryDir.empty())
+        {
+            return m_recordedTrajectoryDir;
+        }
+
+        return project->getProjDir() + "/debug/" + test.name + "/trajectory";
+    }
+
     void clear()
     {
         m_contextVisibility.clear();
@@ -1532,7 +1553,8 @@ public:
     
     std::string loadTestLogFromStep(CCodeProject* project, const TestDef& test, uint32_t debugStepId)
     {
-        std::string directoryForThisStep = project->getProjDir() + "/debug/" + test.name + "/trajectory/step_" + std::to_string(debugStepId) + "/wd";
+        std::string trajectoryDir = recordedTrajectoryDir(project, test);
+        std::string directoryForThisStep = trajectoryDir + "/step_" + std::to_string(debugStepId) + "/wd";
         if(!boost_fs::exists(directoryForThisStep))
         {
             return std::string();
@@ -1644,8 +1666,9 @@ public:
     {
         bool stepResults = true;
         std::string log;
-        
-        std::string directoryForThisStep = project->getProjDir() + "/debug/" + test.name + "/trajectory/step_" + std::to_string(debugStepId) + "/wd";
+
+        std::string trajectoryDir = recordedTrajectoryDir(project, test);
+        std::string directoryForThisStep = trajectoryDir + "/step_" + std::to_string(debugStepId) + "/wd";
         
         std::stringstream ssTestInput;
         checkTestStepInput(ssTestInput, step, testStepName, false);
@@ -1704,7 +1727,7 @@ public:
                 if(finalResult && !stdoutRegex.empty())
                 {
                     std::string stdoutLog = stripTestResultMarkers(testCommandResult);
-                    
+
                     std::string regexErr;
                     if (!fullRegexMatch(stdoutLog, stdoutRegex, regexErr)) {
                        
@@ -1733,8 +1756,8 @@ public:
     bool getStepTrajecotyCfg(CCodeProject* project, const TestDef& test, int stepId, web::json::value& cfg)
     {
         std::string info;
-        
-        std::string trajectoryDir = project->getProjDir() + "/debug/" + test.name + "/trajectory";
+
+        std::string trajectoryDir = recordedTrajectoryDir(project, test);
         
         if(!boost_fs::exists(trajectoryDir))
         {
@@ -1772,7 +1795,7 @@ public:
     {
         std::string info;
         std::string stepIdStr = std::to_string(stepId);
-        std::string trajectoryDir = project->getProjDir() + "/debug/" + test.name + "/trajectory";
+        std::string trajectoryDir = recordedTrajectoryDir(project, test);
         std::string stepIdDir = "/step_" + stepIdStr;
 
         web::json::value trajectoryCfg;

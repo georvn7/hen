@@ -92,7 +92,11 @@ namespace hen {
         Context                 m_distilleryContext;
         
         TestDef                 m_test;
-        
+        std::string             m_testDirectory;
+        std::string             m_trajectoryRootDir;
+        std::string             m_logsRootDir;
+        std::string             m_datasetRunKey;
+
         int                     m_currentFixIndex;
         CCodeProject*           m_project;
         
@@ -114,7 +118,18 @@ namespace hen {
         
         std::vector<std::pair<int,int>> m_mergedFixes;
         std::string                     m_prologue;
-        
+
+        void configureRecordedRoots(const std::string& testDirectory,
+                                    const std::string& trajectoryRootDir,
+                                    const std::string& logsRootDir,
+                                    const std::string& datasetRunKey);
+        std::string getTrajectoryRootDir(CCodeProject* project, const TestDef& test) const;
+        std::string getLogsRootDir(CCodeProject* project, const TestDef& test) const;
+        std::string getDatasetDir(CCodeProject* project) const;
+        std::string getDistillLogDir(CCodeProject* project) const;
+        std::string getTrajectoryStepDir(int stepId) const;
+        std::string getLogsStepDir(int stepId) const;
+
         bool loadTrajectory(CCodeProject* project, const TestDef& test, int fromStep, int toStep);
         
         std::pair<bool, uint32_t> findRequestIdForPattern(const boost_fs::path& dir, const std::string& prefix, const std::string& suffix);
@@ -187,7 +202,7 @@ namespace hen {
                                      EditSourceSequence& optimalSequence);
         void pushOptimizedFixTrack(CCodeProject* project, const std::string& message, EditSourceSequence& optimalSequence);
         EditSourceSequence buildOriginalFixTrack(int fromTrajectoryIndex, int toTrajectoryIndex);
-        
+
         bool checkFixTrackData(CCodeProject* project, uint32_t startStep, uint32_t fixStep);
         void removeFixTrackData(CCodeProject* project, uint32_t startStep, uint32_t fixStep);
         
@@ -273,10 +288,22 @@ namespace hen {
     public:
         
         void distillDag();
-        
+
         uint32_t loadTrajectory(CCodeProject* project, const std::string& testJsonPath, int fromStep, int toStep);
+        uint32_t loadTrajectory(CCodeProject* project,
+                                const std::string& testDirectory,
+                                const std::string& trajectoryRootDir,
+                                const std::string& logsRootDir,
+                                const std::string& datasetRunKey,
+                                int fromStep, int toStep);
         std::string printTrajectory();
         void distillTrajectory(CCodeProject* project, const std::string& testJsonPath, int& fromStep, int toStep);
+        void distillTrajectory(CCodeProject* project,
+                               const std::string& testDirectory,
+                               const std::string& trajectoryRootDir,
+                               const std::string& logsRootDir,
+                               const std::string& datasetRunKey,
+                               int& fromStep, int toStep);
         
         void printTrajectoryInfo();
         void printFixesAndTests();

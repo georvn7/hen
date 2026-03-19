@@ -353,12 +353,76 @@ namespace hen {
 
         return out;
     }
-    
+
     Distillery::Distillery()
     {
         m_fromStep = 0;
         m_currentFixIndex = -1;
         m_project = nullptr;
+    }
+
+    void Distillery::configureRecordedRoots(const std::string& testDirectory,
+                                            const std::string& trajectoryRootDir,
+                                            const std::string& logsRootDir,
+                                            const std::string& datasetRunKey)
+    {
+        m_testDirectory = testDirectory;
+        m_trajectoryRootDir = trajectoryRootDir;
+        m_logsRootDir = logsRootDir;
+        m_datasetRunKey = datasetRunKey;
+        m_debugContext.setRecordedTrajectoryDir(m_trajectoryRootDir);
+    }
+
+    std::string Distillery::getTrajectoryRootDir(CCodeProject* project, const TestDef& test) const
+    {
+        if(!m_trajectoryRootDir.empty())
+        {
+            return m_trajectoryRootDir;
+        }
+
+        return project->getProjDir() + "/debug/" + test.name + "/trajectory";
+    }
+
+    std::string Distillery::getLogsRootDir(CCodeProject* project, const TestDef& test) const
+    {
+        if(!m_logsRootDir.empty())
+        {
+            return m_logsRootDir;
+        }
+
+        return project->getProjDir() + "/logs/debug/" + test.name;
+    }
+
+    std::string Distillery::getDatasetDir(CCodeProject* project) const
+    {
+        std::string datasetDir = project->getProjDir() + "/dataset/" + m_test.name;
+        if(!m_datasetRunKey.empty())
+        {
+            datasetDir += "/" + m_datasetRunKey;
+        }
+
+        return datasetDir;
+    }
+
+    std::string Distillery::getDistillLogDir(CCodeProject* project) const
+    {
+        std::string logDir = project->getProjDir() + "/logs/distill/" + m_test.name;
+        if(!m_datasetRunKey.empty())
+        {
+            logDir += "/" + m_datasetRunKey;
+        }
+
+        return logDir;
+    }
+
+    std::string Distillery::getTrajectoryStepDir(int stepId) const
+    {
+        return m_trajectoryRootDir + "/step_" + std::to_string(stepId);
+    }
+
+    std::string Distillery::getLogsStepDir(int stepId) const
+    {
+        return m_logsRootDir + "/step_" + std::to_string(stepId);
     }
 
     std::string Distillery::checkoutExact(const std::string& folder,
@@ -461,9 +525,9 @@ namespace hen {
             //error
             return -1;
         }
-        
+
         int stepIndex = step - m_fromStep - 1;
-        
+
         for(int i=stepIndex; i >= 0; --i)
         {
             if(m_trajectory[i].m_action == action)
@@ -471,7 +535,7 @@ namespace hen {
                 return i;
             }
         }
-        
+
         return -1;
     }
 
@@ -482,14 +546,14 @@ namespace hen {
             //error
             return -1;
         }
-        
+
         if(step - m_fromStep >= m_trajectory.size())
         {
             return -1;
         }
-        
+
         int stepIndex = step - m_fromStep - 1;
-        
+
         for(int i=stepIndex; i < m_trajectory.size(); ++i)
         {
             if(m_trajectory[i].m_action == action)
@@ -497,7 +561,7 @@ namespace hen {
                 return i;
             }
         }
-        
+
         return -1;
     }
 
@@ -509,7 +573,7 @@ namespace hen {
     std::string Distillery::functionInfo(CCodeProject* project, int toStep, const std::string& functionName, int invocation, int lineNumber)
     {
         goTo(project, toStep);
-        
+
         DebugStep stepInfo;
         std::string info = m_debugContext.stepFunctionInfo(m_project, functionName, "", invocation, lineNumber, stepInfo);
         return info;
@@ -518,7 +582,7 @@ namespace hen {
     std::pair<int, int> Distillery::getFixTrackRange(CCodeProject* project, int fixStep)
     {
         int fixStepIndex = stepToTrajectoryIndex(fixStep);
-        
+
         int startFixIndex;
         int endFixIndex;
         for(auto fix : m_mergedFixes)
@@ -530,39 +594,39 @@ namespace hen {
                 break;
             }
         }
-        
+
         int startFixStep = trajectoryIndexToStep(startFixIndex);
         int firstRunIndex = getLastIndexBefore(startFixStep, "run_test");
         //int nextRunStep = fixStep + 1;
 
         int lastRunIndex = endFixIndex + 1; //stepToTrajectoryIndex(nextRunStep);
-        
+
         return std::make_pair(firstRunIndex, lastRunIndex);
     }
 
     std::string Distillery::trackForFix(CCodeProject* project, int fixStep)
     {
         auto range = getFixTrackRange(project, fixStep);
-        
+
         m_debugContext.clear();
-        
+
         std::string contextInfo;
         std::string lastFunctionName;
         for(int i=range.first; i<range.second; ++i)
         {
             int s = trajectoryIndexToStep(i);
-            
+
             contextInfo += "\nSTEP: " + std::to_string(s) + "\n\n";
             contextInfo += m_trajectory[i].fullInfo() + "\n\n";
-            
+
             if(m_trajectory[i].m_action == "fix_function")
             {
                 lastFunctionName = m_trajectory[i].m_subject;
-                
+
                 std::string functionSourceBefore =  m_debugContext.getRequestedInfo(m_project, 0, 0, {},
                                                     {std::make_shared<std::string>(m_trajectory[i].m_subject)},
                                                     {},{});
-                
+
                 contextInfo += "Source of the function '" + m_trajectory[i].m_subject + "' before the fix\n\n";
                 if(functionSourceBefore.empty())
                 {
@@ -576,17 +640,17 @@ namespace hen {
             else if(m_trajectory[i].m_action == "run_test")
             {
                 goTo(project, s);
-                
+
                 if(!lastFunctionName.empty())
                 {
                     //TODO: Should we check if the function exists in the m_project??
-                    
+
                     contextInfo += "Source of the function '" + lastFunctionName + "' after the fix\n\n";
-                    
+
                     std::string functionSourceAfter =  m_debugContext.getRequestedInfo(m_project, 0, 0, {},
                                                         {std::make_shared<std::string>(lastFunctionName)},
                                                         {},{});
-                    
+
                     if(functionSourceAfter.empty())
                     {
                         contextInfo += "The source is already available in the context\n\n";
@@ -596,22 +660,22 @@ namespace hen {
                         contextInfo += functionSourceAfter;
                     }
                 }
-                
+
                 contextInfo += m_debugContext.loadTestLogFromStep(project, m_test, s);
-                
+
                 lastFunctionName.clear();
             }
             else if(m_trajectory[i].m_action == "debug_function")
             {
                 goTo(project, s);
-                
+
                 NextDebugStep prevStep;
                 int stepId = trajectoryIndexToStep(s)-1;
-                std::string stepDir = project->getProjDir() + "/debug/" + m_test.name + "/trajectory/step_" + std::to_string(s-1);
+                std::string stepDir = getTrajectoryStepDir(stepId);
                 web::json::value stepJson;
                 if(loadJson(stepJson, stepDir + "/nextStep.json"))
                 prevStep.from_json(stepJson);
-                
+
                 if(!prevStep.breakpoints.empty())
                 {
                     contextInfo += "\nbreakpoints:\n";
@@ -621,7 +685,7 @@ namespace hen {
             else
             {
                 goTo(project, s);
-                
+
                 DebugStep dummyDebugStep;
                 contextInfo += m_debugContext.stepInfo(m_project, m_test,
                                                        m_trajectory[i].m_action,
@@ -630,11 +694,11 @@ namespace hen {
                                                        m_trajectory[i].m_invocation,
                                                        m_trajectory[i].m_lineNumber,
                                                        dummyDebugStep);
-                
+
                 lastFunctionName.clear();
             }
         }
-        
+
         return contextInfo;
     }
 
@@ -642,7 +706,7 @@ namespace hen {
     {
         CommitInfo info;
         info.hash.clear();
-        
+
         info.fixIndex = getLastIndexBefore(step, "fix_function");
         info.checkoutParent = false;
         if(info.fixIndex < 0)
@@ -656,58 +720,58 @@ namespace hen {
             //fixIndex+1 as the commit now is stored in the subsequent run_test step
             info.hash = m_trajectory[info.fixIndex+1].m_commitHash;
         }
-        
+
         while(info.hash.empty() && info.fixIndex >= 0 && info.fixIndex < m_trajectory.size())
         {
             int fixStep = trajectoryIndexToStep(info.fixIndex);
-            
+
             //Scan froward, so we need to get the parent commit of the found one
             info.checkoutParent = true;
             info.fixIndex = getFirstIndexAfter(fixStep + 1, "fix_function");
-            
+
             //fixIndex+1 as the commit now is stored in the subsequent run_test step
             info.hash = m_trajectory[info.fixIndex+1].m_commitHash;
         }
-        
+
         return info;
     }
 
     void Distillery::goTo(CCodeProject* project, int step)
     {
         auto commitInfo = findCommit(project, step);
-        
+
         if(commitInfo.hash.empty())
         {
             //TODO: do something here!
             std::cout << "Error: the commit hash is empty!!!\n";
         }
-        
+
         if(m_currentFixIndex == commitInfo.fixIndex)
         {
             return;
         }
-        
+
         m_currentFixIndex = commitInfo.fixIndex;
-        
+
         std::string originalDagDir = project->getProjDir() + "/dag";
         std::string distillProjDir = project->getProjDir() + "/temp/DistillProject";
         std::string tempDagDir = distillProjDir + "/dag";
-        
+
         if(!boost_fs::exists(tempDagDir))
         {
             boost_fs::create_directories(distillProjDir);
-            
+
             boost::system::error_code ec;
             boost_fs::copy(originalDagDir, tempDagDir,
                            boost_fs::copy_options::recursive |
                            boost_fs::copy_options::overwrite_existing, ec);
-            
+
             if (ec) {
                 std::cout << "Copy dag Git repo failed! from: " << originalDagDir << " to: " << tempDagDir << "\n";
                 std::cout << "Error: " << ec.message() << "\n";
             }
         }
-        
+
         checkoutExact(tempDagDir, commitInfo.hash, true, false, commitInfo.checkoutParent);
 
         if(m_project)
@@ -715,52 +779,50 @@ namespace hen {
             delete m_project;
             m_project = nullptr;
         }
-        
-        
+
+
         {
             //We create a temporary project but as a principle:
             //WE DO THE ONLY VERY NECESSARY with this project!
             m_project = new CCodeProject;
             m_project->m_description = project->m_description;
             m_project->setup(distillProjDir);
-            
+
             std::string promptsDir = Client::getInstance().getEnvironmentDir();
             std::string promptsDirDistillery = promptsDir + "/Distillery/Prompts";
-            
+
             Prompt::clearSearchPaths();
             Prompt::addSearchPath(promptsDirDistillery);
-            
+
             //m_project->generateCommonFiles("build");
             //m_project->compileCommonHeader(CCodeNode::BUILD_PRINT_TEST | CCodeNode::BUILD_DEBUG);
-            
+
             Client::getInstance().setHackyProject(m_project);
-            
+
             m_project->load();
             m_project->generateSources();
-            
+
             Client::getInstance().setHackyProject(project);
         }
-        
+
         int lastRun = getLastIndexBefore(step, "run_test");
         if(lastRun < 0)
         {
             std::cout << "Corrupted trajectory at step " << step << std::endl;
             return;
         }
-        
+
         int lastDebug = getLastIndexBefore(step, "debug_function");
         if(lastDebug >= 0 && lastDebug > lastRun)
         {
             //We have to load the infor from the debug step.
             lastRun = lastDebug;
         }
-        
+
         int stepRun = m_fromStep + lastRun + 1;
-        
-        std::string stepDir = project->getProjDir() + "/debug/" + m_test.name + "/trajectory/step_";
-        stepDir += std::to_string(stepRun);
-        stepDir += "/wd";
-        
+
+        std::string stepDir = getTrajectoryStepDir(stepRun) + "/wd";
+
         m_debugContext.setup(stepDir, m_system);
     }
 
@@ -772,9 +834,9 @@ namespace hen {
         for(auto& step : m_trajectory)
         {
             std::string stepHint;
-            
+
             usedActions[step.m_action]++;
-            
+
             if(step.m_action == "fix_function" || step.m_action == "run_test" || step.m_action == "stop_unit_test")
             {
                 stepHint += "\nDEBUG STEP: " + std::to_string(s++) + "\n\n";
@@ -787,45 +849,45 @@ namespace hen {
                 stepHint += " line: " + std::to_string(step.m_lineNumber);
                 stepHint += " - " + step.m_motivation.substr(0,96) + "...";
             }
-            
+
             ssout << stepHint << std::endl;
         }
-        
+
         ssout << std::endl << "USED ACTIONS" << std::endl;
-        
+
         for(auto& action : usedActions)
         {
             ssout << action.first << " : " << action.second << std::endl;
         }
-        
+
         return ssout.str();
     }
 
     bool Distillery::loadTrajectory(CCodeProject* project, const TestDef& test, int fromStep, int toStep)
     {
-        std::string trajectoryDir = Client::getInstance().getProjectDirectory() + "/debug/" + test.name + "/trajectory";
-        
+        std::string trajectoryDir = getTrajectoryRootDir(project, test);
+
         if(!boost_fs::exists(trajectoryDir))
         {
             return false;
         }
-        
+
         if(fromStep < 0) {
             fromStep = 0;
         }
-        
+
         if(toStep < 0) {
             toStep = 50000; //We must not have more than that.
         }
-        
+
         m_fromStep = fromStep;
-        
+
         for(int step = fromStep; step < toStep; ++step)
         {
             std::string stepIndexStr = std::to_string(step+1);
-            
+
             std::string stepDir = "/step_" + stepIndexStr;
-            
+
             std::string dbgStepPath = trajectoryDir + stepDir + "/dbgStep.json";
             if(!boost_fs::exists(dbgStepPath))
             {
@@ -833,36 +895,36 @@ namespace hen {
                 std::cout << "Stop trajectory loading" << std::endl;
                 return true;
             }
-            
+
             DebugStep dbgStep;
             dbgStep.load(dbgStepPath);
-            
+
             //Load line number and invocation from the previous nextStep.json
             std::string prevStepIndexStr = std::to_string(step);
-            
+
             std::string prevNextStepPath = trajectoryDir + "/step_" + prevStepIndexStr + "/nextStep.json";
-            
+
             web::json::value jsonPrevNextStep;
             loadJson(jsonPrevNextStep, prevNextStepPath);
-            
+
             if(jsonPrevNextStep.has_field(U("line_number")))
             {
                 dbgStep.m_lineNumber = jsonPrevNextStep[U("line_number")].as_integer();
             }
-            
+
             if(jsonPrevNextStep.has_field(U("invocation")))
             {
                 dbgStep.m_invocation = jsonPrevNextStep[U("invocation")].as_integer();
             }
-            
+
             m_trajectory.push_back(dbgStep);
-            
+
             if(dbgStep.m_action == "fix_function")
             {
                 m_newFunctionsPerStep[step+1] = getFunctionsDefinedInStep(project, test, step);
             }
         }
-        
+
         return true;
     }
 
@@ -871,7 +933,7 @@ namespace hen {
         if (!boost_fs::exists(dir) || !boost_fs::is_directory(dir)) {
             return {false, 0};
         }
-        
+
         // Small helper as a lambda
         const auto regex_escape = [](const std::string& s) -> std::string {
             static const std::regex re{ R"([.^$|()\\[*+?{}])" };
@@ -1043,17 +1105,16 @@ namespace hen {
             std::cout << m_fromStep + m_trajectory.size() << " steps long)" << std::endl;
             return definedFunctions;
         }
-        
+
         if(m_trajectory[stepInTrajectoryIdx].m_action != "fix_function")
         {
             std::cout << "The step " << step + 1 << " is not a 'fix_function' step and can't define functions" << std::endl;
             return definedFunctions;
         }
-        
-        std::string projDir = project->getProjDir();
-        std::string stepLog = projDir + "/logs/debug/" + test.name + "/step_" + std::to_string(step + 1);
+
+        std::string stepLog = getLogsStepDir(step + 1);
         auto startIdRange = findRequestsIdRange(stepLog);
-        
+
         if(startIdRange.first < 0)
         {
             //'fix_function' actions don't generate request for the next step
@@ -1061,7 +1122,7 @@ namespace hen {
             //Get the range from the preveious step
             if(step > 0)
             {
-                std::string prevStepLog = projDir + "/logs/debug/" + test.name + "/step_" + std::to_string(step);
+                std::string prevStepLog = getLogsStepDir(step);
                 startIdRange = findRequestsIdRange(prevStepLog);
                 if(startIdRange.second > startIdRange.first)
                 {
@@ -1069,7 +1130,7 @@ namespace hen {
                     startIdRange.second = -1;
                 }
             }
-            
+
             //no excuses this time though
             if(startIdRange.first < 0)
             {
@@ -1077,33 +1138,33 @@ namespace hen {
                 return definedFunctions;
             }
         }
-        
+
         auto endIdRange = startIdRange;
-        
+
         int nextStep = step + 1;
-        
+
         //If the range is open, try to find the end of the range in the next steps
         while(startIdRange.second <= startIdRange.first)
         {
-            std::string nextStepLog = projDir + "/logs/debug/" + test.name + "/step_" + std::to_string(nextStep + 1);
+            std::string nextStepLog = getLogsStepDir(nextStep + 1);
             if(!boost_fs::exists(nextStepLog))
             {
                 break;
             }
-            
+
             endIdRange = findRequestsIdRange(nextStepLog);
-            
+
             if(endIdRange.first < 0)
             {
                 std::cout << "Couldn't find requests for step " << step << std::endl;
             }
-            
+
             startIdRange.second = endIdRange.first;
-            
+
             nextStep++;
         }
-        
-        std::string logNodes = projDir + "/logs/nodes";
+
+        std::string logNodes = project->getProjDir() + "/logs/nodes";
         if (boost_fs::exists(logNodes) && boost_fs::is_directory(logNodes))
         {
             for (boost_fs::directory_iterator it(logNodes), end; it != end; ++it)
@@ -1115,7 +1176,7 @@ namespace hen {
                     {
                         const boost_fs::path p(req);
                         const std::string& marker = "nodes";
-                        
+
                         for (auto it = p.begin(), end = p.end(); it != end; ++it) {
                             if (it->string() == marker) {
                                 auto next = it; ++next;
@@ -1129,7 +1190,7 @@ namespace hen {
                 }
             }
         }
-        
+
         return definedFunctions;
     }
 
@@ -1228,13 +1289,16 @@ namespace hen {
         std::string testFiles = "//File: test.json\n```json\n";
         testFiles += getFileContent(testDirectory + "/test.json");
         testFiles += "\n```\n\n";
-        
-        std::string datasetDir = project->getProjDir() + "/dataset/" + m_test.name;
-        
+
+        std::string datasetDir = getDatasetDir(project);
+        if(!boost_fs::exists(datasetDir))
+        {
+            boost_fs::create_directories(datasetDir);
+        }
+
         saveToFile(mergedTrajectory, datasetDir + "/merged_trajectory.txt");
-        
-        //TODO: There is a serious chance testWD to be wrong!
-        std::string testWD = project->getProjDir() + "/debug/wd_pub";
+
+        std::string testWD = testDirectory;
         for(auto file : m_test.getRewardHackingTestFiles(testWD))
         {
             boost_fs::path filePath(file);
@@ -1242,53 +1306,53 @@ namespace hen {
             testFiles += getFileContent(testDirectory + "/" + file);
             testFiles += "\n```\n\n";
         }
-        
+
         Prompt promptScoreTrajectory("AnalyzeTrajectory.txt",{
                             {"trajectory", mergedTrajectory},
                             {"test_files", testFiles}
         });
-        
+
         web::json::value object;
         web::json::value schema;
         setupSchema<TrajectoryAnalysis>(schema);
-        
+
         //Cache _cache(dir, cache);
         Cache cache(datasetDir, "/trajecoty_analysis.json");
         project->captureContext(std::string());
-        
+
         project->inference(cache, promptScoreTrajectory, schema, object);
-        
+
         TrajectoryAnalysis trackAnalysis;
         trackAnalysis.from_json(object);
-        
+
         project->popContext();
-        
+
         saveJson(object, datasetDir + "/trajecoty_analysis.json");
-        
+
         for(auto b : trackAnalysis.blockers)
         {
             uint32_t fixStep = *b;
-            
+
             //TODO: Only for test
             //if(fixStep != 34) continue;
-            
+
             int fixIndex = stepToTrajectoryIndex(fixStep);
             if(fixIndex < 0 || fixIndex > m_trajectory.size())
             {
                 //Somthing is not cool here
                 continue;
             }
-            
+
             if(m_trajectory[fixIndex].m_action != "fix_function")
             {
                 fixStep = trajectoryIndexToStep(fixIndex);
                 fixIndex = getFirstIndexAfter(fixStep, "fix_function");
                 fixStep = trajectoryIndexToStep(fixIndex);
             }
-            
+
             distillFixTrack(project, trackAnalysis.analysis, fixStep);
         }
-        
+
         //Compile train.jsonl
         compileDataset(datasetDir);
     }
@@ -1296,35 +1360,40 @@ namespace hen {
     void Distillery::clear()
     {
         m_test.clear();
+        m_testDirectory.clear();
+        m_trajectoryRootDir.clear();
+        m_logsRootDir.clear();
+        m_datasetRunKey.clear();
         m_trajectory.clear();
         m_newFunctionsPerStep.clear();
         m_fromStep = 0;
-        
+
         m_distilleryContext.reset();
-        
+
         m_currentFixIndex = -1;
         if(m_project)
         {
             delete m_project;
             m_project = nullptr;
         }
-        
+
         m_debugContext.clear();
+        m_debugContext.clearRecordedTrajectoryDir();
         m_dataset.clear();
-        
+
         m_dbgSystemPrompt.clear();
         m_projDesc.clear();
-        
+
         m_nextStepPrompt.clear();
         m_debugAnalysisPrompt.clear();
-        
+
         //The original trajectory
         m_fromStep = 0;
         m_trajectory.clear();
         //New functions for each step
         m_newFunctionsPerStep.clear();
         m_newFunctions.clear();
-        
+
         //From first:fix_function to the last secodn:fix_function actions
         m_mergedFixes.clear();
         m_prologue.clear();
@@ -1335,7 +1404,7 @@ namespace hen {
                                         int fromStep, int toStep)
     {
         std::ifstream file(testJsonPath + "/test.json");
-        
+
         std::string jsonStr((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
         auto uJsonStr = utility::conversions::to_string_t(jsonStr);
         auto json = web::json::value::parse(uJsonStr);
@@ -1349,104 +1418,151 @@ namespace hen {
             std::cout << testJsonPath << "/test.json" << std::endl;
             m_system = "main";
         }
-        
+
         m_test.from_json(json);
-        
+        configureRecordedRoots(testJsonPath,
+                               project->getProjDir() + "/debug/" + m_test.name + "/trajectory",
+                               project->getProjDir() + "/logs/debug/" + m_test.name,
+                               std::string());
+
         loadTrajectory(project, m_test, fromStep, toStep);
-        
+
+        return (uint32_t)m_trajectory.size();
+    }
+
+    uint32_t Distillery::loadTrajectory(CCodeProject* project,
+                                        const std::string& testDirectory,
+                                        const std::string& trajectoryRootDir,
+                                        const std::string& logsRootDir,
+                                        const std::string& datasetRunKey,
+                                        int fromStep, int toStep)
+    {
+        std::ifstream file(testDirectory + "/test.json");
+
+        std::string jsonStr((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        auto uJsonStr = utility::conversions::to_string_t(jsonStr);
+        auto json = web::json::value::parse(uJsonStr);
+        if(json.has_field(U("function")))
+        {
+            m_system = utility::conversions::to_utf8string(json[U("function")].as_string());
+        }
+        else
+        {
+            std::cout << "The test file doesn't have 'function' field: ";
+            std::cout << testDirectory << "/test.json" << std::endl;
+            m_system = "main";
+        }
+
+        m_test.from_json(json);
+        configureRecordedRoots(testDirectory, trajectoryRootDir, logsRootDir, datasetRunKey);
+
+        loadTrajectory(project, m_test, fromStep, toStep);
+
         return (uint32_t)m_trajectory.size();
     }
 
     void Distillery::distillTrajectory(CCodeProject* project, const std::string& testJsonPath, int& fromStep, int toStep)
     {
+        web::json::value jsonTest;
+        loadJson(jsonTest, testJsonPath + "/test.json");
+        TestDef tempTest;
+        tempTest.from_json(jsonTest);
+
+        std::string trajectoryDir = Client::getInstance().getProjectDirectory() + "/debug/" + tempTest.name + "/trajectory";
+        std::string logsDir = project->getProjDir() + "/logs/debug/" + tempTest.name;
+
+        distillTrajectory(project, testJsonPath, trajectoryDir, logsDir, std::string(), fromStep, toStep);
+    }
+
+    void Distillery::distillTrajectory(CCodeProject* project,
+                                       const std::string& testDirectory,
+                                       const std::string& trajectoryRootDir,
+                                       const std::string& logsRootDir,
+                                       const std::string& datasetRunKey,
+                                       int& fromStep, int toStep)
+    {
         {
-            web::json::value jsonTest;
-            loadJson(jsonTest, testJsonPath + "/test.json");
-            TestDef tempTest;
-            tempTest.from_json(jsonTest);
-            std::string trajectoryDir = Client::getInstance().getProjectDirectory() + "/debug/" + tempTest.name + "/trajectory";
-            
-            uint32_t nextStepIndex = (uint32_t)nextIndex(trajectoryDir, "step_");
+            uint32_t nextStepIndex = (uint32_t)nextIndex(trajectoryRootDir, "step_");
             if(nextStepIndex > 300)
             {
                 fromStep = nextStepIndex - 300;
             }
         }
-        
-        if(loadTrajectory(project, testJsonPath, fromStep, toStep) <= 0)
+
+        if(loadTrajectory(project, testDirectory, trajectoryRootDir, logsRootDir, datasetRunKey, fromStep, toStep) <= 0)
         {
             return;
         }
-        
+
         std::cout << printTrajectory();
-        
+
         for(auto perS : m_newFunctionsPerStep)
         {
             m_newFunctions.insert(perS.second.begin(), perS.second.end());
         }
-        
+
         if(!m_newFunctions.empty())
         {
             std::cout << "ALL NEW FUNCTIONS: " << getAsCsv(m_newFunctions) << std::endl;
         }
-        
+
         std::string promptsDir = Client::getInstance().getEnvironmentDir();
         std::string promptsDirDebugger = promptsDir + "/Debugger/Prompts";
         std::string promptsDirDistillery = promptsDir + "/Distillery/Prompts";
-        
+
         m_distilleryContext.reset();
         project->setActiveContext(&m_distilleryContext);
-        
-        Prompt::clearSearchPaths();
-        Prompt::addSearchPath(promptsDirDistillery);
-        
-        Prompt role("DistilleryRole.txt",{});
-        project->pushMessage(role, "system", true);
-        
-        Prompt distillationWorkflow("DistillationWorkflow.txt",{});
-        project->pushMessage(distillationWorkflow, "user", true);
-        
-        Prompt::clearSearchPaths();
-        Prompt::addSearchPath(promptsDirDebugger);
-        
-        m_projDesc = "PROJECT DESCRIPTION: " + project->getProjectBrief();
-        project->pushMessage(m_projDesc, "user", true);
-        
-        std::string hitCount = std::to_string(MAX_BREKPOINT_HITCOUNT);
-        Prompt workflow("Workflow.txt",{{"project", project->getProjectName()},
-                                        {"hit_count", hitCount}});
-        
-        project->pushMessage(workflow, "user", true);
-        
-        m_dbgSystemPrompt = "\nHey, you are a Large Language Model specialized in complex debugging workflows for applications written on C++ and STL.\n\n";//dbgRole.str();
-        
-        m_nextStepPrompt = "Analyze the provided information and current progress debugging the application. ";
-        m_nextStepPrompt += "What should be the next action in order to debug the application?\n\n";
-        
-        m_debugAnalysisPrompt = getFileContent(promptsDirDebugger + "/SystemDebugAnalysis.txt");
-        
 
         Prompt::clearSearchPaths();
         Prompt::addSearchPath(promptsDirDistillery);
-        
-        std::string logDir = project->getProjDir() + "/logs/distill/" + m_test.name;
+
+        Prompt role("DistilleryRole.txt",{});
+        project->pushMessage(role, "system", true);
+
+        Prompt distillationWorkflow("DistillationWorkflow.txt",{});
+        project->pushMessage(distillationWorkflow, "user", true);
+
+        Prompt::clearSearchPaths();
+        Prompt::addSearchPath(promptsDirDebugger);
+
+        m_projDesc = "PROJECT DESCRIPTION: " + project->getProjectBrief();
+        project->pushMessage(m_projDesc, "user", true);
+
+        std::string hitCount = std::to_string(MAX_BREKPOINT_HITCOUNT);
+        Prompt workflow("Workflow.txt",{{"project", project->getProjectName()},
+                                        {"hit_count", hitCount}});
+
+        project->pushMessage(workflow, "user", true);
+
+        m_dbgSystemPrompt = "\nHey, you are a Large Language Model specialized in complex debugging workflows for applications written on C++ and STL.\n\n";//dbgRole.str();
+
+        m_nextStepPrompt = "Analyze the provided information and current progress debugging the application. ";
+        m_nextStepPrompt += "What should be the next action in order to debug the application?\n\n";
+
+        m_debugAnalysisPrompt = getFileContent(promptsDirDebugger + "/SystemDebugAnalysis.txt");
+
+
+        Prompt::clearSearchPaths();
+        Prompt::addSearchPath(promptsDirDistillery);
+
+        std::string logDir = getDistillLogDir(project);
         boost_fs::create_directories(logDir);
         Client::getInstance().setContextLogDir(logDir);
-        
+
         Client::getInstance().selectLLM(InferenceIntent::DEBUG_ANALYSIS);
-        
+
         std::string mergedTrajectory = mergeFixes();
-        
-        scoreTrajectory(project, testJsonPath, mergedTrajectory);
-        
-        
+
+        scoreTrajectory(project, testDirectory, mergedTrajectory);
+
+
         Prompt::clearSearchPaths();
         std::string promptsDirEnv = Client::getInstance().getEnvironmentDir() + "/Prompts";
         Prompt::addSearchPath(promptsDirEnv);
-        
+
         Client::getInstance().unlockLLM();
         project->switchToCompileContext();
-        
+
         clear();
     }
 
@@ -1458,27 +1574,27 @@ namespace hen {
         {
             return -1;
         }
-        
+
         //These properties are necessary. They must be in the json object
         if(!trajectoryCfg.has_field(U("previousSteps")))
         {
             return -1;
         }
-        
+
         int summaryStep = trajectoryCfg[U("previousSteps")].as_number().to_int32();
         if(summaryStep < 0)
         {
             return summaryStep;
         }
-        
-        std::string summaryFile = project->getProjDir() + "/debug/" + m_test.name + "/trajectory/step_" + std::to_string(summaryStep) + "/summary.txt";
-        
+
+        std::string summaryFile = getTrajectoryStepDir(summaryStep) + "/summary.txt";
+
         if(!boost_fs::exists(summaryFile))
         {
             std::cout << "\nUnable to find summary file for step " << summaryStep << "!\n";
             return -1;
         }
-        
+
         summary = getFileContent(summaryFile);
         return summaryStep;
     }
@@ -1490,7 +1606,7 @@ namespace hen {
         {
             const DebugStep& step = m_trajectory[s];
             uint32_t stepIndex = m_fromStep + s + 1;
-            
+
             trajectory += "\nSTEP " + std::to_string(stepIndex) + ": ";
             trajectory += step.m_action;
             if(!step.m_subject.empty())
@@ -1517,7 +1633,7 @@ namespace hen {
             }
             trajectory += "\n";
         }
-        
+
         return trajectory;
     }
 
@@ -1530,18 +1646,18 @@ namespace hen {
             oldSummary = "\nNo summarized steps yet\n\n";
             summaryStep = m_fromStep + 1;
         }
-        
+
         int summaryStepIdx = stepToTrajectoryIndex(summaryStep);
         int runStepIdx = stepToTrajectoryIndex(runStep);
-        
+
         if(summaryStepIdx <= 0 && summaryStepIdx == runStepIdx)
         {
             //return "Summary is not available for the fix sequence.";
             return std::string();
         }
-        
+
         std::string summarizeTrajectory = getOriginalTrajectory(project, summaryStepIdx, runStepIdx);
-        
+
         std::string sequenceToDistill = "(from run_test step " + std::to_string(runStep) + " to fix_function step " + std::to_string(fixStep) + ")";
         std::string sequenceToSummarize = "(from run_test step " + std::to_string(summaryStep) + " to fix_function step " + std::to_string(runStep-1) + ")";
         Prompt promptDistillSummary("DistillSummary.txt",{
@@ -1550,10 +1666,10 @@ namespace hen {
                             {"sequence_to_distill", sequenceToDistill},
                             {"sequence_to_summarize", sequenceToSummarize}
         });
-        
+
         std::string message = promptDistillSummary.str();
         project->captureContext(std::string());
-        
+
         Cache cache;
         bool truncated = false;
         std::string summary = "review";
@@ -1562,29 +1678,29 @@ namespace hen {
         while(summary.length() > 2048 && attempts < 3)
         {
             std::string feedback = "\n\nThe summary is too long. It should be less than 2000 characters. 15-20 concise sentences!\n\n";
-            
+
             summary = "review";
             truncated = false;
             project->inference(cache, feedback, summary, &truncated);
-            
+
             //TODO: Investigate in the future, we want something substantial
             if(summary.length() <= 512)
             {
                 //break;
             }
-            
+
             attempts++;
         }
-        
+
         project->popContext();
-        
+
         return summary;
     }
 
     void Distillery::saveTrainingData(const std::string& datasetDir, const std::string& sampleName, web::json::value& chatSample, bool jsonReponse)
     {
         //TODO: Consider to enforce alternated messages user->assistant
-        
+
         //alternateRoles(chatSample);
 
         std::string sanitizeReason;
@@ -1594,25 +1710,25 @@ namespace hen {
             std::cout << sanitizeReason << std::endl;
             return;
         }
-        
+
         if(!boost_fs::exists(datasetDir)) {
             boost_fs::create_directories(datasetDir);
         }
-        
+
         std::string renderedChatName = datasetDir + "/" + sampleName;
         std::string renderedChatJson = renderedChatName + ".json";
-        
+
         std::string jsonContent = utility::conversions::to_utf8string(chatSample.serialize());
         saveToFile(jsonContent, renderedChatJson);
-        
+
         std::string renderedChat;
-        
+
         uint32_t size = (uint32_t)chatSample[U("messages")].as_array().size();
         for(uint32_t i=0; i<size; ++i)
         {
             auto& message = chatSample[U("messages")].at(i);
             std::string role = utility::conversions::to_utf8string(message[U("role")].as_string());
-            
+
             bool formatAsJson = false;
             if(message.has_field(U("thinking")))
             {
@@ -1621,14 +1737,14 @@ namespace hen {
                 {
                     renderedChat += ">> thinking\n\n\n";
                     renderedChat += thinking + "\n\n\n";
-                    
+
                     if(jsonReponse)
                     {
                         formatAsJson = true;//After the thinking we have a json reponse!
                     }
                 }
             }
-            
+
             std::string content = utility::conversions::to_utf8string(message[U("content")].as_string());
             if(formatAsJson)
             {
@@ -1637,7 +1753,7 @@ namespace hen {
             renderedChat += ">> " + role + "\n\n\n";
             renderedChat += content + "\n\n\n";
         }
-        
+
         std::string renderedChatFile = renderedChatName + ".txt";
         saveToFile(renderedChat, renderedChatFile);
     }
@@ -1647,27 +1763,27 @@ namespace hen {
                                      const std::function<Prompt(const std::string&, const std::string&)> &buildPrompt)
     {
         std::string stepStr = std::to_string(step);
-        std::string stepLogsDir = project->getProjDir() + "/logs/debug/" + m_test.name + "/step_" + stepStr;
+        std::string stepLogsDir = getLogsStepDir(step);
         std::pair<bool, uint32_t> requestId = findRequestIdForPattern(stepLogsDir, "request_", sufix);
         if(!requestId.first)
         {
             return std::make_pair<>(false, web::json::value());
         }
-        
+
         std::string requestFileName = "request_" + std::to_string(requestId.second) + sufix;
-        
+
         web::json::value request;
         loadJson(request, stepLogsDir + "/" + requestFileName);
         std::string jsonRequest;
         jsonRequest += utility::conversions::to_utf8string(request.serialize());
-        
+
         std::string responseFileName = "response_" + std::to_string(requestId.second) + sufix;
-        
+
         web::json::value response;
         loadJson(response, stepLogsDir + "/" + responseFileName);
         std::string jsonResponse;
         jsonResponse += utility::conversions::to_utf8string(response.serialize());
-        
+
         // Let the caller configure the Prompt via lambda
         Prompt distillPrompt = buildPrompt
         ? buildPrompt(jsonRequest, jsonResponse)
@@ -1675,11 +1791,11 @@ namespace hen {
             { "json_request",  jsonRequest  },
             { "json_response", jsonResponse }
         });
-        
+
         Cache cache;
         web::json::value object;
         project->inference(cache, distillPrompt, schema, object);
-        
+
         return std::make_pair<>(true, object);
     }
 
@@ -1687,44 +1803,44 @@ namespace hen {
     std::pair<bool, std::string> Distillery::thinkingForResponse(CCodeProject* project, const std::string& sufix, int step, web::json::value& request, web::json::value& response)
     {
         std::string stepStr = std::to_string(step);
-        std::string stepLogsDir = project->getProjDir() + "/logs/debug/" + m_test.name + "/step_" + stepStr;
+        std::string stepLogsDir = getLogsStepDir(step);
         std::pair<bool, uint32_t> requestId = findRequestIdForPattern(stepLogsDir, "request_", sufix);
         if(!requestId.first)
         {
             return std::make_pair<>(false, std::string());
         }
-        
+
         std::string requestFileName = "request_" + std::to_string(requestId.second) + sufix;
-        
+
         loadJson(request, stepLogsDir + "/" + requestFileName);
         std::string jsonRequest = "```json\n";
         jsonRequest += utility::conversions::to_utf8string(request.serialize());
         jsonRequest += "\n```\n";
-        
+
         std::string responseFileName = "response_" + std::to_string(requestId.second) + sufix;
-        
+
         loadJson(response, stepLogsDir + "/" + responseFileName);
         std::string jsonResponse = "```json\n";
         jsonResponse += utility::conversions::to_utf8string(response.serialize());
         jsonResponse += "\n```\n";
-        
+
         // Let the caller configure the Prompt via lambda
         Prompt prompt("Thinking.txt", {
             { "json_request",  jsonRequest  },
             { "json_response", jsonResponse }
         });
-        
+
         Cache cache;
-        
+
         std::string thinking = "review";
         bool truncated = false;
-        
+
         project->captureContext(std::string());
-        
+
         project->inference(cache, prompt.str(), thinking, &truncated);
-        
+
         project->popContext();
-        
+
         return std::make_pair<>(true, thinking);
     }
 
@@ -1733,17 +1849,17 @@ namespace hen {
         web::json::value jsonSysAnalysisRequest = web::json::value::parse(utility::conversions::to_string_t(sysAnalysisRequest));
         web::json::value jsonSample;
         jsonSample[U("messages")] = jsonSysAnalysisRequest[U("messages")];
-        
+
         json::value responseMessage;
         responseMessage[U("role")] = json::value::string(U("assistant"));
         responseMessage[U("thinking")] = json::value::string(utility::conversions::to_string_t(systemAnalysis.thinking_analysis));
-                                                     
+
         auto responseContent = systemAnalysis.system_analysis.to_json().serialize();
         responseMessage[U("content")] = json::value::string(responseContent);
 
         auto& messagesArray = jsonSample[U("messages")].as_array();
         messagesArray[messagesArray.size()] = responseMessage;
-        
+
         saveTrainingData(datasetDir, fileName, jsonSample, true);
     }
 
@@ -1757,85 +1873,85 @@ namespace hen {
         web::json::value jsonSysAnalysisRequest = web::json::value::parse(utility::conversions::to_string_t(request));
         web::json::value jsonSample;
         jsonSample[U("messages")] = jsonSysAnalysisRequest[U("messages")];
-        
+
         json::value responseMessage;
         responseMessage[U("role")] = json::value::string(U("assistant"));
-        
+
         if(!thinking.empty())
         {
             responseMessage[U("thinking")] = json::value::string(utility::conversions::to_string_t(thinking));
         }
-                                                     
+
         responseMessage[U("content")] = json::value::string(utility::conversions::to_string_t(response));
 
         auto& messagesArray = jsonSample[U("messages")].as_array();
         messagesArray[messagesArray.size()] = responseMessage;
-        
+
         saveTrainingData(datasetDir, fileName, jsonSample, responseAsJson);
     }
 
     bool Distillery::distillRunStep(CCodeProject* project, const std::string& summary, const std::string& fixedFunction, int testStep, int fixStep, std::string& debugNotes)
     {
         m_debugContext.clear();
-        
+
         web::json::value schemaAnalysis;
         setupSchema<DistilledAanalysis>(schemaAnalysis);
-        
+
         project->captureContext(std::string());
-        
+
         std::string currentTrajectory = getTrajectoryPrologue(project, testStep, testStep, summary);
-        
+
         auto hint = m_debugContext.runAnalysis(m_project);
-        
+
         if(!hint.second.empty())
         {
             currentTrajectory += "//Here is a hint from my analysis:\n";
             currentTrajectory += hint.second;
             currentTrajectory += "//The analysis hint ends here\n\n";
         }
-        
+
         std::set<std::string> subSystems;
         std::string systemData = m_debugContext.getSubSystemsData(m_project, subSystems);
         std::string subSystemsStr = getAsCsv(subSystems);
-        
+
         const int subSystemsDepth = PRINT_MAX_FUNCTIONS_DEPTH-1;
         currentTrajectory += "The following functions are classified as sub-systems as they are with call stack depth <= ";
         currentTrajectory += std::to_string(subSystemsDepth) + " and are called just once:\n";
         currentTrajectory += subSystemsStr + "\n\n";
         currentTrajectory += systemData;
-        
+
         if(!fixedFunction.empty() && fixedFunction != "none")
         {
             std::string recentFix = m_debugContext.getRecentFixInfo(m_project, fixedFunction);
             currentTrajectory += recentFix;
         }
-        
+
         //TODO: Inference the response
         DistilledAanalysis distilledSystemAnalysis;
         {
             std::string testStepStr = std::to_string(testStep);
             std::string fixStepStr = std::to_string(fixStep);
             std::string optimizedSequence = "(from step " + testStepStr + " to step " + fixStepStr + ")";
-            
+
             web::json::value schema;
             setupSchema<DistilledAanalysis>(schema);
-            
+
             project->captureContext(std::string());
-            
+
             auto chat = getChat(project, "_SystemAnalysis.json", testStep);
-            
+
             if(chat.first.empty() && chat.second.empty())
             {
                 //TODO: Very likely reward hacking step
-                std::string debugStepPath = project->getProjDir() + "/debug/" + m_test.name + "/trajectory/step_" + testStepStr + "/dbgStep.json";
+                std::string debugStepPath = getTrajectoryStepDir(testStep) + "/dbgStep.json";
                 DebugStep dbgStep;
                 dbgStep.load(debugStepPath);
-                
+
                 debugNotes = dbgStep.m_debugNotes;
                 m_debugContext.clear();
                 return true;
             }
-            
+
             Prompt promptDistillStep("DistillSystemAnalysis.txt",{
                 { "json_request",  chat.first },
                 { "json_response", chat.second },
@@ -1844,32 +1960,32 @@ namespace hen {
                 { "optimized_sequence", optimizedSequence},
                 { "current_trajectory", currentTrajectory},
             });
-            
+
             Cache cache;
-            
+
             // Build visibility from EXACT text that will be in the distilled sample.
             const std::set<std::string> functionCandidates = (m_project ? m_project :
                                                               project)->getNodeNames();
             std::set<std::string> visibleFunctions;
             addMentionedFunctionsFromText(currentTrajectory, functionCandidates,
                                           visibleFunctions);
-            
+
             auto validateSystemGrounding = [&](const DistilledAanalysis& candidate,
                                                std::string& outFeedback) -> bool
             {
                 outFeedback.clear();
-                
+
                 std::string narrative;
                 narrative += candidate.system_analysis.debug_notes;
                 narrative += "\n";
                 narrative += candidate.system_analysis.log_summary;
                 narrative += "\n";
                 narrative += candidate.thinking_analysis;
-                
+
                 std::set<std::string> mentionedFunctions;
                 addMentionedFunctionsFromText(narrative, functionCandidates,
                                               mentionedFunctions);
-                
+
                 std::set<std::string> disallowed;
                 for (const auto& fn : mentionedFunctions)
                 {
@@ -1880,12 +1996,12 @@ namespace hen {
                         disallowed.insert(fn);
                     }
                 }
-                
+
                 if (disallowed.empty())
                 {
                     return true;
                 }
-                
+
                 outFeedback += "Grounding violation in system analysis narrative fields ";
                 outFeedback += "(debug_notes/log_summary/thinking_analysis).\n";
                 outFeedback += "Disallowed function names: " + getAsCsv(disallowed, 30) + "\n";
@@ -1894,18 +2010,18 @@ namespace hen {
                 outFeedback += "Rule: mention only functions visible in CURRENT TRAJECTORY for this distilled sample.\n";
                 outFeedback += "Do not use function names known only from OLD SYSTEM ANALYSIS REQUEST/RESPONSE or OPTIMIZED SEQUENCE.\n";
                 outFeedback += "Regenerate using only grounded names.\n\n";
-                
+
                 return false;
             };
-            
+
             web::json::value object;
             project->inference(cache, promptDistillStep, schema, object);
             distilledSystemAnalysis.from_json(object);
-            
+
             std::string groundingFeedback;
             uint32_t attempts = 0;
             const uint32_t kMaxAttempts = 8;
-            
+
             while (attempts < kMaxAttempts &&
                    !validateSystemGrounding(distilledSystemAnalysis, groundingFeedback))
             {
@@ -1914,7 +2030,7 @@ namespace hen {
                 distilledSystemAnalysis.from_json(object);
                 ++attempts;
             }
-            
+
             // Final check after loop (important).
             if (!validateSystemGrounding(distilledSystemAnalysis, groundingFeedback))
             {
@@ -1922,26 +2038,26 @@ namespace hen {
                 << kMaxAttempts << " retries at step " << testStep
                 << ". Keeping last response." << std::endl;
             }
-            
+
             project->popContext();
         }
-        
+
         project->popContext();
-        
-        std::string datasetDir = project->getProjDir() + "/dataset/" + m_test.name;
-        
+
+        std::string datasetDir = getDatasetDir(project);
+
         std::string testStepStr = std::to_string(testStep);
         std::string fixStepStr = std::to_string(fixStep);
-        
+
         std::string sysAnalysisSample = "system_" + testStepStr + "_" + fixStepStr;
-        
+
         {
             std::string content = utility::conversions::to_utf8string(distilledSystemAnalysis.system_analysis.to_json().serialize());
             json::value jsonSample = buildTrainingData(project, currentTrajectory, content, distilledSystemAnalysis.thinking_analysis);
-            
+
             saveTrainingData(datasetDir, sysAnalysisSample, jsonSample, true);
         }
-        
+
         {
             debugNotes += "\n\nSYSTEM ANALYSIS:\n\n";
             if(!distilledSystemAnalysis.system_analysis.debug_notes.empty())
@@ -1949,12 +2065,12 @@ namespace hen {
                 debugNotes += distilledSystemAnalysis.system_analysis.debug_notes;
                 debugNotes += "\n\nLog Summary:\n";
                 debugNotes += distilledSystemAnalysis.system_analysis.log_summary;
-                
+
             }
         }
-        
+
         m_debugContext.clear();
-        
+
         return false;
     }
 
@@ -1965,10 +2081,10 @@ namespace hen {
                                        const std::string& debugInfo)
     {
         std::string datasetFile = datasetDir + "/train.jsonl";
-        
+
         //web::json::value jsonSysAnalysisRequest = web::json::value::parse(utility::conversions::to_string_t(sysAnalysisRequest));
         json::value messagesArray = json::value::array();
-        
+
         //*** system prompt
         json::value systemMessage;
         systemMessage[U("role")] = json::value::string(U("system"));
@@ -1976,12 +2092,12 @@ namespace hen {
         //systemPrompt += m_debugWorkflow;
         systemMessage[U("content")] = json::value::string(utility::conversions::to_string_t(systemPrompt));
         messagesArray[messagesArray.size()] = systemMessage;
-        
+
         //*** trajecotry
-        
+
         std::string trajecotryContent = debugInfo;
         trajecotryContent += "\n\n" + m_nextStepPrompt;
-        
+
         json::value trajecotryMessage;
         trajecotryMessage[U("role")] = json::value::string(U("user"));
         std::string mergedUserMessage = m_projDesc + "\n\n";
@@ -1989,51 +2105,51 @@ namespace hen {
         mergedUserMessage += trajecotryContent;
         trajecotryMessage[U("content")] = json::value::string(utility::conversions::to_string_t(mergedUserMessage));
         messagesArray[messagesArray.size()] = trajecotryMessage;
-        
+
         //*** response message
         json::value responseMessage;
         responseMessage[U("role")] = json::value::string(U("assistant"));
         responseMessage[U("thinking")] = json::value::string(utility::conversions::to_string_t(debugAnalysis.thinking_analysis));
-                                                     
+
         auto responseContent = debugAnalysis.system_analysis.to_json().serialize();
-        
+
         responseMessage[U("content")] = json::value::string(responseContent);
 
         //auto& messagesArray = jsonSample[U("messages")].as_array();
         messagesArray[messagesArray.size()] = responseMessage;
-        
+
         json::value jsonTrajecotry;
         jsonTrajecotry[U("messages")] = messagesArray;
-        
+
         saveTrainingData(datasetDir, fileName, jsonTrajecotry, true);
     }
 
     std::pair<std::string, std::string> Distillery::getChat(CCodeProject* project, const std::string& sufix, int step)
     {
         std::string stepStr = std::to_string(step);
-        std::string stepLogsDir = project->getProjDir() + "/logs/debug/" + m_test.name + "/step_" + stepStr;
+        std::string stepLogsDir = getLogsStepDir(step);
         std::pair<bool, uint32_t> requestId = findRequestIdForPattern(stepLogsDir, "request_", sufix);
         if(!requestId.first)
         {
             return std::make_pair(std::string(), std::string());
         }
-        
+
         std::string requestFileName = "request_" + std::to_string(requestId.second) + sufix;
-        
+
         web::json::value request;
         loadJson(request, stepLogsDir + "/" + requestFileName);
         std::string jsonRequest;// = "```json\n";
         jsonRequest += utility::conversions::to_utf8string(request.serialize());
         //jsonRequest += "\n```\n";
-        
+
         std::string responseFileName = "response_" + std::to_string(requestId.second) + sufix;
-        
+
         web::json::value response;
         loadJson(response, stepLogsDir + "/" + responseFileName);
         std::string jsonResponse;// = "```json\n";
         jsonResponse += utility::conversions::to_utf8string(response.serialize());
         //jsonResponse += "\n```\n";
-        
+
         return std::make_pair(jsonRequest, jsonResponse);
     }
 
@@ -2047,62 +2163,62 @@ namespace hen {
     {
         std::string debugInfo = getTrajectoryPrologue(project, originalStep, debugStep, summary);
         debugInfo += prevSteps;
-        
+
         std::string currentTrajectory = debugInfo;
-        
+
         std::string stepStr = std::to_string(originalStep);
         //TODO: I don't like extraction from logs, maybe replace with parsing traces/logs for that step, but for now it is OK-ish
         {
-            std::string stepLogsDir = project->getProjDir() + "/logs/debug/" + m_test.name + "/step_" + stepStr;
-            
+            std::string stepLogsDir = getLogsStepDir(originalStep);
+
             std::pair<bool, uint32_t> requestId = findRequestIdForPattern(stepLogsDir, "request_", "_SystemDebugAnalysis.json");
             if(!requestId.first)
             {
                 //return std::make_pair<>(false, web::json::value());
             }
-            
+
             std::string requestFileName = "request_" + std::to_string(requestId.second) + "_SystemDebugAnalysis.json";
-            
+
             web::json::value request;
-            
+
             loadJson(request, stepLogsDir + "/" + requestFileName);
-            
+
             if(!request.has_field(U("messages")))
             {
                 //TODO: signal error
             }
-            
+
             auto& messages = request[U("messages")].as_array();
             auto umessage = messages.at(messages.size()-1).as_object()[U("content")].as_string();
             std::string message = utility::conversions::to_utf8string(umessage);
-            
+
             //TODO: Only temporary
             auto pos = message.find("DEBUG ANALYSIS REQUEST");
             //auto pos = message.find("TRACE ANALYSIS");
-            
+
             std::string debugSection = (pos == std::string::npos) ? "" : message.substr(pos);
             if(debugSection.empty())
             {
                 //TODO: signal error
             }
-            
+
             debugInfo += "\n\n";
             debugInfo += debugSection;
-            
+
             std::string jsonRequest;// = "```json\n";
             jsonRequest += utility::conversions::to_utf8string(request.serialize());
             jsonRequest = formatJson(jsonRequest, std::string("  "));
-            
+
             //TODO: find the DEBUG ANALYSIS text
         }
-        
+
         auto chat = getChat(project, "_SystemDebugAnalysis.json", originalStep);
-        
+
         web::json::value schema;
         setupSchema<DistilledAanalysis>(schema);
-        
+
         project->captureContext(std::string());
-        
+
         std::string debugStepStr = std::to_string(debugStep);
         Prompt promptDistillStep("DistillSystemDebugAnalysis.txt",{
                             {"original_prompt", m_debugAnalysisPrompt},
@@ -2111,9 +2227,9 @@ namespace hen {
                             {"original_step_id", stepStr},
                             {"step_id", debugStepStr}
         });
-        
+
         Cache cache;
-        
+
         web::json::value object;
         project->inference(cache, promptDistillStep, schema, object);
 
@@ -2192,37 +2308,37 @@ namespace hen {
         }
 
         project->popContext();
-        
+
         DebugStep distilledDebugStep;
-        
+
         //DebugStep stepInfo;
         distilledDebugStep.m_logSummary = distilledDebugAnalysis.system_analysis.log_summary;
         distilledDebugStep.m_debugNotes = distilledDebugAnalysis.system_analysis.debug_notes;
         distilledDebugStep.m_action = "debug_function";
         distilledDebugStep.m_subject = distilledStep.debug_step.action_subject;
         distilledDebugStep.m_motivation = distilledStep.debug_step.motivation;
-        
+
         distilledStep.m_debugNotes = distilledDebugAnalysis.system_analysis.debug_notes;
         distilledStep.m_logSummary = distilledDebugAnalysis.system_analysis.log_summary;
-        
+
         if(!distilledStep.debug_step.breakpoints.empty())
         {
             distilledDebugStep.m_motivation += "\n\nEvaluated breakpoints: \n";
             distilledDebugStep.m_motivation += m_debugContext.getBreakpointsInfo(false, distilledStep.debug_step.action_subject,
                                                                                  distilledStep.debug_step.breakpoints);
         }
-        
+
         //Reuse prevSteps to return step info to be added
         prevSteps = "\nSTEP " + debugStepStr + ":\n";
-        
+
         newInfo = distilledDebugStep.fullInfo();
         prevSteps += newInfo;
-        
-        
-        std::string datasetDir = project->getProjDir() + "/dataset/" + m_test.name;
+
+
+        std::string datasetDir = getDatasetDir(project);
         std::string testStepStr = std::to_string(testStep);
         saveDebugAnalysis(project, datasetDir, "debug_" + testStepStr + "_" + debugStepStr, distilledDebugAnalysis, debugInfo);
-        
+
         return currentTrajectory;
     }
 
@@ -2236,9 +2352,9 @@ namespace hen {
         if (newInfo.find_first_not_of(" \t\r\n\f\v") == std::string::npos) {
             return;
         }
-        
+
         auto& arr = messages.as_array();
-        
+
         NextDebugStep req = step.debug_step;
         if (req.invocation <= 0) {
             req.invocation = 1;
@@ -2249,12 +2365,12 @@ namespace hen {
         if (!step.motivation_summary.empty()) {
             req.motivation = step.motivation_summary;
         }
-        
+
         web::json::value a;
         a[U("role")] = web::json::value::string(U("assistant"));
         a[U("content")] = web::json::value::string(req.to_json().serialize());
         arr[arr.size()] = a;
-        
+
         web::json::value u;
         u[U("role")] = web::json::value::string(U("user"));
         std::string labeledInfo = "STEP " + std::to_string(stepId) + ":\n\n" + newInfo;
@@ -2265,7 +2381,7 @@ namespace hen {
     std::string Distillery::rebuildRequestedInfo(CCodeProject* project, const std::vector<DistilledStep>& trajectory, int newDebugStep)
     {
         m_debugContext.clear();
-        
+
         std::string requestedInfo;
         for(int i=0; i<newDebugStep; ++i)
         {
@@ -2287,28 +2403,28 @@ namespace hen {
             requestedInfo = "\n//Information requested previous steps starts here\n\n" + requestedInfo;
             requestedInfo += "\n//Information requested previous steps ends here\n\n";
         }
-    
+
         return requestedInfo;
     }
 
     std::string Distillery::getTrajectoryPrologue(CCodeProject* project, int originalRunStep, int distilledRunStep, const std::string& summary)
     {
         std::string prologue;
-        
+
         //Ensure we have the correct info incorporating the modification from the last debug step
         prologue += m_debugContext.getHighLevelAppInfo(m_project, {}, 0, PRINT_MAX_FUNCTIONS_DEPTH);
         prologue += "\n\n";
-        
+
         prologue += "\nSUMMARY OF PREVIOUS STEPS:\n\n";
         prologue += summary;
-        
+
         std::string lastRunTestLog = m_debugContext.loadTestLogFromStep(project, m_test, originalRunStep);
-        
+
         prologue += "\n\nINFORMATION FOR THE LAST RUN STEP: " + std::to_string(distilledRunStep) + " STARTS HERE\n";
-       
+
         prologue += lastRunTestLog;
         prologue += "INFORMATION FOR THE LAST RUN STEP ENDS HERE\n\n\n";
-        
+
         m_prologue = prologue;
         return prologue;
     }
@@ -2322,7 +2438,7 @@ namespace hen {
     static bool containsToken(const std::string& text, const std::string& token)
     {
         if (token.empty()) return false;
-        
+
         std::size_t pos = 0;
         while ((pos = text.find(token, pos)) != std::string::npos)
         {
@@ -2353,14 +2469,14 @@ namespace hen {
     {
         std::string token;
         bool escaped = false;
-        
+
         auto flush = [&]() {
             if (!token.empty()) {
                 out.insert(token);
                 token.clear();
             }
         };
-        
+
         for (char c : pattern)
         {
             if (escaped) {
@@ -2368,13 +2484,13 @@ namespace hen {
                 flush();
                 continue;
             }
-            
+
             if (c == '\\') {
                 escaped = true;
                 flush();
                 continue;
             }
-            
+
             const unsigned char uc = static_cast<unsigned char>(c);
             if (std::isalnum(uc) || c == '_') {
                 token.push_back(c);
@@ -2382,7 +2498,7 @@ namespace hen {
                 flush();
             }
         }
-        
+
         flush();
     }
 
@@ -2394,56 +2510,56 @@ namespace hen {
     {
         std::map<int, StepDisclosureMapEntry> out;
         if (!project || optimalSequence.steps.empty()) return out;
-        
+
         // Reset to exactly the same starting state as distillation.
         goTo(project, runStep - 1);
         m_debugContext.clear();
-        
+
         const std::set<std::string> functionCandidates = project->getNodeNames();
-        
+
         std::string prevSteps;
         std::string requestedInfo;
         std::set<std::string> fixableByFunctionInfo;
-        
+
         int stepId = runStep;
-        
+
         for (std::size_t i = 0; i < optimalSequence.steps.size(); ++i, ++stepId)
         {
             const auto& step = optimalSequence.steps[i];
-            
+
             // Build the same textual view used by distillStep.
             std::string currentTrajectory = getTrajectoryPrologue(project, runStep, runStep, summary);
             currentTrajectory += prevSteps;
-            
+
             if (!requestedInfo.empty())
             {
                 currentTrajectory += "\n//Information requested previous steps starts here\n\n";
                 currentTrajectory += requestedInfo;
                 currentTrajectory += "\n//Information requested previous steps ends here\n\n";
             }
-            
+
             // Distilled step files start from runStep+1 (run_test itself is not a step_ sample).
             if (i > 0)
             {
                 StepDisclosureMapEntry entry;
                 const DebugVisibility& vis = m_debugContext.visibility();
-                
+
                 entry.visible_functions = vis.m_functions;
                 entry.visible_data_types = vis.m_dataTypes;
                 entry.fixable_functions = fixableByFunctionInfo;
-                
+
                 // Text parity fallback: include names explicitly visible in the distilled prompt text.
                 addMentionedFunctionsFromText(currentTrajectory, functionCandidates, entry.visible_functions);
-                
+
                 out[stepId] = std::move(entry);
             }
-            
+
             // Advance simulated visibility using the same context provider path.
             if (step->action_type == "function_info")
             {
                 fixableByFunctionInfo.insert(step->action_subject);
             }
-            
+
             if (NextDebugStep::isInformationRequest(step->action_type))
             {
                 DebugStep dbgStep;
@@ -2455,13 +2571,13 @@ namespace hen {
                                                            step->invocation,
                                                            step->line_number,
                                                            dbgStep);
-                
+
                 if (!info.empty())
                 {
                     if (!requestedInfo.empty()) requestedInfo += "\n\n";
                     requestedInfo += info;
                 }
-                
+
                 prevSteps += "\nSTEP " + std::to_string(stepId) + " ";
                 prevSteps += dbgStep.summary() + "\n\n";
             }
@@ -2473,12 +2589,12 @@ namespace hen {
                 dbgStep.m_subject = step->action_subject;
                 dbgStep.m_invocation = step->invocation;
                 dbgStep.m_lineNumber = step->line_number;
-                
+
                 prevSteps += "\nSTEP " + std::to_string(stepId) + " ";
                 prevSteps += dbgStep.summary() + "\n\n";
             }
         }
-        
+
         return out;
     }
 
@@ -2486,17 +2602,17 @@ namespace hen {
     {
         std::string feedback;
         std::string recommendation;
-        
+
         if(optimalSequence.steps.size() < 2)
         {
             feedback += "The optimal sequence must have atleast two steps run_test and fix_function.\n\n";
             return std::pair<std::string, std::string>(); //We should not continue
         }
-        
+
         std::string summary;
         getSummaryStepForStep(project, startStep, summary);
         auto disclosure = buildDisclosureMap(project, optimalSequence, startStep, summary);
-        
+
         if((int)optimalSequence.steps.size() > originalSize + 2)
         {
             std::string originalSizeStr = std::to_string(originalSize);
@@ -2504,14 +2620,14 @@ namespace hen {
             feedback += "The optimal sequence has too many steps (" + optimalSizeStr + ") compared to the original (";
             feedback += originalSizeStr + "). Maximum allowed expansion is +2 steps.\n\n";
         }
-        
+
         std::string firstAction = optimalSequence.steps.front()->action_type;
         if(firstAction != "run_test")
         {
             feedback += "The first step in the optimal sequecne is from type '" + firstAction;
             feedback += "' it must be run_test.\n\n";
         }
-        
+
         std::string lastAction = optimalSequence.steps.back()->action_type;
         if(//optimalSequence.steps.back()->action_type != "run_test" &&
            optimalSequence.steps.back()->action_type != "fix_function")
@@ -2519,9 +2635,9 @@ namespace hen {
             feedback += "The last step in the optimal sequecne is from type '" + lastAction;
             feedback += "' it must be fix_function.\n\n";
         }
-        
+
         const std::set<std::string> functionCandidates = (m_project ? m_project : project)->getNodeNames();
-        
+
         int stepIndex = 1;
         for(const auto& step : optimalSequence.steps)
         {
@@ -2538,21 +2654,21 @@ namespace hen {
                 feedback += "Step " + std::to_string(stepId) + " has invalid invocation=0.\n";
                 feedback += "Use invocation=1 when not needed.\n\n";
             }
-            
+
             if (step->original_step == 0 || step->original_step < -1)
             {
                 feedback += "Step " + std::to_string(stepId) + " has invalid original_step=";
                 feedback += std::to_string(step->original_step) + ".\n";
                 feedback += "original_step must be > 0 (mapped to original trajectory) or -1 (synthetic inserted step).\n\n";
             }
-            
+
             if (step->action_type == "debug_function" && step->original_step <= 0)
             {
                 feedback += "Step " + std::to_string(stepId) + " debug_function has invalid original_step=";
                 feedback += std::to_string(step->original_step) + ".\n";
                 feedback += "debug_function must map to a real original step (> 0).\n\n";
             }
-            
+
             if (step->action_type == "debug_function" && step->original_step > 0)
             {
                 // Keep mapping semantics identical to distillStep(): originalStep -> step_(originalStep-1)/nextStep.json
@@ -2564,7 +2680,7 @@ namespace hen {
                 }
                 else
                 {
-                    std::string stepDir = project->getProjDir() + "/debug/" + m_test.name + "/trajectory/step_" + std::to_string(mappedStepId);
+                    std::string stepDir = getTrajectoryStepDir(mappedStepId);
                     web::json::value stepJson;
                     if (!loadJson(stepJson, stepDir + "/nextStep.json"))
                     {
@@ -2575,13 +2691,13 @@ namespace hen {
                     {
                         NextDebugStep originalStep;
                         originalStep.from_json(stepJson);
-                        
+
                         if (originalStep.action_type != "debug_function")
                         {
                             feedback += "Step " + std::to_string(stepId) + " debug_function mapping mismatch: ";
                             feedback += "mapped original step is action_type='" + originalStep.action_type + "' (expected debug_function).\n\n";
                         }
-                        
+
                         if (originalStep.action_type == "debug_function" &&
                             (originalStep.action_subject != step->action_subject ||
                              originalStep.invocation != step->invocation ||
@@ -2598,21 +2714,21 @@ namespace hen {
                     }
                 }
             }
-            
+
             if (step->line_number == (uint32_t)-1)
             {
                 feedback += "Step " + std::to_string(stepId) + " has invalid line_number=UINT_MAX";
                 feedback += " (likely wrapped from a negative value).\n";
                 feedback += "Use line_number=0 when not needed.\n\n";
             }
-            
+
             if (stepIndex > 1) // only distilled step_* entries
             {
                 auto it = disclosure.find(stepId);
                 if (it != disclosure.end())
                 {
                     const auto& d = it->second;
-                    
+
                     std::string visiblePreview;
                     {
                         int shown = 0;
@@ -2627,13 +2743,13 @@ namespace hen {
                         if (visiblePreview.empty()) visiblePreview = "<none>";
                         else if ((int)d.visible_functions.size() > shown) visiblePreview += ", ...";
                     }
-                    
+
                     if (
                         (step->action_type == "function_info" ||
                          step->action_type == "fix_function" ||
                          step->action_type == "call_graph" ||
                          step->action_type == "debug_function") &&
-                        
+
                         !step->action_subject.empty() &&
                         step->action_subject != "none" &&
                         d.visible_functions.find(step->action_subject) == d.visible_functions.end()
@@ -2655,7 +2771,7 @@ namespace hen {
                         feedback += buildAllowedCandidatesLine(d.visible_functions, step->action_subject, 35) + "\n";
                         feedback += "Currently visible functions at step " + std::to_string(stepId) + ": " + visiblePreview + "\n";
                     }
-                    
+
                     if (step->action_type == "fix_function" &&
                         d.fixable_functions.find(step->action_subject) == d.fixable_functions.end())
                     {
@@ -2664,7 +2780,7 @@ namespace hen {
                         feedback += "Fix precondition: before fix_function(X), the optimized sequence must contain an earlier function_info(X).\n";
                         feedback += "Recovery: insert function_info('" + step->action_subject + "') before this fix, "
                         "then keep fix_function('" + step->action_subject + "') as the final step.\n\n";
-                        
+
                         std::string fixablePreview;
                         {
                             int shown = 0;
@@ -2685,12 +2801,12 @@ namespace hen {
                         feedback += "Functions already eligible for fix (prior function_info) at step ";
                         feedback += std::to_string(stepId) + ": " + fixablePreview + "\n";
                     }
-                    
+
                     if (step->action_type == "search_source")
                     {
                         std::set<std::string> regexTokens;
                         extractIdentifierTokensFromRegex(step->action_subject, regexTokens);
-                        
+
                         std::set<std::string> referencedFunctions;
                         for (const auto& tok : regexTokens)
                         {
@@ -2699,7 +2815,7 @@ namespace hen {
                                 referencedFunctions.insert(tok); // exact-name only
                             }
                         }
-                        
+
                         std::set<std::string> notVisible;
                         for (const auto& fn : referencedFunctions)
                         {
@@ -2708,7 +2824,7 @@ namespace hen {
                                 notVisible.insert(fn);
                             }
                         }
-                        
+
                         if (!notVisible.empty())
                         {
                             feedback += "Step " + std::to_string(stepId) + " search_source regex references function names ";
@@ -2727,7 +2843,7 @@ namespace hen {
                     }
                 }
             }
-            
+
             if(step->action_type == "run_test")
             {
                 goTo(project, startStep);
@@ -2736,9 +2852,9 @@ namespace hen {
             {
                 std::string motivation;
                 DebugStep dummy;
-                
+
                 std::string searchResult = m_debugContext.stepSearchSource(m_project, step->action_subject, motivation, dummy);
-                
+
                 if(searchResult.length() > SEARCH_TRACE_SIZE)
                 {
                     recommendation += "The source search for regex:\n";
@@ -2755,10 +2871,10 @@ namespace hen {
                     feedback += "We can't have fix_function step in the middle of the sequence being optimized, only at the end.\n\n";
                 }
             }
-            
+
             stepIndex++;
         }
-        
+
         return std::make_pair(feedback, recommendation);
     }
 
@@ -2779,17 +2895,17 @@ namespace hen {
             {
                 continue;
             }
-            
+
             OptimizedStep originalStep;
             originalStep.action_type = step.m_action;
             originalStep.action_subject = step.m_subject;
             originalStep.line_number = (step.m_lineNumber == (uint32_t)-1) ? 0 : step.m_lineNumber;
             originalStep.invocation = (step.m_invocation == 0) ? 1 : step.m_invocation;
             originalStep.original_step = trajectoryIndexToStep(i);
-            
+
             originalSequence.steps.push_back(std::make_shared<OptimizedStep>(originalStep));
         }
-        
+
         return originalSequence;
     }
 
@@ -2804,8 +2920,8 @@ namespace hen {
         auto range = getFixTrackRange(project, fixStep);
         int runStepIndex = range.first;
         int runStep = trajectoryIndexToStep(runStepIndex);
-        
-        
+
+
         std::string trajecotry;
         std::string summary;
         int summaryStep = getSummaryStepForStep(project, runStep, summary);
@@ -2817,9 +2933,9 @@ namespace hen {
         {
             summaryStep = runStep;
         }
-        
+
         int summaryStepIdx = stepToTrajectoryIndex(summaryStep);
-        
+
         int originalSize = fixStep - runStep + 1;
         std::string idealTargetGuidance;
         if(idealMaxCount == 0)
@@ -2838,19 +2954,19 @@ namespace hen {
             idealTargetGuidance += "If that is not possible, return the best valid sequence you can without sacrificing grounding, logical progression, or the final source-code effect. ";
             idealTargetGuidance += "The original segment contains " + std::to_string(originalSize) + " steps.";
         }
-        
+
         std::string prevSteps;
         for(int s=summaryStepIdx;s<runStepIndex;++s)
         {
             int step = trajectoryIndexToStep(s);
             std::string stepIdStr = std::to_string(step);
-            
+
             prevSteps += "\nSTEP " + stepIdStr + ":\n";
             prevSteps += m_trajectory[s].fullInfo() + "\n";
         }
-        
+
         trajecotry += prevSteps;
-        
+
         if(trajecotry.empty())
         {
             trajecotry = "Information for previous steps is not available";
@@ -2877,10 +2993,10 @@ namespace hen {
 
         auto disclosureForOptimize = buildDisclosureMap(project, originalSequence, runStep, summary);
         std::string disclosureContract = buildDisclosureContractText(disclosureForOptimize, 45);
-        
+
         goTo(project, fixStep-1);
         std::string appInfo = m_debugContext.getHighLevelAppInfo(m_project, "", PRINT_MAX_FUNCTIONS_DEPTH, PRINT_MAX_FUNCTIONS_DEPTH);
-        
+
         Prompt promptOptimizeFixTrack("OptimizeFixTrack.txt",{
                             {"app_info", appInfo},
                             {"trajectory", trajecotry},
@@ -2888,34 +3004,34 @@ namespace hen {
                             {"disclosure_contract", disclosureContract},
                             {"ideal_target_guidance", idealTargetGuidance}
         });
-        
+
         web::json::value object;
         web::json::value schema;
         setupSchema<EditSourceSequence>(schema);
-        
+
         project->captureContext(std::string());
-        
+
         InfoRequest infoRequest;
-    
+
         std::string message = promptOptimizeFixTrack.str();
-        
+
         std::string maxInfoRequestsStr = std::to_string(OPTIMIZE_TRACK_MAX_INFO_REQUESTS);
         Prompt promptOptimizeFixTrackInfo("OptimizeFixTrackInfo.txt",{
             {"max_requests", maxInfoRequestsStr}
         });
-        
+
         message += promptOptimizeFixTrackInfo.str();
-        
+
         std::string responseInfo = project->provideInfoLoop(message, OPTIMIZE_TRACK_MAX_INFO_REQUESTS);
-        
+
         Prompt promptOptimizeFixTrackEpilog("OptimizeFixTrackEpilog.txt",{
         });
         responseInfo += promptOptimizeFixTrackEpilog.str();
-        
+
         project->inference(cache, responseInfo, schema, object);
-        
+
         optimalSequence.from_json(object);
-        
+
         auto feedback = validateSequence(project, optimalSequence, originalSize, runStep);
         bool firstFb = true;
         uint32_t attempts = 0;
@@ -2928,16 +3044,16 @@ namespace hen {
         {
             std::string feedbackPrompt = feedback.first + feedback.second;
             project->inference(cache, feedbackPrompt, schema, object);
-        
+
             optimalSequence.clear();
             optimalSequence.from_json(object);
             feedback = validateSequence(project, optimalSequence, originalSize, runStep);
-            
+
             firstFb = false;
-            
+
             attempts++;
         }
-        
+
         project->popContext();
 
         if (!feedback.first.empty())
@@ -2947,7 +3063,7 @@ namespace hen {
             optimalSequence.clear();
             return std::string();
         }
-        
+
         // Hard cap on expansion: allow at most +2 steps over the original run->fix span.
         if ((int)optimalSequence.steps.size() > originalSize + 2)
         {
@@ -2957,7 +3073,7 @@ namespace hen {
             optimalSequence.clear();
             return std::string();
         }
-        
+
         std::string ctxMessage = promptOptimizeFixTrack.str();
         ctxMessage += promptOptimizeFixTrackEpilog;
         return ctxMessage;
@@ -2971,29 +3087,29 @@ namespace hen {
                                               web::json::value* messages)
     {
         json::value messagesArray = json::value::array();
-        
+
         // system
         json::value systemMessage;
         systemMessage[U("role")] = json::value::string(U("system"));
         std::string systemPrompt = m_dbgSystemPrompt;
         systemMessage[U("content")] = json::value::string(utility::conversions::to_string_t(systemPrompt));
         messagesArray[messagesArray.size()] = systemMessage;
-        
+
         // schema/instrumentation tail
         web::json::value localSchema;
         if (!schema) {
             setupSchema<NextDebugStep>(localSchema);
             schema = &localSchema;
         }
-        
+
         std::string nextStepTail = "\n\n" + m_nextStepPrompt;
         nextStepTail += project->getInstrumentationMessage(*schema);
-        
+
         if (messages && messages->is_array()) {
             // interleaved mode: user prologue + prior interleaved msgs
             json::value prologueMessage;
             prologueMessage[U("role")] = json::value::string(U("user"));
-            
+
             std::string base = m_projDesc + "\n\n";
             if (!m_prologue.empty()) {
                 base += m_prologue;
@@ -3001,15 +3117,15 @@ namespace hen {
                 // fallback if prologue was not set yet
                 base += trajectory;
             }
-            
+
             prologueMessage[U("content")] = json::value::string(utility::conversions::to_string_t(base));
             messagesArray[messagesArray.size()] = prologueMessage;
-            
+
             auto& src = messages->as_array();
             for (size_t i = 0; i < src.size(); ++i) {
                 messagesArray[messagesArray.size()] = src[i];
             }
-            
+
             // append instruction/schema to the last user message
             auto& arr = messagesArray.as_array();
             int lastUserIdx = -1;
@@ -3017,7 +3133,7 @@ namespace hen {
                 if (!arr[i].is_object() || !arr[i].has_field(U("role")) || !arr[i].at(U("role")).is_string()) {
                     continue;
                 }
-                
+
                 const std::string role =
                 utility::conversions::to_utf8string(arr[i].at(U("role")).as_string());
                 if (role == "user") {
@@ -3025,7 +3141,7 @@ namespace hen {
                     break;
                 }
             }
-            
+
             if (lastUserIdx >= 0) {
                 std::string lastContent;
                 if (arr[lastUserIdx].has_field(U("content")) && arr[lastUserIdx].at(U("content")).is_string()) {
@@ -3043,27 +3159,27 @@ namespace hen {
             // original single-turn mode
             std::string trajectoryContent = trajectory;
             trajectoryContent += nextStepTail;
-            
+
             json::value trajectoryMessage;
             trajectoryMessage[U("role")] = json::value::string(U("user"));
-            
+
             std::string mergedUserMessage = m_projDesc + "\n\n";
             mergedUserMessage += trajectoryContent;
             trajectoryMessage[U("content")] = json::value::string(utility::conversions::to_string_t(mergedUserMessage));
-            
+
             messagesArray[messagesArray.size()] = trajectoryMessage;
         }
-        
+
         // assistant target
         json::value responseMessage;
         responseMessage[U("role")] = json::value::string(U("assistant"));
         responseMessage[U("thinking")] = json::value::string(utility::conversions::to_string_t(thinking));
         responseMessage[U("content")] = json::value::string(utility::conversions::to_string_t(content));
         messagesArray[messagesArray.size()] = responseMessage;
-        
+
         json::value jsonTrajectory;
         jsonTrajectory[U("messages")] = messagesArray;
-        
+
         return jsonTrajectory;
     }
 
@@ -3078,102 +3194,102 @@ namespace hen {
                                         const StepDisclosureMapEntry* disclosureEntry)
     {
         web::json::value object;
-        
+
         web::json::value schema;
         setupSchema<DistilledStep>(schema);
-        
+
         Cache cache;
         project->captureContext(std::string());
-        
+
         std::string currentTrajectory = getTrajectoryPrologue(project, lastOriginalRunStep, lastOriginalRunStep, summary);
-        
+
         currentTrajectory += prevSteps;
-        
+
         if(!requestedInfo.empty())
         {
             currentTrajectory += "\n//Information requested previous steps starts here\n\n";
             currentTrajectory += requestedInfo;
             currentTrajectory += "\n//Information requested previous steps ends here\n\n";
         }
-        
+
         std::string stepIdStr = std::to_string(step);
-        
+
         std::set<std::string> allowedNewHelpers;
-        
+
         std::string newFunctionsHint;
         if(nextStep.debug_step.action_type == "fix_function")
         {
             CCodeNode* ccFixed =
             project->getNodeByName(nextStep.debug_step.action_subject);
-            
+
             //Also collect helper names allowed in narrative
             auto collectHelpers = [&](int keyStep) {
                 auto it = m_newFunctionsPerStep.find(keyStep);
                 if(it == m_newFunctionsPerStep.end() || it->second.empty())
                     return;
-                
+
                 for(const auto& func : it->second)
                 {
                     CCodeNode* ccNode = project->getNodeByName(func);
                     if(!ccNode) continue;
                     if(ccFixed && !ccFixed->calledInTheSource(func)) continue;
                     if(!ccNode->hasPathToMain()) continue;
-                    
+
                     allowedNewHelpers.insert(func);
-                    
+
                     if(newFunctionsHint.empty())
                     {
                         newFunctionsHint += "\n\nThe original fix_function step you're distilling from maybe ";
                         newFunctionsHint += "introduced the following helper functions that were used in the source.";
                         newFunctionsHint += " Consider mentioning their addition in the motivation and analysis:\n";
                     }
-                    
+
                     newFunctionsHint += "//" + ccNode->m_prototype.brief;
                     newFunctionsHint += "\n";
                     newFunctionsHint += ccNode->m_prototype.declaration;
                     newFunctionsHint += "\n\n";
                 }
             };
-            
+
             collectHelpers(nextStep.m_originalStep);
             collectHelpers(nextStep.m_originalStep + 1); // robust against step-index offset
         }
-        
+
         const std::string lockedActionType    = nextStep.debug_step.action_type;
         const std::string lockedActionSubject = nextStep.debug_step.action_subject;
         const uint32_t    lockedInvocation    = nextStep.debug_step.invocation;
         const uint32_t    lockedLineNumber    = nextStep.debug_step.line_number;
-        
+
         const std::set<std::string> functionCandidates = (m_project ? m_project : project)->getNodeNames();
-        
+
         Prompt promptDistillStep("DistillStep.txt",{
                             {"current_trajectory", currentTrajectory},
                             {"new_functions", newFunctionsHint},
                             {"step_id", stepIdStr}
         });
-        
+
         project->inference(cache, promptDistillStep, schema, object);
-        
+
         nextStep.debug_step.clear();
         nextStep.from_json(object);
-        
+
         DebugStep debugStep;
-        
+
         std::string feedback;
         uint32_t attempts = 0;
         const uint32_t kMaxAttempts = 8;
         bool converged = false;
-        
+
         auto summarizeFeedback = [](const std::string& s) -> std::string {
             const std::size_t kMax = 600;
             if (s.size() <= kMax) return s;
             return s.substr(0, kMax) + "...";
         };
-        
+
         while(true)
         {
             feedback.clear();
-            
+
             if (nextStep.debug_step.action_type != lockedActionType ||
                 nextStep.debug_step.action_subject != lockedActionSubject ||
                 nextStep.debug_step.invocation != lockedInvocation ||
@@ -3187,20 +3303,20 @@ namespace hen {
                 feedback += "  line_number=" + std::to_string(lockedLineNumber) + "\n";
                 feedback += "Regenerate. Change only motivation/motivation_summary/analysis.\n\n";
             }
-            
+
             if(nextStep.debug_step.action_type == "debug_function")
             {
                 int stepId = originalStep-1;
                 std::string stepIdStr = std::to_string(stepId);
                 if(stepId > 0 && stepId <= m_fromStep + m_trajectory.size())
                 {
-                    std::string stepDir = project->getProjDir() + "/debug/" + m_test.name + "/trajectory/step_" + stepIdStr;
+                    std::string stepDir = getTrajectoryStepDir(stepId);
                     web::json::value stepJson;
                     loadJson(stepJson, stepDir + "/nextStep.json");
-                    
+
                     NextDebugStep prevStep;
                     prevStep.from_json(stepJson);
-                    
+
                     if(prevStep.action_type != "debug_function")
                     {
                         feedback += "Breakpoints and their conditions must exactly match the one from the original step\n\n";
@@ -3213,7 +3329,7 @@ namespace hen {
                         else
                         {
                             int bpCount = (int)nextStep.debug_step.breakpoints.size();
-                            
+
                             for(int i=0; i<bpCount; ++i)
                             {
                                 int j=0;
@@ -3224,7 +3340,7 @@ namespace hen {
                                         break;
                                     }
                                 }
-                                
+
                                 if(j==bpCount)
                                 {
                                     feedback += "Breakpoints and their conditions must exactly match the one from the original step\n\n";
@@ -3238,7 +3354,7 @@ namespace hen {
                     feedback += "The suggested mapping to the original step " + stepIdStr + " doesn't exist in the trajectory\n\n";
                 }
             }
-            
+
             if (disclosureEntry)
             {
                 std::string narrative;
@@ -3247,70 +3363,70 @@ namespace hen {
                 narrative += nextStep.motivation_summary;
                 narrative += "\n";
                 narrative += nextStep.analysis; // becomes assistant thinking in training
-                
+
                 std::set<std::string> mentionedFunctions;
                 addMentionedFunctionsFromText(narrative, functionCandidates,
                                               mentionedFunctions);
-                
+
                 std::set<std::string> disallowed;
                 for (const auto& fn : mentionedFunctions)
                 {
                     if (fn == lockedActionSubject) continue; // allow locked subject mention
-                    
+
                     const bool isVisible = disclosureEntry->visible_functions.count(fn) > 0;
                     const bool isAllowedHelper = allowedNewHelpers.count(fn) > 0;
-                    
+
                     if (!isVisible && !isAllowedHelper)
                     {
                         disallowed.insert(fn);
                     }
                 }
-                
+
                 if (!disallowed.empty())
                 {
                     feedback += "Grounding violation in narrative fields (motivation/motivation_summary/analysis).\n";
                     feedback += "Disallowed function names: " + getAsCsv(disallowed, 30) + "\n";
                     feedback += "Currently visible functions at this step: " + getAsCsv(disclosureEntry->visible_functions, 30) + "\n";
                     feedback += "Regenerate using only functions disclosed in CURRENT TRAJECTORY.\n\n";
-                    
+
                     if (!allowedNewHelpers.empty())
                     {
                         feedback += "Allowed newly introduced helper functions for this fix step: ";
                         feedback += getAsCsv(allowedNewHelpers, 30) + "\n";
                     }
                 }
-                
+
                 const bool lockedNeedsMention =
                 (lockedActionType == "function_info" || lockedActionType ==
                  "fix_function" || lockedActionType == "debug_function") &&
                 !lockedActionSubject.empty() && lockedActionSubject != "none" &&
                 functionCandidates.count(lockedActionSubject);
-                
+
                 if (lockedNeedsMention && !containsToken(narrative, lockedActionSubject))
                 {
                     feedback += "Grounding violation: narrative must explicitly mention locked action_subject '";
                     feedback += lockedActionSubject + "'.\n\n";
                 }
             }
-            
+
             if (feedback.empty())
             {
                 converged = true;
                 break;
             }
-            
+
             if (attempts >= kMaxAttempts)
             {
                 break; // keep last response, but report explicit non-convergence
             }
-            
+
             ++attempts;
             project->inference(cache, feedback, schema, object);
             nextStep.debug_step.clear();
             nextStep.from_json(object);
-            
+
         }
-        
+
         if (!converged)
         {
             std::cout << "Step distillation didn't converge after ";
@@ -3318,7 +3434,7 @@ namespace hen {
             std::cout << " (original step " << originalStep << "). Keeping last response.\n";
             std::cout << "Last validation feedback:\n" << summarizeFeedback(feedback) << std::endl;
         }
-        
+
         if(nextStep.debug_step.isInformationRequest())
         {
             newInfo = m_debugContext.stepInfo(m_project, m_test,
@@ -3328,14 +3444,14 @@ namespace hen {
                                               nextStep.debug_step.invocation,
                                               nextStep.debug_step.line_number,
                                               debugStep);
-            
+
             prevSteps += "\nSTEP " + stepIdStr + " ";
             prevSteps += debugStep.summary() + "\n";
             prevSteps += nextStep.motivation_summary + "\n\n";
         }
-        
+
         project->popContext();
-        
+
         return currentTrajectory;
     }
 
@@ -3343,23 +3459,23 @@ namespace hen {
     {
         std::string testStepStr = std::to_string(startStep);
         std::string fixStepStr = std::to_string(fixStep);
-        
-        std::string datasetDir = project->getProjDir() + "/dataset/" + m_test.name;
+
+        std::string datasetDir = getDatasetDir(project);
         if(!boost_fs::exists(datasetDir))
         {
             std::cout << "The dataset directory doesn't exists: " << datasetDir << std::endl;
             return false;
         }
-        
+
         std::string sysAnalysisSample = "system_" + testStepStr + "_" + fixStepStr;
-        
+
         std::string systemFile = datasetDir + "/" + sysAnalysisSample + ".json";
         if(!boost_fs::exists(systemFile))
         {
             std::cout << "The system analysis training sample doesn't exists: " << systemFile << std::endl;
             return false;
         }
-        
+
         for(uint32_t s=startStep+1; s<=fixStep; ++s)
         {
             std::string currentStepStr = std::to_string(s);
@@ -3370,20 +3486,20 @@ namespace hen {
                 return false;
             }
         }
-        
+
         return true;
     }
 
     void Distillery::removeFixTrackData(CCodeProject* project, uint32_t startStep, uint32_t fixStep)
     {
-        std::string datasetDir = project->getProjDir() + "/dataset/" + m_test.name;
+        std::string datasetDir = getDatasetDir(project);
         std::string startStepStr = std::to_string(startStep);
         std::string fixStepStr = std::to_string(fixStep);
-        
+
         std::string systemAnalysisFile = datasetDir + "/system_" + startStepStr + "_" + fixStepStr;
         boost_fs::remove(systemAnalysisFile + ".json");
         boost_fs::remove(systemAnalysisFile + ".txt");
-        
+
         std::string prefix = "step_" + startStepStr + "_";
         for (boost_fs::directory_iterator it(datasetDir), end; it != end; ++it)
         {
@@ -3403,15 +3519,15 @@ namespace hen {
     std::string Distillery::prevStepsSummary(const std::vector<DistilledStep>& distilledTrajectory, int startStep)
     {
         std::string summary;
-        
+
         int stepId = startStep;
         for(const auto& step : distilledTrajectory)
         {
             std::string stepIdStr = std::to_string(stepId);
-            
+
             summary += "\n\nSTEP " + stepIdStr + " ";
             summary += step.debug_step.action_type + " " + step.debug_step.action_subject;
-            
+
             if(step.debug_step.action_type == "function_info")
             {
                 summary += " invocation " + std::to_string(step.debug_step.invocation);
@@ -3421,17 +3537,17 @@ namespace hen {
                 summary += " line " + std::to_string(step.debug_step.line_number);
                 summary += " invocation " + std::to_string(step.debug_step.invocation);
             }
-            
+
             if(!step.motivation_summary.empty())
             {
                 summary += "\n" + step.motivation_summary + "\n\n";
             }
-            
+
             if(step.debug_step.action_type == "debug_function")
             {
                 summary += "\nBreakpoints:\n";
                 summary += m_debugContext.getBreakpointsInfo(false, step.debug_step.action_subject, step.debug_step.breakpoints);
-                
+
                 //summary += "\n\nDebug Notes\n";
                 summary += step.m_debugNotes;
             }
@@ -3440,10 +3556,10 @@ namespace hen {
                 //summary += "\nDebug Notes\n";
                 summary += step.m_debugNotes;
             }
-            
+
             stepId++;
         }
-        
+
         return summary;
     }
 
@@ -3452,32 +3568,32 @@ namespace hen {
         auto fixRange = getFixTrackRange(project, fixStep);
         bool needsOptimization = fixRange.second - fixRange.first > 3;
         std::string fixTrack = trackForFix(project, fixStep);
-        
+
         int startStep = trajectoryIndexToStep(fixRange.first);
         std::string testStepStr = std::to_string(startStep);
         std::string fixStepStr = std::to_string(fixStep);
-        
-        std::string datasetDir = project->getProjDir() + "/dataset/" + m_test.name;
+
+        std::string datasetDir = getDatasetDir(project);
         if(!boost_fs::exists(datasetDir))
         {
             boost_fs::create_directories(datasetDir);
         }
-        
+
         EditSourceSequence originalSequence = buildOriginalFixTrack(fixRange.first, fixRange.second);
         std::string originalJson = "original_fix_" + testStepStr + "_" + fixStepStr + ".json";
         saveJson(originalSequence.to_json(), datasetDir + "/" + originalJson) ;
-        
+
         std::string sysAnalysisSample = "system_" + testStepStr + "_" + fixStepStr;
-        
+
         if(checkFixTrackData(project, startStep, fixStep))
         {
             return ;
         }
-        
+
         removeFixTrackData(project, startStep, fixStep);
-        
+
         project->captureContext(std::string());
-        
+
         std::string optimizedJson = "optimized_fix_" + testStepStr + "_" + fixStepStr + ".json";
         EditSourceSequence optimalSequence;
         std::string optimalSequenceMsg;
@@ -3492,20 +3608,20 @@ namespace hen {
                                                            fixTrack, fixStep,
                                                            (uint32_t)optimalSequence.steps.size(),
                                                            sequence);
-                
+
                 if(sequence.steps.size() > 0 &&
                    (i==0 || sequence.steps.size() < optimalSequence.steps.size()))
                 {
                     optimalSequenceMsg = sequenceMsg;
                     optimalSequence = sequence;
                 }
-                
+
                 if(optimalSequence.steps.size() < 4)
                 {
                     break;
                 }
             }
-            
+
             if(optimalSequence.steps.size() > 0)
             {
                 pushOptimizedFixTrack(project, optimalSequenceMsg, optimalSequence);
@@ -3514,18 +3630,18 @@ namespace hen {
         else
         {
             optimalSequence = originalSequence;
-            
+
             std::string firstRunStr = std::to_string(trajectoryIndexToStep(fixRange.first));
             std::string lastRunStr = std::to_string(trajectoryIndexToStep(fixRange.second));
             optimalSequence.analysis = "The optimal sequence for this fix is the original one from run_test step ";
             optimalSequence.analysis += firstRunStr + " to fix_function step " + lastRunStr;
-            
+
             std::string originalFixSequence = "OPTIMIZED TRAJECTORY READY FOR DISTILLATION:\n\n\n";
             originalFixSequence += fixTrack + "\n";
-            
+
             project->pushMessage(originalFixSequence, "user", true);
         }
-        
+
         if(optimalSequence.steps.empty())
         {
             std::cout << "Skipping fix track due to invalid/empty optimized sequence for ";
@@ -3545,20 +3661,20 @@ namespace hen {
                 return;
             }
         }
-        
+
         //Save optimized sequence
         saveJson(optimalSequence.to_json(), datasetDir + "/" + optimizedJson);
-        
+
         std::string summary = distillSummaryBefore(project, startStep, fixStep);
-        
+
         auto disclosure = buildDisclosureMap(project, optimalSequence, startStep, summary);
-        
+
         std::string prevSteps;
         std::string requestedInfo;
         std::vector<std::string> infoRequests;
         m_debugContext.clear();
-        
-        
+
+
         if(needsOptimization &&
            optimalSequence.steps.size() > 2 &&
            optimalSequence.steps.back()->action_type == "run_test")
@@ -3566,13 +3682,13 @@ namespace hen {
             //Do not distill the last run_test step
             optimalSequence.steps.pop_back();
         }
-        
+
         for(const auto& step : optimalSequence.steps)
         {
             const bool badOriginalStep =
                 (step->original_step == 0 || step->original_step < -1) ||
                 (step->action_type == "debug_function" && step->original_step <= 0);
-            
+
             if(step->action_type.empty() || badOriginalStep)
             {
                 std::cout << "ERROR: Rejecting optimized sequence with invalid step fields: ";
@@ -3580,7 +3696,7 @@ namespace hen {
                 project->popContext();
                 return;
             }
-            
+
             if(step->line_number == (uint32_t)-1)
             {
                 step->line_number = 0;
@@ -3591,11 +3707,11 @@ namespace hen {
                 step->invocation = 1;
             }
         }
-        
+
         std::string systemAnalysis;
-        
+
         std::vector<DistilledStep> distilledTrajectory;
-        
+
         std::string startStepStr = std::to_string(startStep);
         int currentStep = startStep;
         web::json::value messages = web::json::value::array();
@@ -3603,21 +3719,21 @@ namespace hen {
         for(auto step : optimalSequence.steps)
         {
             std::string currentStepStr = std::to_string(currentStep);
-            
+
             prevSteps = prevStepsSummary(distilledTrajectory, startStep);
-            
+
             if(step->action_type == "run_test")
             {
                 goTo(project, currentStep);
-                
-                std::string prevStepJson = project->getProjDir() + "/debug/" + m_test.name + "/trajectory/step_" + std::to_string(currentStep-1) + "/dbgStep.json";
-                
+
+                std::string prevStepJson = getTrajectoryStepDir(currentStep - 1) + "/dbgStep.json";
+
                 DebugStep prevStep;
                 bool prevLoaded = prevStep.load(prevStepJson);
-                
+
                 DebugStep stepInfo;
                 stepInfo.m_logSummary.clear(); //Everything for the system analysis is in the debug notes
-                
+
                 if(distillRunStep(project, summary, prevStep.m_subject, currentStep, fixStep, systemAnalysis))
                 {
                     //Need to check if there is a reward-hacking review
@@ -3625,7 +3741,7 @@ namespace hen {
                     web::json::value rewardHackingResponse;
                     std::pair<bool, std::string> rewardHacking = thinkingForResponse(project, "_RewardHacking.json", currentStep,
                                                                                      rewardHackingRequest, rewardHackingResponse);
-                    
+
                     if(rewardHacking.first && !rewardHacking.second.empty()) //Yes, this is reward-hacking review
                     {
                         //Let's save the system analysis
@@ -3640,9 +3756,9 @@ namespace hen {
                         {
                             rewardAnalysis.system_analysis.log_summary = "Reward-hacking prcatices have been identified.\n";
                         }
-                        
+
                         stepInfo.m_logSummary = rewardAnalysis.system_analysis.log_summary;
-                        
+
                         std::string rewardHackingRequestStr = utility::conversions::to_utf8string(rewardHackingRequest.serialize());
 
                         saveSystemAnalysis(datasetDir,
@@ -3651,12 +3767,12 @@ namespace hen {
                                            rewardHackingRequestStr);
                     }
                 }
-                
+
                 stepInfo.m_debugNotes = systemAnalysis;
                 stepInfo.m_action = "run_test";
                 stepInfo.m_lineNumber = 0;
                 stepInfo.m_invocation = 1;
-                
+
                 //DebugStep prevFixStep;
                 if(prevLoaded &&
                    !prevStep.m_subject.empty() &&
@@ -3665,13 +3781,13 @@ namespace hen {
                     stepInfo.m_motivation = "Run the test to verify the fix of '" + prevStep.m_subject;
                     stepInfo.m_motivation += "' and find what else needs fixes to successfully pass the test.";
                     stepInfo.m_subject = prevStep.m_subject;
-                    
+
                     std::string newInfo;
-                    
+
                     //We need debug notes for the system anaysis added to the info
                     //for the multiple turns training set
                     newInfo = stepInfo.m_debugNotes + newInfo;
-                    
+
                     infoRequests.push_back(newInfo);
                 }
                 else
@@ -3679,12 +3795,12 @@ namespace hen {
                     stepInfo.m_motivation = "Run the test to verify the recent fix and find what else needs fixes to successfully pass the test.";
                     stepInfo.m_subject = "none";
                 }
-                
+
                 prevSteps += "\nSTEP: " + currentStepStr + "\n\n";
                 prevSteps += stepInfo.fullInfo() + "\n\n";
-                
+
                 std::cout << systemAnalysis;
-                
+
                 DistilledStep distilledStep;
                 distilledStep.debug_step.action_type    = stepInfo.m_action;
                 distilledStep.debug_step.action_subject = stepInfo.m_subject;
@@ -3693,7 +3809,7 @@ namespace hen {
                 //distilledStep.analysis                  = systemAnalysis.thinking_analysis;
                 distilledStep.debug_step.motivation     = stepInfo.m_motivation;
                 distilledStep.m_debugNotes = systemAnalysis;
-                
+
                 distilledTrajectory.push_back(distilledStep);
                 addStepToMessages(project, distilledStep, currentStep, stepInfo.notes(), messages);
             }
@@ -3702,11 +3818,11 @@ namespace hen {
                 //TODO: We must very precisely map debugging steps from the original trajectory,
                 //so we can restore the Git to this commit
                 goTo(project, step->original_step);
-                
+
                 //TODO: We need to recompile the requestedInfo as we have a new run
-                
+
                 //TODO: remap the startStep to the original step corresponding on the new debug_function step
-                
+
                 DistilledStep nextStep;
                 std::string newInfo;
                 nextStep.debug_step.action_type = step->action_type;
@@ -3714,49 +3830,49 @@ namespace hen {
                 nextStep.debug_step.invocation = (step->invocation == 0) ? 1 : step->invocation;
                 nextStep.debug_step.line_number = step->line_number;
                 nextStep.m_originalStep = step->original_step;
-                
+
                 const StepDisclosureMapEntry* disclosureEntry = nullptr;
                 auto dIt = disclosure.find(currentStep);
                 if (dIt != disclosure.end()) disclosureEntry = &dIt->second;
-                
+
                 std::string currentTrajectory = distillStep(project, step->original_step, startStep, fixStep, currentStep,
                                                             summary, prevSteps, requestedInfo, newInfo, nextStep, disclosureEntry);
-                
+
                 std::string content = utility::conversions::to_utf8string(nextStep.debug_step.to_json().serialize());
                 web::json::value schema;
                 setupSchema<NextDebugStep>(schema);
                 json::value jsonSample = buildTrainingData(project, currentTrajectory, content, nextStep.analysis, &schema, &messages);
                 saveTrainingData(datasetDir, "step_" + startStepStr + "_" + currentStepStr, jsonSample, true);
-                
+
                 distilledTrajectory.push_back(nextStep);
-                
+
                 DebugStep debugStep;
                 {
                     debugStep.m_motivation = nextStep.debug_step.motivation;
-                    
+
                     debugStep.m_action = nextStep.debug_step.action_type;
                     debugStep.m_subject = nextStep.debug_step.action_subject;
-                    
+
                     debugStep.m_lineNumber = nextStep.debug_step.line_number;
                     debugStep.m_invocation = nextStep.debug_step.invocation;
                 }
-                
+
                 std::string tempPrevSteps = prevSteps;
                 tempPrevSteps += "\nSTEP " + currentStepStr + " ";
                 tempPrevSteps += debugStep.summary() + "\n";
                 tempPrevSteps += nextStep.motivation_summary + "\n\n";
-                
+
                 std::string trajectory = distillDebugStep(project, summary,
                                                            tempPrevSteps,
                                                           newInfo,
                                                           nextStep,
                                                           step->original_step,
                                                           startStep, currentStep);
-                
+
                 //Now tempPrevSteps is updated in the distillDebugStep to contain only the debug_function step full info
                 //so add it to the steps trajectory
                 prevSteps += tempPrevSteps;
-                
+
                 int newDebugStep = currentStep - startStep;
                 requestedInfo = rebuildRequestedInfo(project, distilledTrajectory, newDebugStep);
                 addStepToMessages(project, nextStep, currentStep, newInfo, messages);
@@ -3769,44 +3885,44 @@ namespace hen {
                 nextStep.debug_step.invocation = (step->invocation == 0) ? 1 : step->invocation;
                 nextStep.debug_step.line_number = step->line_number;
                 nextStep.m_originalStep = step->original_step;
-                
+
                 const StepDisclosureMapEntry* disclosureEntry = nullptr;
                 auto dIt = disclosure.find(currentStep);
                 if (dIt != disclosure.end()) disclosureEntry = &dIt->second;
-                
+
                 std::string newInfo;
                 std::string currentTrajectory = distillStep(project, step->original_step, startStep, fixStep, currentStep,
                                                             summary, prevSteps, requestedInfo, newInfo, nextStep, disclosureEntry);
-                
+
                 if(!newInfo.empty())
                 {
                     requestedInfo += "\n\n";
                     requestedInfo += newInfo;
                 }
-                
+
                 infoRequests.push_back(newInfo);
-                
+
                 distilledTrajectory.push_back(nextStep);
-                
+
                 //TODO: Find the proper way to save the data!!!
-                
+
                 std::string content = utility::conversions::to_utf8string(nextStep.debug_step.to_json().serialize());
                 web::json::value schema;
                 setupSchema<NextDebugStep>(schema);
                 json::value jsonSample = buildTrainingData(project, currentTrajectory, content, nextStep.analysis, &schema, &messages);
-                
+
                 saveTrainingData(datasetDir, "step_" + startStepStr + "_" + currentStepStr, jsonSample, true);
-                
+
                 if(NextDebugStep::isInformationRequest(step->action_type))
                 {
                     addStepToMessages(project, nextStep, currentStep, newInfo, messages);
                 }
             }
-            
+
             currentStep++;
         }
 #endif
-        
+
         project->popContext();
     }
 
@@ -3817,7 +3933,7 @@ namespace hen {
         {
             std::cout << "\nSTEP: " << stepIdx + 1 << std::endl << std::endl;
             std::cout << step.fullInfo() << std::endl << std::endl;
-            
+
             if(step.m_action == "fix_function")
             {
                 auto it = m_newFunctionsPerStep.find(stepIdx);
@@ -3828,11 +3944,11 @@ namespace hen {
                     {
                         std::cout << func << " ";
                     }
-                    
+
                     std::cout << std::endl;
                 }
             }
-            
+
             stepIdx++;
         }
     }
@@ -3840,7 +3956,7 @@ namespace hen {
     void Distillery::printFixesAndTests()
     {
         int stepIdx = m_fromStep;
-        
+
         for(auto step : m_trajectory)
         {
             if(step.m_action == "fix_function" || step.m_action == "run_test")
@@ -3848,7 +3964,7 @@ namespace hen {
                 std::cout << "\nSTEP: " << stepIdx + 1 << std::endl << std::endl;
                 std::cout << step.concise() << std::endl << std::endl;
             }
-            
+
             stepIdx++;
         }
     }
@@ -3858,12 +3974,12 @@ namespace hen {
         //I want this function refactored to
         //std::string Distillery::mergeFixes()
         //The mergeFixes doesn't print the info to std::cout but returns a string with that info
-        
+
         //I also want to keep track of the merged fixes.
         //The separate fixes the pair entries are both the 0-based step indices
         //std::vector<std::pair<int,int>> m_mergedFixes;
         //I plan to traverse merged fixes like this: for(int step = fix.first; step < fix.second; ++step) {}
-        
+
         using std::size_t;
         const size_t N = m_trajectory.size();
 
@@ -4069,17 +4185,17 @@ namespace hen {
     {
         int stepIndex = (step-1) - m_fromStep;
         std::ostringstream out;
-        
+
         if(stepIndex >= m_trajectory.size())
         {
             //this is not cool
             out << "Invalid step " << step << " Maximum steps in the trajectory " << m_fromStep + (int)m_trajectory.size() << "\n\n";
             return out.str();
         }
-        
+
         int startFix = stepIndex;
         int endFix = stepIndex;
-        
+
         for(auto fix : m_mergedFixes)
         {
             if(fix.first <= stepIndex && stepIndex <= fix.second)
@@ -4089,7 +4205,7 @@ namespace hen {
                 break;
             }
         }
-        
+
         int testIndex=startFix;
         for(; testIndex >= 0; --testIndex)
         {
@@ -4098,13 +4214,13 @@ namespace hen {
                 break;
             }
         }
-        
+
         for(int i=testIndex; i <= endFix; i++)
         {
             out << "\nSTEP: " << (m_fromStep+i+1) << "\n\n";
             out << m_trajectory[i].fullInfo() << "\n\n";
         }
-        
+
         return out.str();
     }
 

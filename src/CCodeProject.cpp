@@ -1852,13 +1852,27 @@ namespace hen {
             return archIndex + 1;//Old archives plus the current trajectory
         }
 
-        removeAllWithRetry(trajectoryDir);
-        
-        //Logs
-        //For now just delete logs
         std::string logsDebugDir = getProjDir() + "/logs/debug/" + unitTestDef.name;
+        std::string archiveLogsDir = archiveDir + "/logs";
+        if(boost_fs::exists(logsDebugDir))
+        {
+            removeAllWithRetry(archiveLogsDir);
+
+            boost::system::error_code logEc;
+            boost_fs::copy(logsDebugDir, archiveLogsDir,
+                           boost_fs::copy_options::recursive |
+                           boost_fs::copy_options::overwrite_existing, logEc);
+            if(logEc)
+            {
+                std::cout << "Unable to archive debug logs from: " << logsDebugDir << " to: " << archiveLogsDir << std::endl;
+                std::cout << "Error: " << logEc.message() << std::endl;
+            }
+        }
+
+        removeAllWithRetry(trajectoryDir);
+
         removeAllWithRetry(logsDebugDir);
-        
+
         return archIndex + 1;//Old archives plus the current trajectory
     }
 
@@ -1886,11 +1900,25 @@ namespace hen {
             return;
         }
 
-        removeAllWithRetry(trajectoryDir);
-        
-        //Logs
-        //For now just delete logs
         std::string logsDebugDir = getProjDir() + "/logs/debug/" + unitTestDef.name;
+        std::string archiveLogsDir = archiveDir + "/logs";
+        if(boost_fs::exists(logsDebugDir))
+        {
+            removeAllWithRetry(archiveLogsDir);
+
+            boost::system::error_code logEc;
+            boost_fs::copy(logsDebugDir, archiveLogsDir,
+                           boost_fs::copy_options::recursive |
+                           boost_fs::copy_options::overwrite_existing, logEc);
+            if(logEc)
+            {
+                std::cout << "Unable to archive broken debug logs from: " << logsDebugDir << " to: " << archiveLogsDir << std::endl;
+                std::cout << "Error: " << logEc.message() << std::endl;
+            }
+        }
+
+        removeAllWithRetry(trajectoryDir);
+
         removeAllWithRetry(logsDebugDir);
     }
 
@@ -2168,9 +2196,17 @@ namespace hen {
             {
                 if (!boost::filesystem::is_directory(it->status()))
                     continue;
-                
+
+                std::string runKey = it->path().filename().string();
+                if(runKey != "trajectory" &&
+                   runKey != "broken" &&
+                   !startsWith(runKey, "archive"))
+                {
+                    continue;
+                }
+
                 uint32_t archIndex = (uint32_t)nextIndex(it->path().string(), "step_");
-                
+
                 if(archIndex < 4) continue;
                 archIndex--;
                 
@@ -2181,16 +2217,40 @@ namespace hen {
                 
                 if(lastStep.m_debugNotes == "PASS")
                 {
-                    std::string testWD = it->path().string() + "/test";
+                    std::string trajectoryRootDir = it->path().string();
+                    std::string testWD = trajectoryRootDir + "/test";
                     if(!boost_fs::exists(testWD))
                     {
                         testWD = lastStepDir + "/wd";
                     }
-                    
+
+                    if(!boost_fs::exists(testWD + "/test.json"))
+                    {
+                        std::cout << "Skipping data synthesis for trajectory due to missing test.json: " << trajectoryRootDir << std::endl;
+                        continue;
+                    }
+
+                    std::string logsDir = trajectoryRootDir + "/logs";
+                    if(!boost_fs::exists(logsDir))
+                    {
+                        logsDir = getProjDir() + "/logs/debug/" + testName;
+                    }
+
+                    if(!boost_fs::exists(logsDir))
+                    {
+                        std::cout << "Skipping data synthesis for trajectory due to missing debug logs: " << trajectoryRootDir << std::endl;
+                        continue;
+                    }
+
                     if(boost_fs::exists(testWD))
                     {
                         int startFrom = 0;
-                        Distillery::getInstance().distillTrajectory(this, testWD, startFrom, -1);
+                        Distillery::getInstance().distillTrajectory(this,
+                                                                   testWD,
+                                                                   trajectoryRootDir,
+                                                                   logsDir,
+                                                                   runKey,
+                                                                   startFrom, -1);
                     }
                 }
                 else
@@ -2215,7 +2275,7 @@ namespace hen {
         Client::getInstance().agentToServer("\n\nDEBUGGING...\n\n");
         
         //TODO: ONLY FOR TEST
-        //synthetizeTrainingData();
+        synthetizeTrainingData();
         
         debugTests();
         
