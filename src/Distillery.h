@@ -65,6 +65,32 @@ namespace hen {
         DECLARE_FIELD(std::string, thinking_analysis, "Chain-of-thought to be uset to train reasoning LLMs")
     };
 
+    class DistillSkipItem : public Reflection<DistillSkipItem>
+    {
+        public:
+        DECLARE_TYPE(DistillSkipItem, "A persisted skip entry for distillation audit")
+        DECLARE_FIELD(std::string, sample_id, "The sample identifier that was skipped")
+        DECLARE_FIELD(uint32_t, step, "The run_test step associated with the skipped sample")
+        DECLARE_FIELD(uint32_t, fix_step, "The fix_function step associated with the skipped sample")
+        DECLARE_FIELD(std::string, reason, "Why the sample was skipped")
+    };
+
+    class DistillSummary : public Reflection<DistillSummary>
+    {
+        public:
+        DECLARE_TYPE(DistillSummary, "Leaf-local summary for a dataset distillation run")
+        DECLARE_FIELD(std::string, trajectory_id, "The test or trajectory identifier for this dataset leaf")
+        DECLARE_FIELD(std::string, dataset_run_key, "Optional dataset run key used to isolate archived runs")
+        DECLARE_FIELD(std::string, source_test_directory, "Directory containing the source test artifacts")
+        DECLARE_FIELD(std::string, source_trajectory_root, "Root directory containing the recorded trajectory")
+        DECLARE_FIELD(std::string, source_logs_root, "Root directory containing the recorded logs")
+        DECLARE_FIELD(uint32_t, step_samples_written, "Number of step_* samples written during this distillation run")
+        DECLARE_FIELD(uint32_t, debug_samples_written, "Number of debug_* samples written during this distillation run")
+        DECLARE_FIELD(uint32_t, system_samples_written, "Number of system_* samples written during this distillation run")
+        DECLARE_FIELD(uint32_t, system_samples_skipped, "Number of system_* samples intentionally skipped during this distillation run")
+        DECLARE_ARRAY_FIELD(DistillSkipItem, skipped_items, "Detailed entries for intentionally skipped samples")
+    };
+
     class EditSourceSequence : public Reflection<EditSourceSequence>
     {
         public:
@@ -96,6 +122,8 @@ namespace hen {
         std::string             m_trajectoryRootDir;
         std::string             m_logsRootDir;
         std::string             m_datasetRunKey;
+        std::string             m_datasetDir;
+        DistillSummary          m_distillSummary;
 
         int                     m_currentFixIndex;
         CCodeProject*           m_project;
@@ -129,6 +157,16 @@ namespace hen {
         std::string getDistillLogDir(CCodeProject* project) const;
         std::string getTrajectoryStepDir(int stepId) const;
         std::string getLogsStepDir(int stepId) const;
+        void initializeDistillSummary(CCodeProject* project);
+        void saveDistillSummary();
+        void noteSampleWritten(const std::string& sampleName);
+        void noteSystemSkip(const std::string& sampleName,
+                            int step,
+                            int fixStep,
+                            const std::string& reason);
+        void removeTrainingDataSample(const std::string& sampleName);
+        bool hasRecordedStepArtifact(int step, const std::string& suffix);
+        bool isPassingRunStepForRewardReview(const DebugStep& stepInfo) const;
 
         bool loadTrajectory(CCodeProject* project, const TestDef& test, int fromStep, int toStep);
         

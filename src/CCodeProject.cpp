@@ -2230,10 +2230,14 @@ namespace hen {
                         continue;
                     }
 
-                    std::string logsDir = trajectoryRootDir + "/logs";
-                    if(!boost_fs::exists(logsDir))
+                    std::string logsDir;
+                    if(runKey == "trajectory")
                     {
                         logsDir = getProjDir() + "/logs/debug/" + testName;
+                    }
+                    else
+                    {
+                        logsDir = trajectoryRootDir + "/logs";
                     }
 
                     if(!boost_fs::exists(logsDir))

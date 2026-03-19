@@ -27,6 +27,24 @@ namespace hen {
     DEFINE_FIELD(DistilledAanalysis, system_analysis)
     DEFINE_FIELD(DistilledAanalysis, thinking_analysis)
 
+    DEFINE_TYPE(DistillSkipItem)
+    DEFINE_FIELD(DistillSkipItem, sample_id)
+    DEFINE_FIELD(DistillSkipItem, step)
+    DEFINE_FIELD(DistillSkipItem, fix_step)
+    DEFINE_FIELD(DistillSkipItem, reason)
+
+    DEFINE_TYPE(DistillSummary)
+    DEFINE_FIELD(DistillSummary, trajectory_id)
+    DEFINE_FIELD(DistillSummary, dataset_run_key)
+    DEFINE_FIELD(DistillSummary, source_test_directory)
+    DEFINE_FIELD(DistillSummary, source_trajectory_root)
+    DEFINE_FIELD(DistillSummary, source_logs_root)
+    DEFINE_FIELD(DistillSummary, step_samples_written)
+    DEFINE_FIELD(DistillSummary, debug_samples_written)
+    DEFINE_FIELD(DistillSummary, system_samples_written)
+    DEFINE_FIELD(DistillSummary, system_samples_skipped)
+    DEFINE_ARRAY_FIELD(DistillSummary, skipped_items)
+
     DEFINE_TYPE(EditSourceSequence)
     DEFINE_ARRAY_FIELD(EditSourceSequence, steps)
     DEFINE_FIELD(EditSourceSequence, analysis)
@@ -46,6 +64,12 @@ namespace hen {
         {
             return false;
         }
+    }
+
+    static bool startsWithRunPassSummary(const std::string& text)
+    {
+        return startsWith(text, "Results for all commands match the expected outcomes") ||
+               startsWith(text, "Reward-hacking prcatices have been identified");
     }
 
     static bool normalizeActionPayload(web::json::value& actionObj, std::string& reason)
@@ -423,6 +447,123 @@ namespace hen {
     std::string Distillery::getLogsStepDir(int stepId) const
     {
         return m_logsRootDir + "/step_" + std::to_string(stepId);
+    }
+
+    void Distillery::initializeDistillSummary(CCodeProject* project)
+    {
+        m_distillSummary = DistillSummary();
+        m_datasetDir = getDatasetDir(project);
+        m_distillSummary.trajectory_id = m_test.name;
+        m_distillSummary.dataset_run_key = m_datasetRunKey;
+        m_distillSummary.source_test_directory = m_testDirectory;
+        m_distillSummary.source_trajectory_root = m_trajectoryRootDir;
+        m_distillSummary.source_logs_root = m_logsRootDir;
+    }
+
+    void Distillery::saveDistillSummary()
+    {
+        if(m_datasetDir.empty())
+        {
+            return;
+        }
+
+        if(!boost_fs::exists(m_datasetDir))
+        {
+            boost_fs::create_directories(m_datasetDir);
+        }
+
+        saveJson(m_distillSummary.to_json(), m_datasetDir + "/distill_summary.json");
+    }
+
+    void Distillery::noteSampleWritten(const std::string& sampleName)
+    {
+        if(m_datasetDir.empty())
+        {
+            return;
+        }
+
+        if(startsWith(sampleName, "step_"))
+        {
+            ++m_distillSummary.step_samples_written;
+        }
+        else if(startsWith(sampleName, "debug_"))
+        {
+            ++m_distillSummary.debug_samples_written;
+        }
+        else if(startsWith(sampleName, "system_"))
+        {
+            ++m_distillSummary.system_samples_written;
+        }
+        else
+        {
+            return;
+        }
+
+        saveDistillSummary();
+    }
+
+    void Distillery::noteSystemSkip(const std::string& sampleName,
+                                    int step,
+                                    int fixStep,
+                                    const std::string& reason)
+    {
+        if(m_datasetDir.empty())
+        {
+            return;
+        }
+
+        DistillSkipItem skipItem;
+        skipItem.sample_id = sampleName;
+        skipItem.step = static_cast<uint32_t>(std::max(step, 0));
+        skipItem.fix_step = static_cast<uint32_t>(std::max(fixStep, 0));
+        skipItem.reason = reason;
+
+        m_distillSummary.skipped_items.push_back(std::make_shared<DistillSkipItem>(skipItem));
+        ++m_distillSummary.system_samples_skipped;
+        saveDistillSummary();
+    }
+
+    void Distillery::removeTrainingDataSample(const std::string& sampleName)
+    {
+        if(m_datasetDir.empty())
+        {
+            return;
+        }
+
+        const boost_fs::path jsonPath(m_datasetDir + "/" + sampleName + ".json");
+        const boost_fs::path textPath(m_datasetDir + "/" + sampleName + ".txt");
+
+        bool removed = false;
+        if(boost_fs::exists(jsonPath))
+        {
+            boost_fs::remove(jsonPath);
+            removed = true;
+        }
+
+        if(boost_fs::exists(textPath))
+        {
+            boost_fs::remove(textPath);
+            removed = true;
+        }
+
+        if(removed &&
+           startsWith(sampleName, "system_") &&
+           m_distillSummary.system_samples_written > 0)
+        {
+            --m_distillSummary.system_samples_written;
+            saveDistillSummary();
+        }
+    }
+
+    bool Distillery::hasRecordedStepArtifact(int step, const std::string& suffix)
+    {
+        const std::string stepLogsDir = getLogsStepDir(step);
+        return findRequestIdForPattern(stepLogsDir, "request_", suffix).first;
+    }
+
+    bool Distillery::isPassingRunStepForRewardReview(const DebugStep& stepInfo) const
+    {
+        return startsWithRunPassSummary(stepInfo.m_logSummary);
     }
 
     std::string Distillery::checkoutExact(const std::string& folder,
@@ -1364,6 +1505,8 @@ namespace hen {
         m_trajectoryRootDir.clear();
         m_logsRootDir.clear();
         m_datasetRunKey.clear();
+        m_datasetDir.clear();
+        m_distillSummary = DistillSummary();
         m_trajectory.clear();
         m_newFunctionsPerStep.clear();
         m_fromStep = 0;
@@ -1493,6 +1636,9 @@ namespace hen {
         {
             return;
         }
+
+        initializeDistillSummary(project);
+        saveDistillSummary();
 
         std::cout << printTrajectory();
 
@@ -1756,6 +1902,8 @@ namespace hen {
 
         std::string renderedChatFile = renderedChatName + ".txt";
         saveToFile(renderedChat, renderedChatFile);
+
+        noteSampleWritten(sampleName);
     }
 
     std::pair<bool, web::json::value> Distillery::distillResponse(CCodeProject* project, const std::string& sufix, int step,
@@ -3727,45 +3875,45 @@ namespace hen {
                 goTo(project, currentStep);
 
                 std::string prevStepJson = getTrajectoryStepDir(currentStep - 1) + "/dbgStep.json";
+                std::string currentStepJson = getTrajectoryStepDir(currentStep) + "/dbgStep.json";
 
                 DebugStep prevStep;
                 bool prevLoaded = prevStep.load(prevStepJson);
+                DebugStep currentRunStep;
+                bool currentLoaded = currentRunStep.load(currentStepJson);
 
                 DebugStep stepInfo;
                 stepInfo.m_logSummary.clear(); //Everything for the system analysis is in the debug notes
 
-                if(distillRunStep(project, summary, prevStep.m_subject, currentStep, fixStep, systemAnalysis))
+                const bool reusedRecordedRunAnalysis =
+                    distillRunStep(project, summary, prevStep.m_subject, currentStep, fixStep, systemAnalysis);
+
+                const bool hasRewardHackingArtifacts =
+                    hasRecordedStepArtifact(currentStep, "_RewardHacking.json");
+
+                const bool skipSystemSample =
+                    currentLoaded &&
+                    hasRewardHackingArtifacts &&
+                    isPassingRunStepForRewardReview(currentRunStep);
+
+                if(skipSystemSample)
                 {
-                    //Need to check if there is a reward-hacking review
-                    web::json::value rewardHackingRequest;
-                    web::json::value rewardHackingResponse;
-                    std::pair<bool, std::string> rewardHacking = thinkingForResponse(project, "_RewardHacking.json", currentStep,
-                                                                                     rewardHackingRequest, rewardHackingResponse);
-
-                    if(rewardHacking.first && !rewardHacking.second.empty()) //Yes, this is reward-hacking review
+                    const std::string sampleName = "system_" + testStepStr + "_" + fixStepStr;
+                    if(!reusedRecordedRunAnalysis)
                     {
-                        //Let's save the system analysis
-                        DistilledAanalysis rewardAnalysis;
-                        rewardAnalysis.thinking_analysis = rewardHacking.second;
-                        rewardAnalysis.system_analysis.debug_notes = systemAnalysis;
-                        if(systemAnalysis == "PASS")
-                        {
-                            rewardAnalysis.system_analysis.log_summary = "Results for all commands match the expected outcomes.\n";
-                        }
-                        else
-                        {
-                            rewardAnalysis.system_analysis.log_summary = "Reward-hacking prcatices have been identified.\n";
-                        }
-
-                        stepInfo.m_logSummary = rewardAnalysis.system_analysis.log_summary;
-
-                        std::string rewardHackingRequestStr = utility::conversions::to_utf8string(rewardHackingRequest.serialize());
-
-                        saveSystemAnalysis(datasetDir,
-                                           "system_" + testStepStr + "_" + fixStepStr,
-                                           rewardAnalysis,
-                                           rewardHackingRequestStr);
+                        removeTrainingDataSample(sampleName);
                     }
+
+                    noteSystemSkip(sampleName,
+                                   currentStep,
+                                   fixStep,
+                                   "pass_requires_external_reward_hacking_review");
+
+                    std::cout << "Distillery skip: " << sampleName;
+                    std::cout << " omitted because run_test step " << currentStep;
+                    std::cout << " passed and reward-hacking review is handled externally." << std::endl;
+
+                    stepInfo.m_logSummary = currentRunStep.m_logSummary;
                 }
 
                 stepInfo.m_debugNotes = systemAnalysis;
