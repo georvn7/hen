@@ -15,6 +15,14 @@ RESPONSE ENDS
 
 This 'analysis' is the same field in a .jason file that could be used to train a reasoning LLM with 'harmony' chart format. So the analysis should be provided as thinking chain-of-thought 
 
+IMPORTANT OUTPUT FORMAT:
+- Return plain text only.
+- Do NOT return JSON.
+- Do NOT wrap the answer in markdown code fences.
+- Do NOT prefix the answer with field names such as `analysis:` or `"analysis":`.
+- Do NOT surround the full answer with quotes.
+- Output only the reasoning text itself.
+
 You can use all of the information available in this discussion but the thinking should sound like intuition based on previous experience. The only information you can directly quote in the thinking is the one available in the REQUEST
 The thinking analysis shows the THINKING IN PROGRESS, not a finished explanation. Think like an expert muttering to themselves while debugging.
 The thinking should feel like watching someone's reasoning unfold in real-time.
