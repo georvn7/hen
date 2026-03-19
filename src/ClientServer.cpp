@@ -2,9 +2,16 @@
 
 namespace hen {
 
-json::value Message::json()
+json::value Message::json() const
 {
-    string_t ustr = conversions::to_string_t(c_str());
+    size_t payloadSize = m_storage.size();
+    if(payloadSize > 0 && m_storage[payloadSize - 1] == 0)
+    {
+        payloadSize--;
+    }
+    
+    std::string payload(reinterpret_cast<const char*>(m_storage.data()), payloadSize);
+    string_t ustr = conversions::to_string_t(payload);
     return json::value::parse(ustr);
 }
 
@@ -264,6 +271,8 @@ m_localEP(localEP)
 
 void RemoteEP::send(void* data, uint32_t size)
 {
+    std::lock_guard<std::mutex> lock(m_sendMutex);
+    
     try {
         auto transferred = boost::asio::write(m_socket, boost::asio::buffer(&size, sizeof(size)));
         transferred = boost::asio::write(m_socket, boost::asio::buffer(data, size));

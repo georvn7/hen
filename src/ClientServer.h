@@ -7,6 +7,7 @@
 #include <queue>
 #include <utility>
 #include <span>
+#include <mutex>
 
 #include <cpprest/json.h>
 
@@ -36,7 +37,7 @@ namespace hen {
         
         size_t size() const { return m_storage.size(); }
         
-        const char* c_str() {return (const char*)m_storage.data();}
+        const char* c_str() const {return (const char*)m_storage.data();}
         
         template<typename T>
         boost::optional<T> as() const {
@@ -50,7 +51,7 @@ namespace hen {
             return boost::none;
         }
         
-        json::value json();
+        json::value json() const;
     };
 
     class RemoteEP : public std::enable_shared_from_this<RemoteEP>
@@ -58,6 +59,7 @@ namespace hen {
         EndPoint& m_localEP;
         tcp::socket m_socket;
         unsigned short m_cachedRemotePort;
+        std::mutex m_sendMutex;
         
         void startAsyncRead(std::promise<std::shared_ptr<Message>> promise);
         

@@ -742,6 +742,8 @@ void Client::checkLLMContextSize(const json::value& messages, json::value& reque
 
 bool Client::sendRequest(const json::value& messages, json::value& response, const json::value* schemas)
 {
+    std::lock_guard<std::mutex> llmRequestLock(m_llmRequestMutex);
+    
     json::value request;
     
     request[U("messages")] = messages;

@@ -89,6 +89,7 @@ namespace hen {
         bool                                m_disableUserCommands;
         
         std::unique_ptr<ClientEP>           m_llmClientEP;
+        std::mutex                          m_llmRequestMutex;
         
         bool m_localUser;
         

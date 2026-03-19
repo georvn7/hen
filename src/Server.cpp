@@ -648,7 +648,26 @@ private:
 
 bool LLMServerEP::receive(std::shared_ptr<RemoteEP> remote, std::shared_ptr<Message> msg)
 {
-    auto requestBody = msg->json();
+    web::json::value requestBody;
+    try
+    {
+        requestBody = msg->json();
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << "LLMServerEP received malformed request frame: "
+                  << e.what() << std::endl;
+        
+        web::json::value errorReply;
+        errorReply[U("error")] = web::json::value::object();
+        errorReply[U("error")][U("code")] = web::json::value::string(U("transport_malformed_json"));
+        errorReply[U("error")][U("message")] = web::json::value::string(
+            utility::conversions::to_string_t(std::string("Malformed JSON request frame: ") + e.what()));
+        
+        auto errorStr = utility::conversions::to_utf8string(errorReply.serialize());
+        remote->send((void*)errorStr.c_str(), static_cast<uint32_t>(errorStr.size() + 1));
+        return true;
+    }
     
     uint32_t requestId = INVALID_REQUEST_ID;
     if (requestBody.has_field(U("request_id"))) {
