@@ -28,6 +28,7 @@ import argparse
 import json
 import os
 import re
+import socket
 import sys
 import time
 from dataclasses import dataclass, field
@@ -79,6 +80,7 @@ STRONG_REASONS = {
     "invalid_fix_function_subject",
     "duplicate_in_prompt_history",
     "duplicate_info_request",
+    "grounded_shortcut_to_final_fix",
 }
 
 
@@ -143,11 +145,13 @@ class Candidate:
     signature: Optional[StepSignature] = None
     matches_original_step_exact: bool = False
     matches_original_fix_subject: bool = False
+    reject_kind: str = ""
 
 
 @dataclass
 class SelectionTrace:
     sample_outcomes: List[str] = field(default_factory=list)
+    sample_details: List[dict] = field(default_factory=list)
 
 
 def parse_args() -> argparse.Namespace:
@@ -223,6 +227,11 @@ def parse_args() -> argparse.Namespace:
         help="Skip malformed/unparseable rejects instead of keeping them.",
     )
     parser.add_argument(
+        "--allow-weak-rejects",
+        action="store_true",
+        help="Keep the best sampled reject even if it only has weak scoring reasons.",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Print per-step decisions while generating pairs.",
@@ -237,6 +246,59 @@ def load_json(path: Path) -> dict:
 
 def save_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
+
+
+def action_args_for_trace(parsed: Optional[dict], action: ActionKey) -> dict:
+    view = {
+        "action_type": action.normalized_type,
+        "action_subject": action.normalized_subject,
+    }
+    if isinstance(parsed, dict):
+        if "invocation" in parsed:
+            view["invocation"] = parsed.get("invocation")
+        if "line_number" in parsed:
+            view["line_number"] = parsed.get("line_number")
+    return view
+
+
+def build_trace_payload(
+    step_name: str,
+    chosen_parsed: dict,
+    chosen_action: ActionKey,
+    trace: SelectionTrace,
+    reject: Optional[Candidate],
+) -> dict:
+    payload = {
+        "sample": step_name,
+        "preferred_action": action_args_for_trace(chosen_parsed, chosen_action),
+        "kept": reject is not None,
+        "sample_outcomes": trace.sample_outcomes,
+        "samples": trace.sample_details,
+    }
+    if reject is not None:
+        payload["selected_reject"] = {
+            "action": action_args_for_trace(reject.parsed, reject.action),
+            "reasons": reject.reasons,
+            "score": reject.score,
+            "reject_kind": reject.reject_kind,
+            "matches_original_step_exact": reject.matches_original_step_exact,
+            "matches_original_fix_subject": reject.matches_original_fix_subject,
+        }
+    return payload
+
+
+def classify_reject_kind(candidate: Candidate) -> str:
+    if any(reason in STRONG_REASONS for reason in candidate.reasons):
+        return "hard_negative"
+    return "efficiency_negative"
+
+
+def candidate_priority(candidate: Candidate) -> int:
+    if candidate.parsed is None:
+        return 0
+    if candidate.action.normalized_type == "run_test":
+        return 1
+    return 2
 
 
 def sanitize_message(message: dict) -> dict:
@@ -470,6 +532,7 @@ def score_candidate(
     prompt_history: Sequence[ActionKey],
     track_meta: Optional[TrackStepMeta],
     keep_invalid_rejects: bool,
+    allow_weak_rejects: bool,
 ) -> Tuple[Optional[Candidate], str]:
     parsed, action = parse_action_from_text(candidate_text)
     candidate = Candidate(
@@ -496,7 +559,8 @@ def score_candidate(
         and action.normalized_subject
         and action.normalized_subject == track_meta.final_fix_subject
     ):
-        return None, "grounded_shortcut_to_final_fix"
+        candidate.reasons.append("grounded_shortcut_to_final_fix")
+        candidate.score += 4
 
     if track_meta is not None and candidate.signature is not None:
         if candidate.signature == track_meta.mapped_original_signature:
@@ -545,6 +609,8 @@ def score_candidate(
         return None, "no_scoring_reasons"
 
     if not any(reason in STRONG_REASONS for reason in candidate.reasons):
+        if allow_weak_rejects:
+            return candidate, "accepted_weak_reject"
         return None, "only_weak_reasons"
 
     return candidate, ",".join(candidate.reasons)
@@ -580,6 +646,8 @@ def post_chat_completions(
     except error.HTTPError as exc:
         details = exc.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"HTTP {exc.code} from {url}: {details}") from exc
+    except (TimeoutError, socket.timeout) as exc:
+        raise RuntimeError(f"Timed out waiting for {url} after {timeout_sec}s") from exc
     except error.URLError as exc:
         raise RuntimeError(f"Unable to reach {url}: {exc}") from exc
 
@@ -620,6 +688,7 @@ def choose_best_reject(
     sanitized_prompt = sanitize_messages(prompt_messages)
 
     for _ in range(args.samples_per_step):
+        sample_index = len(trace.sample_outcomes) + 1
         last_error: Optional[Exception] = None
         raw = ""
         for _attempt in range(args.request_retries):
@@ -641,7 +710,16 @@ def choose_best_reject(
                 time.sleep(0.5)
 
         if last_error is not None:
-            raise last_error
+            outcome = f"request_failed:{type(last_error).__name__}"
+            trace.sample_outcomes.append(outcome)
+            trace.sample_details.append(
+                {
+                    "sample_index": sample_index,
+                    "outcome": outcome,
+                    "request_error": str(last_error),
+                }
+            )
+            continue
 
         candidate, outcome = score_candidate(
             candidate_text=raw,
@@ -649,13 +727,38 @@ def choose_best_reject(
             prompt_history=prompt_history,
             track_meta=track_meta,
             keep_invalid_rejects=not args.drop_invalid_rejects,
+            allow_weak_rejects=args.allow_weak_rejects,
         )
         trace.sample_outcomes.append(outcome)
+        parsed, action = parse_action_from_text(raw)
+        detail = {
+            "sample_index": sample_index,
+            "outcome": outcome,
+            "candidate_action": action_args_for_trace(parsed, action),
+        }
+        if candidate is not None:
+            candidate.reject_kind = classify_reject_kind(candidate)
+            detail.update(
+                {
+                    "reasons": candidate.reasons,
+                    "score": candidate.score,
+                    "reject_kind": candidate.reject_kind,
+                    "matches_original_step_exact": candidate.matches_original_step_exact,
+                    "matches_original_fix_subject": candidate.matches_original_fix_subject,
+                }
+            )
+        trace.sample_details.append(detail)
 
         if candidate is None:
             continue
 
-        if best is None or candidate.score > best.score:
+        if best is None or (
+            candidate_priority(candidate),
+            candidate.score,
+        ) > (
+            candidate_priority(best),
+            best.score,
+        ):
             best = candidate
 
     return best, trace
@@ -703,6 +806,15 @@ def process_step_file(
     prompt_history = collect_prompt_history_actions(prompt_messages)
     step_name = step_path.stem
     track_meta = step_meta_index.get(step_name)
+    prefer_file = leaf_dir / f"{step_name}_prefer.json"
+    trace_file = leaf_dir / f"{step_name}_trace.json"
+    reject_file = leaf_dir / f"{step_name}_reject.json"
+    pair_file = leaf_dir / f"{step_name}_pair.txt"
+
+    if not args.overwrite and (prefer_file.exists() or reject_file.exists() or pair_file.exists() or trace_file.exists()):
+        raise RuntimeError(
+            f"Refusing to overwrite existing pair files for {step_name}. Use --overwrite."
+        )
 
     reject, trace = choose_best_reject(
         prompt_messages=prompt_messages,
@@ -711,6 +823,8 @@ def process_step_file(
         track_meta=track_meta,
         args=args,
     )
+    trace_payload = build_trace_payload(step_name, chosen_parsed, chosen_action, trace, reject)
+    save_text(trace_file, json.dumps(trace_payload, ensure_ascii=True, indent=2))
     if reject is None:
         if args.verbose:
             print(f"[skip] {step_name}: outcomes={';'.join(trace.sample_outcomes)}")
@@ -731,6 +845,7 @@ def process_step_file(
         "rejected_action_subject": reject.action.normalized_subject,
         "reject_reasons": reject.reasons,
         "reject_score": reject.score,
+        "reject_kind": reject.reject_kind,
         "original_track_present": track_meta.original_track_present if track_meta is not None else False,
         "matches_original_step_exact": reject.matches_original_step_exact,
         "matches_original_fix_subject": reject.matches_original_fix_subject,
@@ -747,15 +862,6 @@ def process_step_file(
             }
         )
 
-    prefer_file = leaf_dir / f"{step_name}_prefer.json"
-    reject_file = leaf_dir / f"{step_name}_reject.json"
-    pair_file = leaf_dir / f"{step_name}_pair.txt"
-
-    if not args.overwrite and (prefer_file.exists() or reject_file.exists() or pair_file.exists()):
-        raise RuntimeError(
-            f"Refusing to overwrite existing pair files for {step_name}. Use --overwrite."
-        )
-
     prefer_payload = {"messages": prompt_messages + [chosen_message]}
     reject_payload = {"messages": prompt_messages + [rejected_message]}
 
@@ -770,6 +876,7 @@ def process_step_file(
         "meta": meta,
     }
     train_writer.write(json.dumps(dpo_record, ensure_ascii=True) + "\n")
+    train_writer.flush()
 
     if args.verbose:
         print(
@@ -793,9 +900,22 @@ def process_leaf_dir(leaf_dir: Path, args: argparse.Namespace) -> Tuple[int, int
     if output_jsonl.exists() and not args.overwrite:
         raise RuntimeError(f"Refusing to overwrite existing {output_jsonl}. Use --overwrite.")
 
+    if args.overwrite:
+        for stale in leaf_dir.iterdir():
+            if not stale.is_file():
+                continue
+            if (
+                stale.name == "train_dbg_dpo.jsonl"
+                or stale.name.endswith("_prefer.json")
+                or stale.name.endswith("_reject.json")
+                or stale.name.endswith("_pair.txt")
+                or stale.name.endswith("_trace.json")
+            ):
+                stale.unlink()
+
     kept = 0
     total = 0
-    with output_jsonl.open("w", encoding="utf-8") as train_writer:
+    with output_jsonl.open("w", encoding="utf-8", buffering=1) as train_writer:
         for step_path in step_files:
             total += 1
             if process_step_file(step_path, leaf_dir, step_meta_index, train_writer, args):

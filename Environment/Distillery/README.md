@@ -28,10 +28,30 @@ This is intentional:
 - optimized trajectories remain the preferred policy target
 - the generator should avoid obvious false negatives without treating all original steps as correct
 
+### Reject Kinds
+
+Kept rejects are now tagged so training can filter them by policy:
+
+- `hard_negative`
+  - malformed output
+  - schema violations
+  - duplicate/invalid requests
+  - grounded shortcuts such as jumping straight to the final fix too early
+- `efficiency_negative`
+  - structured, still-plausible debugger actions that differ from the optimized step
+  - accepted to preserve optimized-trajectory preference data without pretending they are malformed or obviously invalid
+
+This is a deliberate separation:
+
+- valid-but-less-efficient alternatives should not be mixed blindly with malformed or clearly wrong negatives
+- downstream training can keep only `hard_negative`, or include `efficiency_negative` as a softer preference signal
+- when selecting a single reject for a step, the generator prefers structured non-`run_test` negatives over `run_test`, and `run_test` over malformed fallback outputs
+
 ### Output metadata
 
 Generated DPO records may include:
 
+- `reject_kind`
 - `original_track_present`
 - `matches_original_step_exact`
 - `matches_original_fix_subject`
@@ -50,6 +70,7 @@ python3 -m unittest discover -s Environment/Distillery/Scripts -p 'test_generate
 The deterministic tests cover:
 
 - original-track metadata loading
+- `hard_negative` vs `efficiency_negative` tagging
 - suppression of exact original info-action rejects
 - metadata tagging for original `fix_function` subjects
-- propagation of the new metadata into emitted DPO records
+- propagation of the new metadata and trace files into emitted outputs
