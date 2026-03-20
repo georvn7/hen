@@ -1055,20 +1055,25 @@ namespace hen {
             DebugStep dbgStep;
             dbgStep.load(dbgStepPath);
 
+            // dbgStep.json does not persist line/invocation, so seed safe defaults
+            // before attempting to restore them from the previous nextStep.json.
+            dbgStep.m_lineNumber = 0;
+            dbgStep.m_invocation = 1;
+
             //Load line number and invocation from the previous nextStep.json
             std::string prevStepIndexStr = std::to_string(step);
 
             std::string prevNextStepPath = trajectoryDir + "/step_" + prevStepIndexStr + "/nextStep.json";
 
             web::json::value jsonPrevNextStep;
-            loadJson(jsonPrevNextStep, prevNextStepPath);
+            const bool hasPrevNextStep = loadJson(jsonPrevNextStep, prevNextStepPath);
 
-            if(jsonPrevNextStep.has_field(U("line_number")))
+            if(hasPrevNextStep && jsonPrevNextStep.has_field(U("line_number")))
             {
                 dbgStep.m_lineNumber = jsonPrevNextStep[U("line_number")].as_integer();
             }
 
-            if(jsonPrevNextStep.has_field(U("invocation")))
+            if(hasPrevNextStep && jsonPrevNextStep.has_field(U("invocation")))
             {
                 dbgStep.m_invocation = jsonPrevNextStep[U("invocation")].as_integer();
             }
@@ -1748,11 +1753,14 @@ namespace hen {
             return summaryStep;
         }
 
-        std::string summaryFile = getTrajectoryStepDir(summaryStep) + "/summary.txt";
+        // The debugger saves the summary snapshot on the current persisted step,
+        // while `previousSteps` marks the last step covered by that summary.
+        std::string summaryFile = getTrajectoryStepDir(step) + "/summary.txt";
 
         if(!boost_fs::exists(summaryFile))
         {
-            std::cout << "\nUnable to find summary file for step " << summaryStep << "!\n";
+            std::cout << "\nUnable to find summary file for recorded step " << step;
+            std::cout << " (coverage boundary previousSteps=" << summaryStep << ")!\n";
             return -1;
         }
 
@@ -2741,7 +2749,7 @@ namespace hen {
         prologue += m_debugContext.getHighLevelAppInfo(m_project, {}, 0, PRINT_MAX_FUNCTIONS_DEPTH);
         prologue += "\n\n";
 
-        prologue += "\nSUMMARY OF PREVIOUS STEPS:\n\n";
+        prologue += "\nSUMMARIZED CONTEXT:\n\n";
         prologue += summary;
 
         std::string lastRunTestLog = m_debugContext.loadTestLogFromStep(project, m_test, originalRunStep);
