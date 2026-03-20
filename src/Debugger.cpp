@@ -8726,9 +8726,22 @@ std::string Debugger::generateTracePoint(CCodeProject* project,
     std::vector<std::string> paramList;
     std::vector<std::string> argList;
 
-    auto csvLists = getLiveVariables(project, dbgInfo, line, column, paramList, argList);
-    liveVarParams = csvLists.first;   // (not used in the signature anymore, but preserved)
-    liveVarArgs   = csvLists.second;  // used by the call-site generator
+    if (attachToFunction)
+    {
+        auto csvLists = getLiveVariables(project, dbgInfo, line, column, paramList, argList);
+        liveVarParams = csvLists.first;   // (not used in the signature anymore, but preserved)
+        liveVarArgs   = csvLists.second;  // used by the call-site generator
+    }
+    else
+    {
+        // Custom breakpoint snippets are injected at the beginning of the target line.
+        // Referencing auto-detected "live variables" there is unsafe because a variable
+        // may be declared later on that same line or immediately below it, which causes
+        // instrumentation-only compile failures. For breakpoints, rely on the explicit
+        // user expression instead of automatic local capture.
+        liveVarParams.clear();
+        liveVarArgs.clear();
+    }
 
     // Select the cap for how many times we emit this TP.
     std::string eventsHitCount;
@@ -8856,16 +8869,14 @@ std::pair<std::string, std::string> Debugger::generateTracePointDeclCall(CCodePr
                                                                std::shared_ptr<FunctionDebugInfo> dbgInfo,
                                                                int line, int column) const
 {
-    std::vector<std::string> paramList;
-    std::vector<std::string> argList;
-    
-    auto csv = getLiveVariables(project, dbgInfo, line, column, paramList, argList);
-    
     std::string location = "_" + std::to_string(line) + "_" + std::to_string(column);
     std::string functionName = "_" + dbgInfo->m_name + "_trace" + location + "(";
     
-    std::string decl = "inline void " + functionName + csv.first + ")";
-    std::string call = functionName + csv.second + ")";
+    // Custom breakpoint snippets are inserted before the target source line executes.
+    // Do not auto-pass local variables here; they may not yet be declared at the
+    // insertion point even if scope analysis considers them live on that line.
+    std::string decl = "inline void " + functionName + ")";
+    std::string call = functionName + ")";
     return std::make_pair(decl, call);
 }
 
