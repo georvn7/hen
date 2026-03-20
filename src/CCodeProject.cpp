@@ -1827,18 +1827,22 @@ namespace hen {
         return testedFunctions;
     }
 
-    uint32_t CCodeProject::archiveTest(const std::string& testPath, std::string& trajectoryDir)
+    bool CCodeProject::archiveTest(const std::string& testPath, std::string& trajectoryDir, uint32_t& nextAttempt, std::string& failureReason)
     {
+        failureReason.clear();
+        nextAttempt = 1;
+
         TestDef unitTestDef;
         unitTestDef.load(testPath + "/test.json");
         std::string testDebugDir = getProjDir() + "/debug/" + unitTestDef.name;
         trajectoryDir = testDebugDir + "/trajectory";
         if(!boost_fs::exists(trajectoryDir))
         {
-            return 1;
+            return true;
         }
         
         uint32_t archIndex = (uint32_t)nextIndex(testDebugDir, "archive");
+        nextAttempt = archIndex + 1;//Old archives plus the current trajectory
         std::string archiveDir = testDebugDir + "/archive" + std::to_string(archIndex);
         
         boost::system::error_code ec;
@@ -1847,16 +1851,20 @@ namespace hen {
                        boost_fs::copy_options::overwrite_existing, ec);
         if(ec)
         {
-            std::cout << "Unable to archive trajectory from: " << trajectoryDir << " to: " << archiveDir << std::endl;
-            std::cout << "Error: " << ec.message() << std::endl;
-            return archIndex + 1;//Old archives plus the current trajectory
+            failureReason = "Unable to archive trajectory from: " + trajectoryDir + " to: " + archiveDir + "\n";
+            failureReason += "Error: " + ec.message();
+            return false;
         }
 
         std::string logsDebugDir = getProjDir() + "/logs/debug/" + unitTestDef.name;
         std::string archiveLogsDir = archiveDir + "/logs";
         if(boost_fs::exists(logsDebugDir))
         {
-            removeAllWithRetry(archiveLogsDir);
+            if(!removeAllWithRetry(archiveLogsDir))
+            {
+                failureReason = "Unable to prepare archive logs directory: " + archiveLogsDir;
+                return false;
+            }
 
             boost::system::error_code logEc;
             boost_fs::copy(logsDebugDir, archiveLogsDir,
@@ -1864,27 +1872,39 @@ namespace hen {
                            boost_fs::copy_options::overwrite_existing, logEc);
             if(logEc)
             {
-                std::cout << "Unable to archive debug logs from: " << logsDebugDir << " to: " << archiveLogsDir << std::endl;
-                std::cout << "Error: " << logEc.message() << std::endl;
+                failureReason = "Unable to archive debug logs from: " + logsDebugDir + " to: " + archiveLogsDir + "\n";
+                failureReason += "Error: " + logEc.message();
+                return false;
             }
         }
 
-        removeAllWithRetry(trajectoryDir);
+        if(!removeAllWithRetry(trajectoryDir) || boost_fs::exists(trajectoryDir))
+        {
+            failureReason = "Unable to remove the archived trajectory directory: " + trajectoryDir;
+            return false;
+        }
 
-        removeAllWithRetry(logsDebugDir);
+        if(boost_fs::exists(logsDebugDir) &&
+           (!removeAllWithRetry(logsDebugDir) || boost_fs::exists(logsDebugDir)))
+        {
+            failureReason = "Unable to remove the archived debug logs directory: " + logsDebugDir;
+            return false;
+        }
 
-        return archIndex + 1;//Old archives plus the current trajectory
+        return true;
     }
 
-    void CCodeProject::archiveBrokenTest(const std::string& testPath)
+    bool CCodeProject::archiveBrokenTest(const std::string& testPath, std::string& failureReason)
     {
+        failureReason.clear();
+
         TestDef unitTestDef;
         unitTestDef.load(testPath + "/test.json");
         std::string testDebugDir = getProjDir() + "/debug/" + unitTestDef.name;
         std::string trajectoryDir = testDebugDir + "/trajectory";
         if(!boost_fs::exists(trajectoryDir))
         {
-            return ;
+            return true;
         }
         
         std::string archiveDir = testDebugDir + "/broken";
@@ -1895,16 +1915,20 @@ namespace hen {
                        boost_fs::copy_options::overwrite_existing, ec);
         if(ec)
         {
-            std::cout << "Unable to archive broken trajectory from: " << trajectoryDir << " to: " << archiveDir << std::endl;
-            std::cout << "Error: " << ec.message() << std::endl;
-            return;
+            failureReason = "Unable to archive broken trajectory from: " + trajectoryDir + " to: " + archiveDir + "\n";
+            failureReason += "Error: " + ec.message();
+            return false;
         }
 
         std::string logsDebugDir = getProjDir() + "/logs/debug/" + unitTestDef.name;
         std::string archiveLogsDir = archiveDir + "/logs";
         if(boost_fs::exists(logsDebugDir))
         {
-            removeAllWithRetry(archiveLogsDir);
+            if(!removeAllWithRetry(archiveLogsDir))
+            {
+                failureReason = "Unable to prepare broken archive logs directory: " + archiveLogsDir;
+                return false;
+            }
 
             boost::system::error_code logEc;
             boost_fs::copy(logsDebugDir, archiveLogsDir,
@@ -1912,14 +1936,26 @@ namespace hen {
                            boost_fs::copy_options::overwrite_existing, logEc);
             if(logEc)
             {
-                std::cout << "Unable to archive broken debug logs from: " << logsDebugDir << " to: " << archiveLogsDir << std::endl;
-                std::cout << "Error: " << logEc.message() << std::endl;
+                failureReason = "Unable to archive broken debug logs from: " + logsDebugDir + " to: " + archiveLogsDir + "\n";
+                failureReason += "Error: " + logEc.message();
+                return false;
             }
         }
 
-        removeAllWithRetry(trajectoryDir);
+        if(!removeAllWithRetry(trajectoryDir) || boost_fs::exists(trajectoryDir))
+        {
+            failureReason = "Unable to remove the broken trajectory directory: " + trajectoryDir;
+            return false;
+        }
 
-        removeAllWithRetry(logsDebugDir);
+        if(boost_fs::exists(logsDebugDir) &&
+           (!removeAllWithRetry(logsDebugDir) || boost_fs::exists(logsDebugDir)))
+        {
+            failureReason = "Unable to remove the broken debug logs directory: " + logsDebugDir;
+            return false;
+        }
+
+        return true;
     }
 
     void CCodeProject::debugTests()
@@ -2045,7 +2081,23 @@ namespace hen {
                         
                         //Archive the previous trajectory
                         std::string trajectoryDir;
-                        uint32_t utAttempt = archiveTest(unitTestPath, trajectoryDir);
+                        uint32_t utAttempt = 1;
+                        std::string archiveFailureReason;
+                        if(!archiveTest(unitTestPath, trajectoryDir, utAttempt, archiveFailureReason))
+                        {
+                            std::cout << "Unable to prepare a fresh unit-test trajectory for: " << unitTestPath << std::endl;
+                            if(!archiveFailureReason.empty())
+                            {
+                                std::cout << archiveFailureReason << std::endl;
+                            }
+                            return;
+                        }
+                        if(boost_fs::exists(trajectoryDir))
+                        {
+                            std::cout << "Unable to start unit-test debugging with a clean trajectory. Existing path was not removed: "
+                                      << trajectoryDir << std::endl;
+                            return;
+                        }
                         
                         std::string branchName = "before_" + config.current + "_" + std::to_string(utAttempt);
                         
@@ -2113,7 +2165,16 @@ namespace hen {
                                     ccNode = getNodeByName(test.second);
                                     ccNode->improveUnitTest();
                                     
-                                    archiveBrokenTest(unitTestPath);
+                                    std::string brokenArchiveFailureReason;
+                                    if(!archiveBrokenTest(unitTestPath, brokenArchiveFailureReason))
+                                    {
+                                        std::cout << "Unable to archive the broken unit-test trajectory for: " << unitTestPath << std::endl;
+                                        if(!brokenArchiveFailureReason.empty())
+                                        {
+                                            std::cout << brokenArchiveFailureReason << std::endl;
+                                        }
+                                        return;
+                                    }
                                 }
                                 else
                                 {
@@ -2137,7 +2198,23 @@ namespace hen {
                     
                     //We start with different unit tests each run. So it can't be continuation of the previous trajectory!
                     std::string trajectoryDirFullTest;
-                    archiveTest(publicTestPath, trajectoryDirFullTest);
+                    uint32_t fullTestAttempt = 1;
+                    std::string fullArchiveFailureReason;
+                    if(!archiveTest(publicTestPath, trajectoryDirFullTest, fullTestAttempt, fullArchiveFailureReason))
+                    {
+                        std::cout << "Unable to prepare a fresh public-test trajectory for: " << publicTestPath << std::endl;
+                        if(!fullArchiveFailureReason.empty())
+                        {
+                            std::cout << fullArchiveFailureReason << std::endl;
+                        }
+                        return;
+                    }
+                    if(boost_fs::exists(trajectoryDirFullTest))
+                    {
+                        std::cout << "Unable to start public-test debugging with a clean trajectory. Existing path was not removed: "
+                                  << trajectoryDirFullTest << std::endl;
+                        return;
+                    }
                     
                     auto dbgResult = Debugger::getInstance().debug(this, -1,
                                                                   "main",

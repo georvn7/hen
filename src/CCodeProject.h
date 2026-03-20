@@ -239,8 +239,8 @@ namespace hen {
         
         void setupBuild() override;
         void finalizeBuild() override;
-        uint32_t archiveTest(const std::string& testPath, std::string& trajectoryDir);
-        void archiveBrokenTest(const std::string& testPath);
+        bool archiveTest(const std::string& testPath, std::string& trajectoryDir, uint32_t& nextAttempt, std::string& failureReason);
+        bool archiveBrokenTest(const std::string& testPath, std::string& failureReason);
         void debugTests();
         void synthetizeTrainingData();
         std::multimap<uint32_t, std::string, std::greater<uint32_t>>
