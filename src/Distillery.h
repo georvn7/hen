@@ -301,7 +301,14 @@ namespace hen {
                                      const std::string& response,
                                      bool responseAsJson);
         
-        bool distillRunStep(CCodeProject* project, const std::string& summary, const std::string& fixedFunction, int testStep, int fixStep, std::string& debugNotes);
+        bool distillRunStep(CCodeProject* project,
+                            const std::string& summary,
+                            const std::string& fixedFunction,
+                            int testStep,
+                            int fixStep,
+                            const std::set<std::string>& requiredFunctions,
+                            const std::set<std::string>& requiredDataTypes,
+                            std::string& debugNotes);
         
         std::string distillDebugStep(CCodeProject* project,
                                      const std::string& summary,

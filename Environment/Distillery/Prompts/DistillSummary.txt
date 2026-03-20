@@ -15,6 +15,10 @@ DEBUGGING STEPS TO SUMMARIZE
 [[sequence_to_summarize]] - this is the sequence (DEBUGGING STEPS TO SUMMARIZE) that you need to summarize this step along with the OLD SUMMARY
 
 The task is to summarize both the OLD SUMMARY and the DEBUGGING STEPS in a new concise summary:
+- `sequence_to_distill` is provided only to define the cutoff boundary for visibility. Do not summarize it.
+- The new summary must contain only information that was already known strictly before the upcoming `run_test` in `sequence_to_distill`.
+- Do not mention outcomes, fixes, recent fixes, resolved blockers, or step ranges that belong to the current fix track being distilled.
+- It is acceptable to mention an entity name only if that entity was already disclosed in the OLD SUMMARY or in DEBUGGING STEPS TO SUMMARIZE.
 - The new summary needs to be concise
 - One or two concise sentence on the following topics but only if they are relevant to the OLD SUMMARY and the DEBUGGING STEPS. However, this is not a hard limit as we don't want to miss something important.
 - The new summary must contain concise history of the previous fixes, if any.
@@ -31,4 +35,4 @@ The task is to summarize both the OLD SUMMARY and the DEBUGGING STEPS in a new c
 10. Retain technical specifics: Function names, file names, line numbers, configurations
 11. Track verification results: What was confirmed working vs. still broken
 12. Preserve breakthrough moments: Key insights that advanced understanding
-13. Preserve the number/range of the debugging steps for all of the above artifacts as we might refer to those steps in the future
+13. Preserve the number/range of debugging steps only for artifacts that are strictly earlier than the upcoming `run_test` in `sequence_to_distill`

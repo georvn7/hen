@@ -1,6 +1,7 @@
 #include "Distillery.h"
 #include "Client.h"
 #include <algorithm>
+#include <regex>
 
 namespace hen {
 
@@ -52,6 +53,20 @@ namespace hen {
     static void addMentionedFunctionsFromText(const std::string& text,
                                               const std::set<std::string>& candidates,
                                               std::set<std::string>& out);
+    static void addMentionedEntitiesFromText(const std::string& text,
+                                             const std::set<std::string>& functionCandidates,
+                                             const std::set<std::string>& dataTypeCandidates,
+                                             std::set<std::string>& outFunctions,
+                                             std::set<std::string>& outDataTypes);
+    static void collectProjectEntityCandidates(CCodeProject* project,
+                                               std::set<std::string>& outFunctions,
+                                               std::set<std::string>& outDataTypes);
+    static std::string validateSummaryCausality(CCodeProject* project,
+                                                const std::string& summary,
+                                                const std::string& oldSummary,
+                                                const std::string& priorTrajectory,
+                                                int runStep,
+                                                const std::string& currentFixSubject);
 
     static bool tryParseJsonText(const std::string& text, web::json::value& out)
     {
@@ -1787,6 +1802,7 @@ namespace hen {
     {
         std::string oldSummary;
         int summaryStep = getSummaryStepForStep(project, runStep, oldSummary);
+        const bool hasPriorRuntimeSummary = (summaryStep > m_fromStep);
         if(summaryStep <= m_fromStep)
         {
             oldSummary = "\nNo summarized steps yet\n\n";
@@ -1803,6 +1819,18 @@ namespace hen {
         }
 
         std::string summarizeTrajectory = getOriginalTrajectory(project, summaryStepIdx, runStepIdx);
+        const std::string safeFallbackSummary = hasPriorRuntimeSummary ? oldSummary : std::string();
+
+        std::string currentFixSubject;
+        const int fixStepIdx = stepToTrajectoryIndex(fixStep);
+        if (fixStepIdx >= 0 && fixStepIdx < m_trajectory.size())
+        {
+            const DebugStep& fixTrackStep = m_trajectory[fixStepIdx];
+            if (fixTrackStep.m_action == "fix_function")
+            {
+                currentFixSubject = fixTrackStep.m_subject;
+            }
+        }
 
         std::string sequenceToDistill = "(from run_test step " + std::to_string(runStep) + " to fix_function step " + std::to_string(fixStep) + ")";
         std::string sequenceToSummarize = "(from run_test step " + std::to_string(summaryStep) + " to fix_function step " + std::to_string(runStep-1) + ")";
@@ -1836,6 +1864,40 @@ namespace hen {
             }
 
             attempts++;
+        }
+
+        std::string causalityFeedback = validateSummaryCausality(project,
+                                                                 summary,
+                                                                 oldSummary,
+                                                                 summarizeTrajectory,
+                                                                 runStep,
+                                                                 currentFixSubject);
+        if (!causalityFeedback.empty())
+        {
+            std::string feedback = "\n\nThe summary leaks future information relative to run_test step ";
+            feedback += std::to_string(runStep) + ". Regenerate once.\n";
+            feedback += "Problem: " + causalityFeedback + "\n";
+            feedback += "Use only information already visible in OLD SUMMARY and DEBUGGING STEPS TO SUMMARIZE.\n";
+            feedback += "Do not mention outcomes, fixes, recent fixes, or resolved blockers from the current fix track.\n";
+
+            summary = "review";
+            truncated = false;
+            project->inference(cache, feedback, summary, &truncated);
+
+            causalityFeedback = validateSummaryCausality(project,
+                                                         summary,
+                                                         oldSummary,
+                                                         summarizeTrajectory,
+                                                         runStep,
+                                                         currentFixSubject);
+            if (!causalityFeedback.empty())
+            {
+                std::cout << "Summary distillation leaked future context for run_test step ";
+                std::cout << runStep << ". Falling back to prior safe summary. Reason: ";
+                std::cout << causalityFeedback << std::endl;
+                project->popContext();
+                return safeFallbackSummary;
+            }
         }
 
         project->popContext();
@@ -2038,7 +2100,14 @@ namespace hen {
         saveTrainingData(datasetDir, fileName, jsonSample, responseAsJson);
     }
 
-    bool Distillery::distillRunStep(CCodeProject* project, const std::string& summary, const std::string& fixedFunction, int testStep, int fixStep, std::string& debugNotes)
+    bool Distillery::distillRunStep(CCodeProject* project,
+                                    const std::string& summary,
+                                    const std::string& fixedFunction,
+                                    int testStep,
+                                    int fixStep,
+                                    const std::set<std::string>& requiredFunctions,
+                                    const std::set<std::string>& requiredDataTypes,
+                                    std::string& debugNotes)
     {
         m_debugContext.clear();
 
@@ -2112,11 +2181,59 @@ namespace hen {
             Cache cache;
 
             // Build visibility from EXACT text that will be in the distilled sample.
-            const std::set<std::string> functionCandidates = (m_project ? m_project :
-                                                              project)->getNodeNames();
+            std::set<std::string> functionCandidates;
+            std::set<std::string> dataTypeCandidates;
+            collectProjectEntityCandidates(m_project ? m_project : project,
+                                           functionCandidates,
+                                           dataTypeCandidates);
+
             std::set<std::string> visibleFunctions;
-            addMentionedFunctionsFromText(currentTrajectory, functionCandidates,
-                                          visibleFunctions);
+            std::set<std::string> visibleDataTypes;
+            addMentionedEntitiesFromText(currentTrajectory,
+                                         functionCandidates,
+                                         dataTypeCandidates,
+                                         visibleFunctions,
+                                         visibleDataTypes);
+
+            DebugStep originalRunStep;
+            const std::string dbgStepPath = getTrajectoryStepDir(testStep) + "/dbgStep.json";
+            std::set<std::string> originalDisclosedFunctions;
+            std::set<std::string> originalDisclosedDataTypes;
+            if (originalRunStep.load(dbgStepPath))
+            {
+                std::string recordedNarrative = originalRunStep.m_debugNotes;
+                recordedNarrative += "\n";
+                recordedNarrative += originalRunStep.m_logSummary;
+
+                addMentionedEntitiesFromText(recordedNarrative,
+                                             functionCandidates,
+                                             dataTypeCandidates,
+                                             originalDisclosedFunctions,
+                                             originalDisclosedDataTypes);
+
+                visibleFunctions.insert(originalDisclosedFunctions.begin(),
+                                        originalDisclosedFunctions.end());
+                visibleDataTypes.insert(originalDisclosedDataTypes.begin(),
+                                        originalDisclosedDataTypes.end());
+            }
+
+            std::set<std::string> requiredGroundedFunctions;
+            for (const auto& fn : requiredFunctions)
+            {
+                if (originalDisclosedFunctions.count(fn))
+                {
+                    requiredGroundedFunctions.insert(fn);
+                }
+            }
+
+            std::set<std::string> requiredGroundedDataTypes;
+            for (const auto& typeName : requiredDataTypes)
+            {
+                if (originalDisclosedDataTypes.count(typeName))
+                {
+                    requiredGroundedDataTypes.insert(typeName);
+                }
+            }
 
             auto validateSystemGrounding = [&](const DistilledAanalysis& candidate,
                                                std::string& outFeedback) -> bool
@@ -2131,32 +2248,93 @@ namespace hen {
                 narrative += candidate.thinking_analysis;
 
                 std::set<std::string> mentionedFunctions;
-                addMentionedFunctionsFromText(narrative, functionCandidates,
-                                              mentionedFunctions);
+                std::set<std::string> mentionedDataTypes;
+                addMentionedEntitiesFromText(narrative,
+                                             functionCandidates,
+                                             dataTypeCandidates,
+                                             mentionedFunctions,
+                                             mentionedDataTypes);
 
-                std::set<std::string> disallowed;
+                std::set<std::string> disallowedFunctions;
                 for (const auto& fn : mentionedFunctions)
                 {
                     if (!fixedFunction.empty() && fixedFunction != "none" && fn ==
                         fixedFunction) continue;
                     if (!visibleFunctions.count(fn))
                     {
-                        disallowed.insert(fn);
+                        disallowedFunctions.insert(fn);
                     }
                 }
 
-                if (disallowed.empty())
+                std::set<std::string> disallowedDataTypes;
+                for (const auto& typeName : mentionedDataTypes)
+                {
+                    if (!visibleDataTypes.count(typeName))
+                    {
+                        disallowedDataTypes.insert(typeName);
+                    }
+                }
+
+                std::set<std::string> missingRequiredFunctions;
+                for (const auto& fn : requiredGroundedFunctions)
+                {
+                    if (!mentionedFunctions.count(fn))
+                    {
+                        missingRequiredFunctions.insert(fn);
+                    }
+                }
+
+                std::set<std::string> missingRequiredDataTypes;
+                for (const auto& typeName : requiredGroundedDataTypes)
+                {
+                    if (!mentionedDataTypes.count(typeName))
+                    {
+                        missingRequiredDataTypes.insert(typeName);
+                    }
+                }
+
+                if (disallowedFunctions.empty() &&
+                    disallowedDataTypes.empty() &&
+                    missingRequiredFunctions.empty() &&
+                    missingRequiredDataTypes.empty())
                 {
                     return true;
                 }
 
                 outFeedback += "Grounding violation in system analysis narrative fields ";
                 outFeedback += "(debug_notes/log_summary/thinking_analysis).\n";
-                outFeedback += "Disallowed function names: " + getAsCsv(disallowed, 30) + "\n";
-                outFeedback += "Currently visible functions in CURRENT TRAJECTORY: ";
+
+                if (!disallowedFunctions.empty())
+                {
+                    outFeedback += "Disallowed function names: ";
+                    outFeedback += getAsCsv(disallowedFunctions, 30) + "\n";
+                }
+
+                if (!disallowedDataTypes.empty())
+                {
+                    outFeedback += "Disallowed data type names: ";
+                    outFeedback += getAsCsv(disallowedDataTypes, 30) + "\n";
+                }
+
+                if (!missingRequiredFunctions.empty())
+                {
+                    outFeedback += "Missing required function names from the recorded run_test analysis: ";
+                    outFeedback += getAsCsv(missingRequiredFunctions, 30) + "\n";
+                }
+
+                if (!missingRequiredDataTypes.empty())
+                {
+                    outFeedback += "Missing required data type names from the recorded run_test analysis: ";
+                    outFeedback += getAsCsv(missingRequiredDataTypes, 30) + "\n";
+                }
+
+                outFeedback += "Currently visible functions in CURRENT TRAJECTORY plus recorded run_test analysis: ";
                 outFeedback += getAsCsv(visibleFunctions, 30) + "\n";
-                outFeedback += "Rule: mention only functions visible in CURRENT TRAJECTORY for this distilled sample.\n";
-                outFeedback += "Do not use function names known only from OLD SYSTEM ANALYSIS REQUEST/RESPONSE or OPTIMIZED SEQUENCE.\n";
+                outFeedback += "Currently visible data types in CURRENT TRAJECTORY plus recorded run_test analysis: ";
+                outFeedback += getAsCsv(visibleDataTypes, 30) + "\n";
+                outFeedback += "Rule: mention only functions/data types visible in CURRENT TRAJECTORY for this distilled sample.\n";
+                outFeedback += "Also preserve blocker/root-cause names from the recorded run_test analysis when those names are needed by later optimized steps.\n";
+                outFeedback += "Do not use function or data type names known only from OLD SYSTEM ANALYSIS REQUEST/RESPONSE or OPTIMIZED SEQUENCE.\n";
                 outFeedback += "Regenerate using only grounded names.\n\n";
 
                 return false;
@@ -2612,6 +2790,168 @@ namespace hen {
         }
     }
 
+    static void addMentionedEntitiesFromText(const std::string& text,
+                                             const std::set<std::string>& functionCandidates,
+                                             const std::set<std::string>& dataTypeCandidates,
+                                             std::set<std::string>& outFunctions,
+                                             std::set<std::string>& outDataTypes)
+    {
+        addMentionedFunctionsFromText(text, functionCandidates, outFunctions);
+        addMentionedFunctionsFromText(text, dataTypeCandidates, outDataTypes);
+    }
+
+    static void collectProjectEntityCandidates(CCodeProject* project,
+                                               std::set<std::string>& outFunctions,
+                                               std::set<std::string>& outDataTypes)
+    {
+        outFunctions.clear();
+        outDataTypes.clear();
+
+        if (!project)
+        {
+            return;
+        }
+
+        outFunctions = project->getNodeNames();
+
+        const auto dataSnapshot = project->getDataShapshot();
+        for (const auto& item : dataSnapshot)
+        {
+            outDataTypes.insert(item.first);
+        }
+    }
+
+    static std::string toLowerAscii(std::string value)
+    {
+        std::transform(value.begin(), value.end(), value.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return value;
+    }
+
+    static bool summaryMentionsFutureSteps(const std::string& summary,
+                                           int runStep,
+                                           std::string& reason)
+    {
+        const std::regex stepPattern(R"(\b[Ss]teps?\s+(\d+)(?:\s*[–-]\s*(\d+))?)");
+        for (std::sregex_iterator it(summary.begin(), summary.end(), stepPattern), end; it != end; ++it)
+        {
+            int first = std::stoi((*it)[1].str());
+            int last = first;
+            if ((*it)[2].matched)
+            {
+                last = std::stoi((*it)[2].str());
+            }
+
+            if (std::max(first, last) >= runStep)
+            {
+                reason = "summary mentions future step range '" + it->str() + "'";
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    static bool summaryMentionsResolvedCurrentFix(const std::string& summary,
+                                                  const std::string& currentFixSubject,
+                                                  std::string& reason)
+    {
+        if (currentFixSubject.empty() || currentFixSubject == "none")
+        {
+            return false;
+        }
+
+        const std::regex fixHeaderPattern(R"(\b[Ff]ix\s+\d+\b)");
+        std::istringstream iss(summary);
+        std::string line;
+        while (std::getline(iss, line))
+        {
+            if (!containsToken(line, currentFixSubject))
+            {
+                continue;
+            }
+
+            const std::string lower = toLowerAscii(line);
+            if (lower.find("recent fixes") != std::string::npos ||
+                lower.find("resolved blocker") != std::string::npos ||
+                std::regex_search(line, fixHeaderPattern))
+            {
+                reason = "summary describes current-track fix subject '" + currentFixSubject + "' as already resolved";
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    static std::string validateSummaryCausality(CCodeProject* project,
+                                                const std::string& summary,
+                                                const std::string& oldSummary,
+                                                const std::string& priorTrajectory,
+                                                int runStep,
+                                                const std::string& currentFixSubject)
+    {
+        if (summary.empty())
+        {
+            return std::string();
+        }
+
+        std::string reason;
+        if (summaryMentionsFutureSteps(summary, runStep, reason))
+        {
+            return reason;
+        }
+
+        if (summaryMentionsResolvedCurrentFix(summary, currentFixSubject, reason))
+        {
+            return reason;
+        }
+
+        std::set<std::string> functionCandidates;
+        std::set<std::string> dataTypeCandidates;
+        collectProjectEntityCandidates(project, functionCandidates, dataTypeCandidates);
+
+        std::set<std::string> visibleFunctions;
+        std::set<std::string> visibleDataTypes;
+        addMentionedEntitiesFromText(oldSummary + "\n" + priorTrajectory,
+                                     functionCandidates,
+                                     dataTypeCandidates,
+                                     visibleFunctions,
+                                     visibleDataTypes);
+
+        std::set<std::string> summaryFunctions;
+        std::set<std::string> summaryDataTypes;
+        addMentionedEntitiesFromText(summary,
+                                     functionCandidates,
+                                     dataTypeCandidates,
+                                     summaryFunctions,
+                                     summaryDataTypes);
+
+        std::set<std::string> disallowed;
+        for (const auto& fn : summaryFunctions)
+        {
+            if (!visibleFunctions.count(fn))
+            {
+                disallowed.insert(fn);
+            }
+        }
+        for (const auto& dt : summaryDataTypes)
+        {
+            if (!visibleDataTypes.count(dt))
+            {
+                disallowed.insert(dt);
+            }
+        }
+
+        if (!disallowed.empty())
+        {
+            return "summary introduces entities that were not visible before the current run_test: " +
+                   getAsCsv(disallowed, 20);
+        }
+
+        return std::string();
+    }
+
     static void extractIdentifierTokensFromRegex(const std::string& pattern,
                                                  std::set<std::string>& out)
     {
@@ -2663,17 +3003,43 @@ namespace hen {
         goTo(project, runStep - 1);
         m_debugContext.clear();
 
-        const std::set<std::string> functionCandidates = project->getNodeNames();
+        std::set<std::string> functionCandidates;
+        std::set<std::string> dataTypeCandidates;
+        collectProjectEntityCandidates(project, functionCandidates, dataTypeCandidates);
 
         std::string prevSteps;
         std::string requestedInfo;
         std::set<std::string> fixableByFunctionInfo;
+        std::set<std::string> currentRunVisibleFunctions;
+        std::set<std::string> currentRunVisibleDataTypes;
 
         int stepId = runStep;
 
         for (std::size_t i = 0; i < optimalSequence.steps.size(); ++i, ++stepId)
         {
             const auto& step = optimalSequence.steps[i];
+
+            auto loadRecordedRunMentions = [&](int recordedRunStep) {
+                currentRunVisibleFunctions.clear();
+                currentRunVisibleDataTypes.clear();
+
+                DebugStep dbgStep;
+                const std::string dbgStepPath = getTrajectoryStepDir(recordedRunStep) + "/dbgStep.json";
+                if (!dbgStep.load(dbgStepPath))
+                {
+                    return;
+                }
+
+                std::string narrative = dbgStep.m_debugNotes;
+                narrative += "\n";
+                narrative += dbgStep.m_logSummary;
+
+                addMentionedEntitiesFromText(narrative,
+                                             functionCandidates,
+                                             dataTypeCandidates,
+                                             currentRunVisibleFunctions,
+                                             currentRunVisibleDataTypes);
+            };
 
             // Build the same textual view used by distillStep.
             std::string currentTrajectory = getTrajectoryPrologue(project, runStep, runStep, summary);
@@ -2693,11 +3059,19 @@ namespace hen {
                 const DebugVisibility& vis = m_debugContext.visibility();
 
                 entry.visible_functions = vis.m_functions;
+                entry.visible_functions.insert(currentRunVisibleFunctions.begin(),
+                                              currentRunVisibleFunctions.end());
                 entry.visible_data_types = vis.m_dataTypes;
+                entry.visible_data_types.insert(currentRunVisibleDataTypes.begin(),
+                                                currentRunVisibleDataTypes.end());
                 entry.fixable_functions = fixableByFunctionInfo;
 
                 // Text parity fallback: include names explicitly visible in the distilled prompt text.
-                addMentionedFunctionsFromText(currentTrajectory, functionCandidates, entry.visible_functions);
+                addMentionedEntitiesFromText(currentTrajectory,
+                                             functionCandidates,
+                                             dataTypeCandidates,
+                                             entry.visible_functions,
+                                             entry.visible_data_types);
 
                 out[stepId] = std::move(entry);
             }
@@ -2706,6 +3080,11 @@ namespace hen {
             if (step->action_type == "function_info")
             {
                 fixableByFunctionInfo.insert(step->action_subject);
+            }
+
+            if (step->action_type == "run_test")
+            {
+                loadRecordedRunMentions(stepId);
             }
 
             if (NextDebugStep::isInformationRequest(step->action_type))
@@ -3780,9 +4159,11 @@ namespace hen {
             optimalSequence = originalSequence;
 
             std::string firstRunStr = std::to_string(trajectoryIndexToStep(fixRange.first));
-            std::string lastRunStr = std::to_string(trajectoryIndexToStep(fixRange.second));
-            optimalSequence.analysis = "The optimal sequence for this fix is the original one from run_test step ";
-            optimalSequence.analysis += firstRunStr + " to fix_function step " + lastRunStr;
+            std::string fixStepStrActual = std::to_string(fixStep);
+            std::string originalSizeStr = std::to_string(originalSequence.steps.size());
+            optimalSequence.analysis = "The optimal sequence for this fix is the original ";
+            optimalSequence.analysis += originalSizeStr + "-step sequence from run_test step ";
+            optimalSequence.analysis += firstRunStr + " to fix_function step " + fixStepStrActual;
 
             std::string originalFixSequence = "OPTIMIZED TRAJECTORY READY FOR DISTILLATION:\n\n\n";
             originalFixSequence += fixTrack + "\n";
@@ -3859,13 +4240,17 @@ namespace hen {
         std::string systemAnalysis;
 
         std::vector<DistilledStep> distilledTrajectory;
+        std::set<std::string> functionCandidates;
+        std::set<std::string> dataTypeCandidates;
+        collectProjectEntityCandidates(project, functionCandidates, dataTypeCandidates);
 
         std::string startStepStr = std::to_string(startStep);
         int currentStep = startStep;
         web::json::value messages = web::json::value::array();
 #if 1
-        for(auto step : optimalSequence.steps)
+        for(std::size_t sequenceIndex = 0; sequenceIndex < optimalSequence.steps.size(); ++sequenceIndex)
         {
+            auto step = optimalSequence.steps[sequenceIndex];
             std::string currentStepStr = std::to_string(currentStep);
 
             prevSteps = prevStepsSummary(distilledTrajectory, startStep);
@@ -3885,8 +4270,53 @@ namespace hen {
                 DebugStep stepInfo;
                 stepInfo.m_logSummary.clear(); //Everything for the system analysis is in the debug notes
 
+                std::set<std::string> requiredFunctions;
+                std::set<std::string> requiredDataTypes;
+                for (std::size_t futureIndex = sequenceIndex + 1; futureIndex < optimalSequence.steps.size(); ++futureIndex)
+                {
+                    const auto& futureStep = optimalSequence.steps[futureIndex];
+                    const std::string& subject = futureStep->action_subject;
+
+                    if (!subject.empty() && subject != "none")
+                    {
+                        if (functionCandidates.count(subject))
+                        {
+                            requiredFunctions.insert(subject);
+                        }
+                        if (dataTypeCandidates.count(subject))
+                        {
+                            requiredDataTypes.insert(subject);
+                        }
+                    }
+
+                    if (futureStep->action_type == "search_source")
+                    {
+                        std::set<std::string> regexTokens;
+                        extractIdentifierTokensFromRegex(subject, regexTokens);
+
+                        for (const auto& token : regexTokens)
+                        {
+                            if (functionCandidates.count(token))
+                            {
+                                requiredFunctions.insert(token);
+                            }
+                            if (dataTypeCandidates.count(token))
+                            {
+                                requiredDataTypes.insert(token);
+                            }
+                        }
+                    }
+                }
+
                 const bool reusedRecordedRunAnalysis =
-                    distillRunStep(project, summary, prevStep.m_subject, currentStep, fixStep, systemAnalysis);
+                    distillRunStep(project,
+                                   summary,
+                                   prevStep.m_subject,
+                                   currentStep,
+                                   fixStep,
+                                   requiredFunctions,
+                                   requiredDataTypes,
+                                   systemAnalysis);
 
                 const bool hasRewardHackingArtifacts =
                     hasRecordedStepArtifact(currentStep, "_RewardHacking.json");
