@@ -9,7 +9,7 @@ Usage:
   ./upload_hf_jsonl.sh --repo <username/dataset_repo> [options] <file1.jsonl> [file2.jsonl ...]
 
 Options:
-  --repo <id>           Hugging Face repo id, e.g. georvn/my-debug-dataset (required)
+  --repo <id>           Hugging Face repo id, e.g. username/my-debug-dataset (required)
   --private             Create repo as private (default if creating: public)
   --public              Create repo as public
   --path-prefix <path>  Prefix path inside repo, e.g. runs/run_2026_02_22
@@ -17,11 +17,11 @@ Options:
   -h, --help            Show this help
 
 Examples:
-  ./upload_hf_jsonl.sh --repo georvn/std-rave-debug \
-    /Users/georvn/projects/std-rave/SimpleC/dataset/S0.../train_dbg_sft.jsonl \
-    /Users/georvn/projects/std-rave/SimpleC/dataset/S0.../train_run_sft.jsonl
+  ./upload_hf_jsonl.sh --repo username/my-debug-dataset \
+    ./SimpleC/dataset/S0_example/train_dbg_sft.jsonl \
+    ./SimpleC/dataset/S0_example/train_run_sft.jsonl
 
-  ./upload_hf_jsonl.sh --repo georvn/std-rave-debug --private \
+  ./upload_hf_jsonl.sh --repo username/my-debug-dataset --private \
     --path-prefix S0_return_constant_generate_assembly \
     ./SimpleC/dataset/S0_return_constant_generate_assembly/train_dbg_sft.jsonl
 USAGE
