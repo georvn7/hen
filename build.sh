@@ -2,6 +2,31 @@
 
 set -euo pipefail
 
+require_supported_host() {
+    local os
+    local arch
+
+    os="$(uname -s)"
+    arch="$(uname -m)"
+
+    if [ "$os" != "Darwin" ]; then
+        echo "ERROR: build.sh currently supports only macOS on Apple Silicon." >&2
+        exit 1
+    fi
+
+    if [ "$arch" != "arm64" ]; then
+        echo "ERROR: build.sh currently supports only Apple Silicon Macs (arm64)." >&2
+        exit 1
+    fi
+
+    if ! xcodebuild -version >/dev/null 2>&1; then
+        echo "ERROR: Xcode must be installed and selected before running build.sh." >&2
+        echo "Install Xcode from the App Store, then run:" >&2
+        echo "  sudo xcode-select -s /Applications/Xcode.app/Contents/Developer" >&2
+        exit 1
+    fi
+}
+
 install_formula() {
     local formula="$1"
     "$BREW_BIN" install "$formula"
@@ -32,6 +57,8 @@ find_brew_bin() {
 
     return 1
 }
+
+require_supported_host
 
 # Check if Homebrew is installed
 BREW_BIN="$(find_brew_bin || true)"
