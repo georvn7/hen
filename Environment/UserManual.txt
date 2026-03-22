@@ -1,9 +1,9 @@
 
-std::rave
+hen
 
 USER MANUAL
 
-std::rave is a coding agent that, given an input project description and test cases, can synthesize complex functions using C++ and STL.
+hen is a coding agent that, given an input project description and test cases, can synthesize complex functions using C++ and STL.
 
 The agent uses specialized chain-of-thought to decompose the problem, reason about each step, ensure consistent functional and data flow and generate syntactically correct, working code. Embodied in high-bandwidth development environment that provides a constant stream of ground-truth data, the agent accumulates knowledge during inference to maintain a reliable long trajectory.
 

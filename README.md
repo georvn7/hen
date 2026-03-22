@@ -65,34 +65,46 @@ To use hen with different Large Language Models (LLMs), for example:
 cd /full/path/to/hen/build/Debug
 ```
 
-### OpenAI
+### Recommended: Anthropic + Groq
 ```bash
 ./hen -client -server -llmpx "localhost:8081" -proj "/full/path/to/hen/SimpleC" -env "/full/path/to/hen/Environment" -dp 10002 \
--llmDir openai/gpt-5 \
--llmExp openai/gpt-5-mini \
--llmDev openai/gpt-5-nano \
--llmDbg openai/gpt-5 -key openai=YOUR_OPENAI_KEY
+-llmDir anthropic/claude-sonnet-4-6 \
+-llmExp groq/openai/gpt-oss-120b \
+-llmDev groq/openai/gpt-oss-20b \
+-llmDbg anthropic/claude-sonnet-4-6 \
+-key anthropic=YOUR_ANTHROPIC_KEY \
+-key groq=YOUR_GROQ_KEY
 ```
 
 6. **When the hen prompt appear**
 
 To start the project
 ```bash
-start -c 1 -s 1
+/start
 ```
 
 To continue to the next step
 ```bash
-step
+/step
 ```
 
 To run autonomously to the full project generation/compilation/debugging
 ```bash
-continue
+/continue
 ```
+
+Bare text entered at the prompt is treated as chat input to the active project session.
 
 At the end of the run two artifacts will be recorded:
 All-in single file - your_project_name.hen.cpp (with embedded test)
 CMake project - you should be able to generate all type of project VS, VS Code, Xcode, ...
+
+When the project has been fully debugged and the trajectory logs are preserved, you can synthesize training data from those successful debug runs by enabling synthetic-data generation on `start`:
+
+```bash
+/start --synthetic-data=true
+```
+
+This loads the already generated project and preserved trajectories, runs the normal post-build debugger flow, and then distills data from the successful debug runs and logs.
 
 Notice, due to the nature of LLMs, hen is non-deterministic. The output folders and their content, from the very same prompt, will vary with each run
