@@ -24,7 +24,12 @@ target_sources(${PROJECT_NAME} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/Environment/source/black_box_api.h"
 )
 
-# And add its folder to the include paths:
+# Keep the patched cpprestsdk header inside the repo and prefer it over the
+# Homebrew install so builds do not mutate /opt/homebrew/include.
+target_include_directories(${PROJECT_NAME} BEFORE PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/Environment/include_overrides
+)
+
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Environment/source
 )

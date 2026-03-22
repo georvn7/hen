@@ -73,14 +73,6 @@ install_formula openssl
 install_formula sqlite
 "$BREW_BIN" reinstall cpprestsdk
 
-if [ "$(uname)" = "Darwin" ]; then
-    cp "./Environment/cpprestsdk/streams.h" "/opt/homebrew/include/cpprest/streams.h"
-    RED='\033[31m'
-    RESET='\033[0m'
-    #in case of a problem compiling didable the next line and reinstal cpprestsdk (brew uninstall cpprestsdk then brew install cpprestsdk)
-    echo -e "${RED}WARNING: Changing file in CPPRESTSDK. This might break the build. Check for this message in build.sh${RESET}"
-fi
-
 tinyxml2_prefix="$("$BREW_BIN" --prefix tinyxml2)"
 cmake_args=(
     -B build
