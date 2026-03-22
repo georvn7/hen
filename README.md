@@ -21,6 +21,15 @@ Test cases (for example: "hen/SimpleC/test)
 
 Everything else is autonomously synthesized by the agent
 
+The repository includes `SimpleC/` as a bundled example target and working project directory. It is a sample use case used to exercise `hen`'s generation, build, and debugger flows, not a special built-in project type required by the architecture.
+
+## Current status
+
+- `hen` is currently macOS-first. The build and runtime flow in this repository is tested on macOS.
+- `hen` is experimental and stateful. It persists debugger trajectories, generated source, intermediate working state, and other run artifacts between steps and across resumed runs.
+- `hen` writes logs and debug artifacts to disk under the project tree during normal operation. This includes generated build state and directories such as `build/`, `SimpleC/debug/`, `SimpleC/logs/`, `SimpleC/dag/`, and related runtime outputs.
+- During model-driven runs, `hen` may also persist request/response logs for debugging and analysis. Do not treat the working project directory as ephemeral or private-by-default.
+
 **Installing hen (tested only on macOS!!!)**
 ===============
 
