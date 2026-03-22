@@ -930,6 +930,23 @@ namespace hen {
 
         checkoutExact(tempDagDir, commitInfo.hash, true, false, commitInfo.checkoutParent);
 
+        std::string distillPlanPath = distillProjDir + "/plan.txt";
+        if(!boost_fs::exists(distillPlanPath))
+        {
+            std::string sourcePlanPath = project->getProjDir() + "/plan.txt";
+            if(boost_fs::exists(sourcePlanPath))
+            {
+                boost::system::error_code planEc;
+                boost_fs::copy_file(sourcePlanPath, distillPlanPath,
+                                    boost_fs::copy_options::overwrite_existing, planEc);
+                if(planEc)
+                {
+                    std::cout << "Copy plan failed! from: " << sourcePlanPath << " to: " << distillPlanPath << "\n";
+                    std::cout << "Error: " << planEc.message() << "\n";
+                }
+            }
+        }
+
         if(m_project)
         {
             delete m_project;
