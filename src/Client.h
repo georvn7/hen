@@ -90,6 +90,7 @@ namespace hen {
         
         std::unique_ptr<ClientEP>           m_llmClientEP;
         std::mutex                          m_llmRequestMutex;
+        bool                                m_debugLoggingNoticeShown = false;
         
         bool m_localUser;
         
@@ -99,6 +100,7 @@ namespace hen {
         uint16_t                            m_debugPort;
         
         void checkLLMContextSize(const json::value& messages, json::value& request);
+        void maybePrintDebugLoggingNotice(const std::string& logDir);
         void sendToServer(const json::value& request, json::value& response);
         
         void initClient(const std::string& serverIP);

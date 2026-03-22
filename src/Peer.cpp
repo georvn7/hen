@@ -16,11 +16,20 @@ std::string Peer::getHeader()
 {
     std::stringstream scout;
     scout << MERCH_PRODUCT_NAME << " - a personal educational project." << std::endl;
-    scout << "Does not represent a commercial product, prototype, or concept!" << std::endl;
+    scout << "Experimental research software." << std::endl;
     scout << std::endl << "Created by " << AUTHOR_NAME << ", © 2025" << std::endl;
     scout << AUTHOR_CONTACTS << std::endl;
     
     return scout.str();
+}
+
+std::string Peer::getRuntimeNotice()
+{
+    std::string notice;
+    notice += "Notice: debugger and distillation runs persist prompts, responses, chat logs,\n";
+    notice += "and trajectory state under the active project directory for resume and\n";
+    notice += "trajectory distillation. Do not treat the project tree as private-by-default.\n";
+    return notice;
 }
 
 std::string Peer::getDisclamer()

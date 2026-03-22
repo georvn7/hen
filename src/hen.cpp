@@ -12,6 +12,7 @@ int main(int argc, char* argv[])
 {
     std::cout << std::endl << std::endl;
     std::cout << Peer::getHeader();
+    std::cout << std::endl << Peer::getRuntimeNotice();
     std::cout << std::endl;
 
     bool server = false;

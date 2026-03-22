@@ -41,8 +41,9 @@ namespace hen {
 		virtual int init(int argc, char* argv[]);
         virtual void shutdown() {}
 		virtual bool update() { return false; }
-		const std::string& getEnvironmentDir() const {return m_environmentDirectory;}
+        const std::string& getEnvironmentDir() const {return m_environmentDirectory;}
         static std::string getHeader();
+        static std::string getRuntimeNotice();
         static std::string getDisclamer();
         static std::string getProductDescription();
 	};

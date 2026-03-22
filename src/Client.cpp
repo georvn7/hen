@@ -608,6 +608,24 @@ void Client::logChat(const json::value& request, const json::value& response, co
     }
 }
 
+void Client::maybePrintDebugLoggingNotice(const std::string& logDir)
+{
+    if(m_debugLoggingNoticeShown || logDir.find("/logs/debug/") == std::string::npos)
+    {
+        return;
+    }
+    
+    m_debugLoggingNoticeShown = true;
+    
+    std::cout << "Notice: debugger/distillation logging is active." << std::endl;
+    std::cout << "Prompts, responses, and chat logs will be written under: " << logDir << std::endl;
+    if(!m_projectDirectory.empty())
+    {
+        std::cout << "Trajectory state will be written under: " << m_projectDirectory + "/debug" << std::endl;
+    }
+    std::cout << "These artifacts are used for debugger resume and trajectory distillation." << std::endl;
+}
+
 void Client::flushLog()
 {
     std::map<std::string, std::string> newLog;
@@ -762,6 +780,7 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
     checkLLMContextSize(messages, request);
 
     std::string logDir = m_ctxLogDir;
+    maybePrintDebugLoggingNotice(logDir);
     
     std::string requestLog = logDir + "/request_";
     requestLog += std::to_string(m_requestId);

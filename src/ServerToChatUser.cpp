@@ -442,6 +442,7 @@ void Server::startAgentUdate(std::shared_ptr<HTTPSession> session, std::map<std:
         float waitStepMultiplier = 0.5f;
         
         std::string projecMsg = "\n\n" + Peer::getHeader();
+        projecMsg += "\n" + Peer::getRuntimeNotice();
         
         projecMsg += "\n\n******************************************************************************\n";
         projecMsg += "*** Project Unique Identifier (PUID): " + projectId + "\n";
