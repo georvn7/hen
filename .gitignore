@@ -1,1 +1,12 @@
 .DS_Store
+build/
+SimpleC/build/
+SimpleC/build_instrumented/
+SimpleC/cache/
+SimpleC/dag/
+SimpleC/debug/
+SimpleC/logs/
+Environment/*.db
+Environment/cpp_identifiers.txt
+SimpleC/items.json
+SimpleC/plan.txt
