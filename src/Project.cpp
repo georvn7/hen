@@ -565,37 +565,12 @@ namespace hen {
         
         std::cout << "Execute command: " << command << " " << cli << std::endl;
         
-        boost::optional<bool> decompose;
-        if (args.count("decompose")) {
-            decompose = args["decompose"].as<bool>();
-        }
-        if(decompose.has_value()) m_decompose = decompose.value();
-        
-        boost::optional<bool> integrate;
-        if (args.count("integrate")) {
-            integrate = args["integrate"].as<bool>();
-        }
-        if(integrate.has_value()) m_integrate = integrate.value();
-        
         boost::optional<bool> cache;
         if (args.count("cache")) {
             cache = args["cache"].as<bool>();
         }
         if(cache.has_value()) m_cache = cache.value();
-        
-        boost::optional<bool> reorder;
-        if (args.count("reorder")) {
-            reorder = args["reorder"].as<bool>();
-        }
-        if(reorder.has_value()) m_reorder = reorder.value();
-        
-        boost::optional<bool> brainstorm;
-        if (args.count("brainstorm")) {
-            brainstorm = args["brainstorm"].as<bool>();
-        }
-        if(brainstorm.has_value()) m_brainstorm = brainstorm.value();
-        
-        //bool oldSave = m_save;
+
         boost::optional<bool> save_flag;
         if (args.count("save")) {
             save_flag = args["save"].as<bool>();
@@ -623,11 +598,6 @@ namespace hen {
         else if (command == "chat")
         {
             chat(cli);
-        }
-        else if (command == "save")
-        {
-            save("",true);
-            return 1;
         }
 
         return result;

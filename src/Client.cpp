@@ -219,42 +219,23 @@ int Client::init(int argc, char* argv[])
 #if 1
     registerCommand("step", []() { boost_opt::options_description desc; desc.add_options()
         ("help,h", "Continues execution to the next response from the LLM");
-        //("decompose,d", boost_opt::value<bool>(), "Sets decompose pass, by default keeps the current value")
-        //("integrate,i", boost_opt::value<bool>(), "Toggle integrate pass, by default keeps the current value")
-        //("cache,c", boost_opt::value<bool>(), "Toggle cache schemas, by default keeps the current value")
-        //("save,s", boost_opt::value<bool>(), "Toggle save nodes after being fully defined, by default keeps the current value");
         return desc;}());
     
     registerCommand("continue", []() { boost_opt::options_description desc; desc.add_options()
         ("help,h", "Continues execution to the next breackpoint or the end of the build");
         return desc;}());
     
-    /*registerCommand("save", []() { boost_opt::options_description desc; desc.add_options()
-        ("help,h", "Saves the graph")
-        ("overwrite,o", "Overwrite existing directory")
-        ("directory,d", boost_opt::value<std::string>(), "Output directory");
-    return desc; }());*/
-    
     registerCommand("start", []() { boost_opt::options_description desc; desc.add_options()
         ("help,h", "Starts the depth-first decompose/integrate traversal")
-        //("decompose,d", boost_opt::value<bool>(), "Sets decompose pass, by default keeps the current value")
-        //("integrate,i", boost_opt::value<bool>(), "Toggle integrate pass, by default keeps the current value")
         ("cache,c", boost_opt::value<bool>(), "Toggle cache schemas, by default keeps the current value")
-        //("generate,g", boost_opt::value<bool>(), "Generates project description from the chat history")
         ("save,s", boost_opt::value<bool>(), "Toggle save nodes after being fully defined, by default keeps the current value")
-        ("debug", boost_opt::value<bool>(), "Toggle post-build test debugging, enabled by default")
+        ("debug,d", boost_opt::value<bool>(), "Toggle post-build test debugging, enabled by default")
         ("synthetic-data", boost_opt::value<bool>(), "Toggle synthetic training data generation after debugging, disabled by default");
-        //("reorder,r", boost_opt::value<bool>(), "Reorder dependent data type definitions, by default keeps the current value")
-        //("brainstorm,b", boost_opt::value<bool>(), "Slef brainstorming the responses, by default keeps the current value");
     return desc; }());
     
     registerCommand("quit", []() { boost_opt::options_description desc; desc.add_options()
         ("help,h", "Exit the application");
     return desc; }());
-    
-    /*registerCommand("skip", []() { boost_opt::options_description desc; desc.add_options()
-        ("help,h", "Skips human-in-a-loop interaction triggered by malfunctioned response");
-    return desc; }());*/
     
     registerCommand("help", []() { boost_opt::options_description desc; desc.add_options()
         ;//("help,h", "Exit the application");
@@ -1225,10 +1206,6 @@ bool Client::processUserInput()
         else if(command == "quit")
         {
             exit(0);
-        }
-        else if(command == "skip")
-        {
-            return false;
         }
         else if(command != "chat")
         {
