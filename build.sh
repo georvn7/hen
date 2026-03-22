@@ -74,15 +74,47 @@ install_formula sqlite
 "$BREW_BIN" reinstall cpprestsdk
 
 tinyxml2_prefix="$("$BREW_BIN" --prefix tinyxml2)"
+boost_prefix="$("$BREW_BIN" --prefix boost)"
+sqlite_prefix="$("$BREW_BIN" --prefix sqlite)"
+llvm_prefix="$("$BREW_BIN" --prefix llvm)"
+openssl_prefix="$("$BREW_BIN" --prefix openssl)"
+cpprestsdk_prefix="$("$BREW_BIN" --prefix cpprestsdk)"
+
+cmake_prefix_path=(
+    "${tinyxml2_prefix}"
+    "${boost_prefix}"
+    "${sqlite_prefix}"
+    "${llvm_prefix}"
+    "${openssl_prefix}"
+    "${cpprestsdk_prefix}"
+)
+
+cmake_prefix_path_str=""
+for prefix in "${cmake_prefix_path[@]}"; do
+    if [ -z "${cmake_prefix_path_str}" ]; then
+        cmake_prefix_path_str="${prefix}"
+    else
+        cmake_prefix_path_str="${cmake_prefix_path_str};${prefix}"
+    fi
+done
+
 cmake_args=(
     -B build
     -G "Xcode"
     -DCMAKE_OSX_ARCHITECTURES=arm64
-    "-DCMAKE_PREFIX_PATH=${tinyxml2_prefix}"
+    "-DCMAKE_PREFIX_PATH=${cmake_prefix_path_str}"
+    "-DBoost_ROOT=${boost_prefix}"
+    "-DSQLite3_ROOT=${sqlite_prefix}"
+    "-DOPENSSL_ROOT_DIR=${openssl_prefix}"
+    "-DLLVM_DIR=${llvm_prefix}/lib/cmake/llvm"
 )
 
 if [ -f "${tinyxml2_prefix}/lib/cmake/tinyxml2/tinyxml2-config.cmake" ]; then
     cmake_args+=("-DTinyXML2_DIR=${tinyxml2_prefix}/lib/cmake/tinyxml2")
+fi
+
+if [ -f "${cpprestsdk_prefix}/lib/cmake/cpprestsdk/cpprestsdk-config.cmake" ]; then
+    cmake_args+=("-Dcpprestsdk_DIR=${cpprestsdk_prefix}/lib/cmake/cpprestsdk")
 fi
 
 cmake "${cmake_args[@]}"

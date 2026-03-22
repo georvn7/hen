@@ -4,9 +4,6 @@ project(hen VERSION 0.1 DESCRIPTION "std::rave is a long-horizon AI programmer" 
 # Force use of FindBoost module BEFORE any package calls
 cmake_policy(SET CMP0167 OLD)
 set(Boost_NO_BOOST_CMAKE ON)
-set(BOOST_ROOT "/opt/homebrew")
-set(BOOST_LIBRARYDIR "/opt/homebrew/lib")
-set(BOOST_INCLUDEDIR "/opt/homebrew/include")
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -25,7 +22,7 @@ target_sources(${PROJECT_NAME} PRIVATE
 )
 
 # Keep the patched cpprestsdk header inside the repo and prefer it over the
-# Homebrew install so builds do not mutate /opt/homebrew/include.
+# installed dependency headers so builds do not mutate system include trees.
 target_include_directories(${PROJECT_NAME} BEFORE PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Environment/include_overrides
 )
@@ -34,7 +31,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Environment/source
 )
 
-# Find Homebrew packages
+# Find external packages.
 find_package(cpprestsdk REQUIRED)
 find_package(TinyXML2 REQUIRED)
 
@@ -42,13 +39,9 @@ find_package(TinyXML2 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS
     thread program_options filesystem url process)
 
-set(SQLite3_INCLUDE_DIR "/opt/homebrew/opt/sqlite/include")
-set(SQLite3_LIBRARY "/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib")
 find_package(SQLite3 REQUIRED)
 find_package(OpenSSL REQUIRED)
 
-# LLVM from Homebrew
-set(LLVM_DIR "/opt/homebrew/opt/llvm/lib/cmake/llvm")
 find_package(LLVM REQUIRED CONFIG)
 
 find_library(LIB_CLANG clang PATHS ${LLVM_LIBRARY_DIRS})
@@ -71,7 +64,7 @@ target_link_libraries(${PROJECT_NAME}
     Boost::process
     cpprestsdk::cpprest
     tinyxml2::tinyxml2
-    SQLite::SQLite3
+    SQLite3::SQLite3
     OpenSSL::SSL
     OpenSSL::Crypto
     ${LIB_CLANG}

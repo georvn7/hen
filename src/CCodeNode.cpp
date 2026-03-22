@@ -2371,7 +2371,7 @@ namespace hen {
         include += buildDir + "/" + buildSourcePath;
         include += " ";
         
-        std::string cmdLine = "clang++ -v -std=c++17 -arch arm64 -Werror=format -fno-diagnostics-show-note-include-stack -c ";
+        std::string cmdLine = getCxxCompilerCommand() + " -v -std=c++17 -arch arm64 -Werror=format -fno-diagnostics-show-note-include-stack -c ";
         
         if(options & BUILD_DEBUG) {
             cmdLine += "-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer -g -O0 -fno-inline-functions -fno-optimize-sibling-calls ";
@@ -2506,7 +2506,7 @@ namespace hen {
         //executable += m_brief.func_name;
         executable += "main";
         
-        std::string command = "clang++ -v -std=c++17 -arch arm64 -o " + executable;
+        std::string command = getCxxCompilerCommand() + " -v -std=c++17 -arch arm64 -o " + executable;
         
         //std::string testObjFile = nodeDir + "/test/" + m_brief.func_name + ".o";
         std::string testObjFile = nodeDir + "/test/main.o";

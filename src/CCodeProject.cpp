@@ -1491,8 +1491,8 @@ namespace hen {
         std::string embeddedTestSection = generateEmbeddedTest();
         cpp << embeddedTestSection << std::endl;
         
-        std::string commandRelease = "clang++ -std=c++17 -O3 -o " + m_description.name + " " + fileName;
-        std::string commandDebug = "clang++ -std=c++17 -Werror=format -g -O0 -DCOMPILE_TEST -o " + m_description.name + " " + fileName;
+        std::string commandRelease = getCxxCompilerCommand() + " -std=c++17 -O3 -o " + m_description.name + " " + fileName;
+        std::string commandDebug = getCxxCompilerCommand() + " -std=c++17 -Werror=format -g -O0 -DCOMPILE_TEST -o " + m_description.name + " " + fileName;
         
         cpp << "//To compile the project use the following command line" << std::endl;
         cpp << "//Debug: " << commandDebug << std::endl;
@@ -1697,7 +1697,7 @@ namespace hen {
         executable += m_dag.m_root->m_data->getName();
         
         boost_fs::remove(executable);
-        std::string command = "clang++ -v -std=c++17 -arch arm64 -o " + executable;
+        std::string command = getCxxCompilerCommand() + " -v -std=c++17 -arch arm64 -o " + executable;
         
         if(enableSanitizer)
         {
@@ -2444,7 +2444,7 @@ namespace hen {
             boost_fs::remove(pchFile);
         }
         
-        std::string cmdLine = "clang++ -v -std=c++17 -arch arm64 -Werror=format -fno-diagnostics-show-note-include-stack ";
+        std::string cmdLine = getCxxCompilerCommand() + " -v -std=c++17 -arch arm64 -Werror=format -fno-diagnostics-show-note-include-stack ";
         
         if(options & CCodeNode::BUILD_DEBUG) {
             cmdLine += "-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer -g -O0 -fno-inline-functions -fno-optimize-sibling-calls ";

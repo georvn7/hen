@@ -970,6 +970,7 @@ namespace hen {
     bool startsWithIgnoreCase(const std::string &s1, const std::string &s2);
     std::string removeFirstWord(const std::string& from, const std::string& word);
     void setupEnv();
+    std::string getCxxCompilerCommand();
     std::string buildPrompt(const std::string& content, const std::map<std::string, std::string>& params);
     bool addToSet(std::vector<std::shared_ptr<std::string>>& vset, const std::string& element);
     bool isInSet(std::vector<std::shared_ptr<std::string>>& vset, const std::string& element);

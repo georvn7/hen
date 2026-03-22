@@ -1047,25 +1047,42 @@ std::string removeFirstWord(const std::string& from, const std::string& word)
 void setupEnv()
 {
 #if defined(__APPLE__)
-    //TODO: if you have different homebrew path you might need to change this
-    std::string new_path = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin";
-    // Get the current PATH
-    const char* current_path = std::getenv("PATH");
-    std::string new_path_value;
-
-    if (current_path) {
-        // Append the new path to the current PATH
-        new_path_value = std::string(current_path) + ":" + new_path;
-    } else {
-        // If PATH is not set, just use the new path
-        new_path_value = new_path;
+    // Avoid mutating PATH implicitly. If a caller needs extra tool locations,
+    // they can provide them explicitly via HEN_EXTRA_PATH.
+    const char* extraPath = std::getenv("HEN_EXTRA_PATH");
+    if(!extraPath || !*extraPath)
+    {
+        return;
     }
-
-    // Set the new PATH environment variable
-    if (setenv("PATH", new_path_value.c_str(), 1) != 0) {
+    
+    const char* currentPath = std::getenv("PATH");
+    std::string newPathValue(extraPath);
+    if(currentPath && *currentPath)
+    {
+        newPathValue += ":";
+        newPathValue += currentPath;
+    }
+    
+    if(setenv("PATH", newPathValue.c_str(), 1) != 0)
+    {
         std::cerr << "Failed to set PATH environment variable." << std::endl;
         std::exit(EXIT_FAILURE);
     }
+#endif
+}
+
+std::string getCxxCompilerCommand()
+{
+    const char* explicitCompiler = std::getenv("HEN_CXX");
+    if(explicitCompiler && *explicitCompiler)
+    {
+        return explicitCompiler;
+    }
+    
+#if defined(__APPLE__)
+    return "/usr/bin/xcrun clang++";
+#else
+    return "clang++";
 #endif
 }
 
