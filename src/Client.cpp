@@ -1168,14 +1168,39 @@ bool Client::processUserInput()
             //TODO: Convert a command from native English language to Unix command-line
             continue; 
         }
-        std::string command = tokens[0];
+        bool slashCommand = !tokens[0].empty() && tokens[0][0] == '/';
+        std::string commandLine = cmdLn;
+        std::string command;
+        std::string cliArg;
+        auto it = m_commands.end();
 
-		auto it = m_commands.find(command);
-		if (it == m_commands.end())
-		{
-            cmdLn = "chat" + cmdLn;
+        if (slashCommand)
+        {
+            size_t slashPos = cmdLn.find('/');
+            commandLine = cmdLn.substr(slashPos + 1);
+            tokens = boost_opt::split_unix(commandLine);
+            if(!tokens.size())
+            {
+                std::cout << "Empty command line" << std::endl;
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                continue;
+            }
+
+            command = tokens[0];
+            it = m_commands.find(command);
+            if (it == m_commands.end())
+            {
+                std::cerr << "Unknown command: /" << command << std::endl;
+                continue;
+            }
+
+            cliArg = commandLine.substr(command.size());
+        }
+        else
+        {
             command = "chat";
-		}
+            cliArg = cmdLn;
+        }
         
         //=======================================
         // Parse command line arguments
@@ -1193,10 +1218,11 @@ bool Client::processUserInput()
         }
         else if(command == "help")
         {
+            std::cout << "Bare text sends a chat message." << std::endl;
             for(auto cmd : m_commands)
             {
                 std::cout << std::endl;
-                std::cout << "Command: " << cmd.first << std::endl;
+                std::cout << "Command: /" << cmd.first << std::endl;
                 std::cout << cmd.second << std::endl;
             }
             std::cout << std::endl;
@@ -1207,7 +1233,7 @@ bool Client::processUserInput()
         {
             exit(0);
         }
-        else if(command != "chat")
+        else if(slashCommand)
         {
             try {
                 std::vector<std::string> argsOnly(++tokens.begin(),tokens.end());
@@ -1245,7 +1271,7 @@ bool Client::processUserInput()
         }
         //=======================================
 		
-        if (m_project->executeCommand(command, cmdLn.substr(command.size()), args) > 0)
+        if (m_project->executeCommand(command, cliArg, args) > 0)
         {
             m_auto = false;
             break;
