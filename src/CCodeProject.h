@@ -106,6 +106,8 @@ namespace hen {
         
         std::string m_buildCacheDir;
         std::string m_plan;
+        bool m_runDebugTests;
+        bool m_runTrainingDataSynthesis;
         
         void clear();
         
@@ -120,7 +122,9 @@ namespace hen {
         
         CCodeProject():
         Project(),
-        m_refactoringDepth(0)
+        m_refactoringDepth(0),
+        m_runDebugTests(true),
+        m_runTrainingDataSynthesis(false)
         {
             
         }
@@ -238,6 +242,7 @@ namespace hen {
         std::string listAllStructDefinitions() const;
         
         void setupBuild() override;
+        int executeCommand(const std::string& command, const std::string& cli, const boost_opt::variables_map& args) override;
         void finalizeBuild() override;
         bool archiveTest(const std::string& testPath, std::string& trajectoryDir, uint32_t& nextAttempt, std::string& failureReason);
         bool archiveBrokenTest(const std::string& testPath, std::string& failureReason);

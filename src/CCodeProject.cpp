@@ -2342,6 +2342,24 @@ namespace hen {
         }
     }
 
+    int CCodeProject::executeCommand(const std::string& command, const std::string& cli, const boost_opt::variables_map& args)
+    {
+        if(command == "start")
+        {
+            if(args.count("debug"))
+            {
+                m_runDebugTests = args["debug"].as<bool>();
+            }
+
+            if(args.count("synthetic-data"))
+            {
+                m_runTrainingDataSynthesis = args["synthetic-data"].as<bool>();
+            }
+        }
+
+        return Project::executeCommand(command, cli, args);
+    }
+
     void CCodeProject::finalizeBuild()
     {
         Client& client = Client::getInstance();
@@ -2353,12 +2371,17 @@ namespace hen {
         
         saveDataDefinitions();
         
-        Client::getInstance().agentToServer("\n\nDEBUGGING...\n\n");
-        
-        //TODO: ONLY FOR TEST
-        synthetizeTrainingData();
-        
-        debugTests();
+        if(m_runDebugTests)
+        {
+            Client::getInstance().agentToServer("\n\nDEBUGGING...\n\n");
+            debugTests();
+        }
+
+        if(m_runTrainingDataSynthesis)
+        {
+            Client::getInstance().agentToServer("\n\nSYNTHESIZING TRAINING DATA...\n\n");
+            synthetizeTrainingData();
+        }
         
         generateSingleSourceFile();
         
