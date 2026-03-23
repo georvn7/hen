@@ -2,26 +2,35 @@ YouTube video: https://youtu.be/u4Sl35QuvAo
 
 # hen
 
-hen is a long-horizon coding agent that, given an input project description and test cases, can synthesize complex algorithms using C++ and STL.
+hen is a stateful long-horizon coding agent for C++ projects. Given a project description and tests, it decomposes the problem into functions and data, generates source, repairs compilation failures, debugs against runtime evidence, and can distill successful debug trajectories into training data.
 
-The agent uses specialized chain-of-thought to decompose the problem, reason about each step, ensure consistent functional and data flow and generate syntactically correct, working code. Embodied in high-bandwidth baspoke development environment that provides a constant stream of ground-truth data, the agent accumulates knowledge during inference to maintain a reliable long trajectory.
+`hen` is built around a debugger-centered workflow rather than a minimal-latency chat loop. The system keeps dense runtime evidence, persists trajectories and logs to disk, and uses those artifacts both for reliability during a run and for later synthetic-data generation.
 
-When done, the agent provides a link to download the project - that's it!
+In practice, `hen` routes work across four LLM roles:
 
-For optimal quality, speed, and cost-efficiency, the agent uses a party of three LLMs with distinct roles:
+- Developer: the fast implementation specialist
+- Expert: the broader algorithmic and architecture model
+- Director: the highest-level planner and escalation target
+- Debugger: the model used for grounded debug analysis and next-step selection
 
-Specialist: A fast model with excellent knowledge of C++ and the STL.
-Expert:    A model with comprehensive knowledge of algorithms, data structures, and design patterns.
-Director:  A powerful model with domain-specific knowledge in the researched area that guides the other two models through complex software development tasks.
+The main inputs are:
 
-The only inputs to the system are:
-
-Project description in the file (for example: "hen/SimpleC/Description.txt")
-Test cases (for example: "hen/SimpleC/test)
-
-Everything else is autonomously synthesized by the agent
+- a project description file, for example `hen/SimpleC/Description.txt`
+- test cases, for example `hen/SimpleC/tests/...`
 
 The repository includes `SimpleC/` as a bundled example target and working project directory. It is a sample use case used to exercise `hen`'s generation, build, and debugger flows, not a special built-in project type required by the architecture.
+
+## Who this is for
+
+- People interested in coding agents with grounded debugger loops rather than only chat-style tool use
+- People interested in trajectory persistence, runtime evidence, and synthetic-data distillation
+- Contributors who are comfortable with an experimental, stateful, macOS-first C++ codebase
+
+## Who this is not for
+
+- People looking for a polished cross-platform end-user coding assistant
+- People expecting the fastest possible agent loop with minimal review and testing overhead
+- People who want the working project tree to stay ephemeral or private-by-default during debugger and distillation runs
 
 ## Current status
 
@@ -29,8 +38,15 @@ The repository includes `SimpleC/` as a bundled example target and working proje
 - `hen` is experimental and stateful. It persists debugger trajectories, generated source, intermediate working state, and other run artifacts between steps and across resumed runs.
 - `hen` writes logs and debug artifacts to disk under the project tree during normal operation. This includes generated build state and directories such as `build/`, `SimpleC/debug/`, `SimpleC/logs/`, `SimpleC/dag/`, and related runtime outputs.
 - During debugger and distillation runs, `hen` persists request/response logs and chat transcripts under the project tree to support debugger resume, trajectory inspection, and dataset distillation. Do not treat the working project directory as ephemeral or private-by-default.
+- `hen` is currently tuned more for dense debugging signal and synthetic-data generation than for the shortest possible agent loop. It intentionally performs extensive testing, keeps extra review passes such as git-history-aware review around some `fix_function` flows, and usually schedules another test run after each `fix_function` so the trajectory stays grounded in fresh runtime evidence.
+- This is not the final efficiency envelope. Future optimization opportunities include bundling multiple information requests into one step, allowing coordinated fixes across multiple functions when safe, and adding a leaner fast-agent mode with fewer review passes when data generation is not the priority.
 
-**Installing hen (tested only on macOS!!!)**
+## Further reading
+
+- [Architecture overview](docs/architecture-overview.md)
+- [Future debugger notes](docs/future-debugger-notes.md)
+
+**Installation**
 ===============
 
 To get started with hen, follow these steps:
@@ -76,7 +92,9 @@ cd /full/path/to/hen/build/Debug
 -key groq=YOUR_GROQ_KEY
 ```
 
-6. **When the hen prompt appear**
+For other available providers and model IDs, check [Environment/LLRegistry.json](Environment/LLRegistry.json) and [src/LLMConfig.h](src/LLMConfig.h). The registry is the source of truth for provider/model pairs and the metadata `hen` uses for role suitability, context size, reasoning settings, rate limits, and token pricing.
+
+6. **When the `hen` prompt appears**
 
 To start the project
 ```bash
@@ -95,9 +113,10 @@ To run autonomously to the full project generation/compilation/debugging
 
 Bare text entered at the prompt is treated as chat input to the active project session.
 
-At the end of the run two artifacts will be recorded:
-All-in single file - your_project_name.hen.cpp (with embedded test)
-CMake project - you should be able to generate all type of project VS, VS Code, Xcode, ...
+At the end of the run two main artifacts are produced:
+
+- an all-in-one source file: `your_project_name.hen.cpp` (with embedded tests)
+- a generated CMake project, which you can then open or generate for environments such as Xcode, VS Code, or Visual Studio
 
 When the project has been fully debugged and the trajectory logs are preserved, you can synthesize training data from those successful debug runs by enabling synthetic-data generation on `start`:
 
