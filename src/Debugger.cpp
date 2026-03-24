@@ -2,6 +2,8 @@
 #include <atomic>
 #include <future>
 #include <mutex>
+#include <cctype>
+#include <string_view>
 
 #include "Debugger.h"
 #include "Utils.h"
@@ -8988,8 +8990,10 @@ bool Debugger::compileFunction(CCodeProject* project, const std::string& functio
         return false;
     }
     
+    bool forceInstrumentedRebuild = m_instrumentedDirtyFunctions.find(functionName) != m_instrumentedDirtyFunctions.end();
+
     //Enforce compilation for the tested/debugged/fixed function
-    if(m_nextStep.action_subject != functionName && node->objectIsValid())
+    if(!forceInstrumentedRebuild && m_nextStep.action_subject != functionName && node->objectIsValid())
     {
         node->restoreCachedObject();
         return true;
@@ -9141,6 +9145,79 @@ private:
     std::vector<Edit> edits_;
 };
 
+namespace {
+
+std::string_view trimView(std::string_view sv)
+{
+    while (!sv.empty() && std::isspace(static_cast<unsigned char>(sv.front()))) {
+        sv.remove_prefix(1);
+    }
+    while (!sv.empty() && std::isspace(static_cast<unsigned char>(sv.back()))) {
+        sv.remove_suffix(1);
+    }
+    return sv;
+}
+
+std::size_t getInstrumentationPreambleEnd(const std::string& source)
+{
+    std::size_t offset = 0;
+    std::size_t insertOffset = 0;
+    bool inBlockComment = false;
+
+    while (offset < source.size()) {
+        std::size_t lineEnd = source.find('\n', offset);
+        if (lineEnd == std::string::npos) {
+            lineEnd = source.size();
+        }
+
+        std::size_t nextOffset = (lineEnd < source.size()) ? lineEnd + 1 : lineEnd;
+        std::string_view line(source.data() + offset, lineEnd - offset);
+        std::string_view trimmed = trimView(line);
+
+        if (inBlockComment) {
+            insertOffset = nextOffset;
+            if (trimmed.find("*/") != std::string_view::npos) {
+                inBlockComment = false;
+            }
+            offset = nextOffset;
+            continue;
+        }
+
+        if (trimmed.empty()) {
+            if (insertOffset != 0) {
+                insertOffset = nextOffset;
+            }
+            offset = nextOffset;
+            continue;
+        }
+
+        if (trimmed.rfind("//", 0) == 0) {
+            insertOffset = nextOffset;
+            offset = nextOffset;
+            continue;
+        }
+
+        if (trimmed.rfind("/*", 0) == 0) {
+            insertOffset = nextOffset;
+            inBlockComment = (trimmed.find("*/") == std::string_view::npos);
+            offset = nextOffset;
+            continue;
+        }
+
+        if (!trimmed.empty() && trimmed.front() == '#') {
+            insertOffset = nextOffset;
+            offset = nextOffset;
+            continue;
+        }
+
+        break;
+    }
+
+    return insertOffset;
+}
+
+}
+
 std::string Debugger::assembleBreakpointCode(CCodeProject* project, const std::string& functionName, std::shared_ptr<Breakpoint> bp) const
 {
     std::string bpCondition = bp->getInstrumentedConditionCode();
@@ -9271,6 +9348,27 @@ bool Debugger::instrumentFunction(CCodeProject* project, const std::string& func
     }
     
     source = instrumentation.flush();
+
+    std::string traceCode = generateTraceCode(project, functionName, traceOptions, customBreakpoints);
+    if(!traceCode.empty())
+    {
+        std::size_t insertOffset = getInstrumentationPreambleEnd(source);
+        insertOffset = std::min(insertOffset, source.size());
+        
+        std::string traceBlock;
+        if(insertOffset != 0 && source[insertOffset - 1] != '\n')
+        {
+            traceBlock += "\n";
+        }
+        traceBlock += traceCode;
+        if(traceBlock.back() != '\n')
+        {
+            traceBlock += "\n";
+        }
+        traceBlock += "\n";
+        
+        source.insert(insertOffset, traceBlock);
+    }
     
     std::string instrumentedPath = getInstrumentedPath(project, info->m_sourceFilePath);
     
@@ -9292,13 +9390,31 @@ bool Debugger::instrumentFunction(CCodeProject* project, const std::string& func
 void Debugger::instrumentSource(CCodeProject* project, const std::string& debugFunctionName, const std::vector<std::shared_ptr<Breakpoint>>& customBreakpoints)
 {
     std::string prevDebuggedFunction = m_functionBeingDebugged;
+    std::string prevInstrumentedSystem = m_instrumentedSystem;
     m_functionBeingDebugged = debugFunctionName;
+    m_instrumentedSystem = m_system;
+    m_instrumentedDirtyFunctions.clear();
+    if(!prevDebuggedFunction.empty())
+    {
+        m_instrumentedDirtyFunctions.insert(prevDebuggedFunction);
+    }
+    if(!debugFunctionName.empty())
+    {
+        m_instrumentedDirtyFunctions.insert(debugFunctionName);
+    }
+    if(!prevInstrumentedSystem.empty())
+    {
+        m_instrumentedDirtyFunctions.insert(prevInstrumentedSystem);
+    }
+    if(!m_system.empty())
+    {
+        m_instrumentedDirtyFunctions.insert(m_system);
+    }
     
     //TODO: Describe the high level plan here!
     startCodeInstrumentation(project, prevDebuggedFunction);
     
     project->generateDataPrinters();
-    generateTraceSources(project, debugFunctionName, customBreakpoints);
     //backupSource(project);
     
     for(auto node : project->nodeMap())

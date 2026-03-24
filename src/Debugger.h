@@ -233,6 +233,8 @@ namespace hen {
         std::map<std::string, size_t> m_functionHashes;
         std::map<std::string, size_t> m_prevFunctionHashes;
         std::string                   m_functionBeingDebugged;
+        std::string                   m_instrumentedSystem;
+        std::set<std::string>         m_instrumentedDirtyFunctions;
         
         LogAnalyzer             m_logger;
         TraceAnalyzer           m_tracer;

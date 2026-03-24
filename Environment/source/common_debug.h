@@ -452,14 +452,15 @@ public:
         return gInstance;
     }
 
-    // Replace your current writeLog method with this version
-    template<typename... Args>
-    void writeLog(const char* func, int line, const char* fmt, Args&&... args)
+    #if defined(__clang__) || defined(__GNUC__)
+    __attribute__((format(printf, 4, 5)))
+    #endif
+    void writeLog(const char* func, int line, const char* fmt, ...)
     {
-        // format first (no lock)
-        PUSH_FMT_SECURE();
-        std::string user = formatString(fmt, std::forward<Args>(args)...);
-        POP_FMT_SECURE();
+        va_list ap;
+        va_start(ap, fmt);
+        std::string user = formatStringV(fmt, ap);
+        va_end(ap);
 
         std::string msg;
         msg.reserve(MAX_SINGLE_MESSAGE + 128);
@@ -472,25 +473,14 @@ public:
 
         black_box_api::stdout_append(msg);
     }
-    
-    inline std::string formatString(const char* format) {
-        thread_local std::vector<char> buf(256);
-        for (;;) {
-            int n = std::snprintf(buf.data(), buf.size(), "%s", format); // treat as data
-            if (n < 0) return "FORMAT_ERROR";
-            if (size_t(n) < buf.size()) return std::string(buf.data(), size_t(n));
-            buf.resize(size_t(n) + 1);
-        }
-    }
 
-    template<typename... Args>
-    #if defined(__clang__) || defined(__GNUC__)
-    __attribute__((format(printf, 2, 3)))
-    #endif
-    std::string formatString(const char* format, Args&&... args) {
+    std::string formatStringV(const char* format, va_list ap) {
         thread_local std::vector<char> buf(256);
         for (;;) {
-            int n = std::snprintf(buf.data(), buf.size(), format, std::forward<Args>(args)...);
+            va_list ap_copy;
+            va_copy(ap_copy, ap);
+            int n = std::vsnprintf(buf.data(), buf.size(), format, ap_copy);
+            va_end(ap_copy);
             if (n < 0) return "FORMAT_ERROR";
             if (size_t(n) < buf.size()) return std::string(buf.data(), size_t(n));
             buf.resize(size_t(n) + 1);
@@ -1199,4 +1189,3 @@ static void hitBP(std::string atFunction,
 } // namespace trace
 
 #include "data_printers.h"
-#include "trace_printers.h"

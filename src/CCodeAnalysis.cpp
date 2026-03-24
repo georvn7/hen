@@ -1333,6 +1333,10 @@ public:
             }
             
             CXCursorKind parentKind = clang_getCursorKind(parent);
+            const bool isDataTypeMemberDecl =
+                parentKind == CXCursor_StructDecl ||
+                parentKind == CXCursor_ClassDecl ||
+                parentKind == CXCursor_ClassTemplate;
             
             const enum CX_StorageClass sc = clang_Cursor_getStorageClass(c);
             const bool isTopLevel = (parentKind == CXCursor_TranslationUnit || parentKind == CXCursor_Namespace);
@@ -1344,7 +1348,11 @@ public:
                 hasAncestor(c, CXCursor_Constructor) ||
                 hasAncestor(c, CXCursor_Destructor);
             
-            if (sc == CX_SC_Static && isInFunction && !isTopLevel)
+            if (m_type == CCodeNode::DATA_DEF && isDataTypeMemberDecl && sc == CX_SC_Static)
+            {
+                m_globalVariables.insert(stdCursorSource.empty() ? stdCursorName : stdCursorSource);
+            }
+            else if (sc == CX_SC_Static && isInFunction && !isTopLevel)
             {
                 m_globalVariables.insert(stdCursorName);
             }
