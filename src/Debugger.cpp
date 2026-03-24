@@ -35,7 +35,6 @@
 //In seconds
 #define MIN_LLDB_TIMEOUT 90
 #define RUN_TEST_LLDB_TIMEOUT 10
-
 //This MUST be above the  HIGH_WATER_MARK (currently 25 MB) of PRINT_TEST in Environment/Prompts/CommonSource.h
 #define MAX_LLDB_STDOUT_SIZE (30*1024*1024)
 
@@ -331,7 +330,7 @@ std::pair<std::string, std::string> Debugger::runLLDB(CCodeProject* project, std
     //args.push_back("-o"); args.push_back("settings set target.output-path /dev/null");
     args.push_back("-o"); args.push_back(consoleLogCmd);
     args.push_back("-o"); args.push_back("settings set target.error-path /dev/null");
-    
+
     std::string asanSettings = "settings set -- target.env-vars ASAN_OPTIONS=abort_on_error=1:halt_on_error=1:";
     asanSettings += "detect_stack_use_after_return=1:alloc_dealloc_mismatch=1:strict_string_checks=1 ";
     asanSettings += "UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1";
@@ -452,15 +451,12 @@ std::pair<std::string, std::string> Debugger::runLLDB(CCodeProject* project, std
     
     try
     {
-        // Create pipes for capturing output
+        // Capture both LLDB stdout and stderr through one parent-readable pipe.
+        // Boost.Process documents this as readable_pipe + connected writable_pipe,
+        // with the same writable end assigned to child stdout and stderr.
         asio::readable_pipe stdout_pipe(*ctx);
-        
-        auto set_nonblocking = [](auto& pipe){
-            int fd = pipe.native_handle();
-            int flags = ::fcntl(fd, F_GETFL, 0);
-            if (flags != -1)
-                ::fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-        };
+        asio::writable_pipe stderr_stdout_pipe(*ctx);
+        asio::connect_pipe(stdout_pipe, stderr_stdout_pipe);
         
         // Launch LLDB with the arguments using v2 API
         auto lldbChild = std::make_shared<bp::process>(
@@ -469,11 +465,12 @@ std::pair<std::string, std::string> Debugger::runLLDB(CCodeProject* project, std
             args,
             bp::process_stdio{
                 nullptr,
-                stdout_pipe,
-                stdout_pipe
+                stderr_stdout_pipe,
+                stderr_stdout_pipe
             },
             bp::process_start_dir(workingDir)
         );
+        stderr_stdout_pipe.close();
         
         // Retrieve the LLDB process ID
         lldbPID = lldbChild->id();
