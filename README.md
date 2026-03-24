@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/hen.png" alt="Cute hen" width="220">
+</p>
+
 YouTube video: https://youtu.be/u4Sl35QuvAo
 
 # hen
