@@ -5274,10 +5274,19 @@ namespace hen {
         CCodeProject* proj = (CCodeProject*)Client::getInstance().project();
         
         std::string cache = "";
+        std::string preservedTestName = trim(m_unitTest.definition.name);
+        auto restoreTestName = [&]() {
+            if(trim(m_unitTest.definition.name).empty() && !preservedTestName.empty())
+            {
+                m_unitTest.definition.name = preservedTestName;
+            }
+            preservedTestName = trim(m_unitTest.definition.name);
+        };
         
         captureContext();
         inference(cache, message, &m_unitTest.definition);
         popContext();
+        restoreTestName();
         
         bool wasOnAuto = Client::getInstance().run();
         
@@ -5316,6 +5325,7 @@ namespace hen {
             {
                 feedback = "\nDo your best effort to fix all this and revise the response!";
                 inference(cache, feedback, &m_unitTest.definition);
+                restoreTestName();
             }
             
             popContext();
@@ -5410,6 +5420,7 @@ namespace hen {
             {"test_name", unitTestName}
         });
         
+        m_unitTest.definition.name = unitTestName;
         inferenceUnitTestDef(defineTest);
         
         popContext();
@@ -5550,7 +5561,17 @@ namespace hen {
         }
         
         if(unitTestExists())
-            return;
+        {
+            TestDef existingTestDef;
+            const std::string testJsonPath = testDir + "/test.json";
+            if(existingTestDef.load(testJsonPath) && !trim(existingTestDef.name).empty())
+            {
+                return;
+            }
+            
+            std::cout << "Regenerating unit test with missing or invalid name: " << testJsonPath << std::endl;
+            deleteUnitTest();
+        }
         
         proj->generateDataHeader();
 
@@ -6532,6 +6553,31 @@ namespace hen {
         std::string cache;
         inference(cache, refactorMessage, &newFunction);
         
+        auto isValidRefactorFunction = [](const FunctionItem& func) {
+            return validateFunctionName(func.func_name) && !func.brief.empty();
+        };
+        
+        auto abortRefactor = [&]() {
+            std::cout << "Invalid truncated-source refactor response for function '"
+                      << m_brief.func_name << "'. Proposed function name: '"
+                      << newFunction.func_name << "'" << std::endl;
+            popContext();
+            client.setLLM(savedLLM);
+            return std::string();
+        };
+        
+        if(!isValidRefactorFunction(newFunction))
+        {
+            inference(cache,
+                      "The previous response is invalid. You must provide a non-empty valid function name and a non-empty brief description for the new function. Revise the answer without asking further questions.",
+                      &newFunction);
+        }
+        
+        if(!isValidRefactorFunction(newFunction))
+        {
+            return abortRefactor();
+        }
+        
         bool wasOnAuto = Client::getInstance().run();
         std::string reviewRefactorBrief = proj->review_refactor_brief.prompt({
             {"function", newFunction.func_name},
@@ -6547,6 +6593,12 @@ namespace hen {
             inference(cache, "Do your best to fix all this and revise the answer without asking further questions!", &newFunction);
         }
         
+        if(!isValidRefactorFunction(newFunction))
+        {
+            if(!wasOnAuto) Client::getInstance().stop();
+            return abortRefactor();
+        }
+        
         //Very unlikely since we provided list with existing functions
         auto it = proj->nodeMap().find(newFunction.func_name);
         if(it != proj->nodeMap().end())
@@ -6556,6 +6608,11 @@ namespace hen {
             //Or to adjust the name and description of the current function
             auto existingFuncNode = (const CCodeNode*)it->second;
             resolveName(existingFuncNode, newFunction);
+        }
+        
+        if(!isValidRefactorFunction(newFunction))
+        {
+            return abortRefactor();
         }
         
         //This is not expected but let's check
@@ -7162,7 +7219,9 @@ namespace hen {
             { "test_name", m_unitTest.definition.name }
         });
         
+        const std::string preservedTestName = m_unitTest.definition.name;
         deleteUnitTest(); //Ensure we first delete the old one
+        m_unitTest.definition.name = preservedTestName;
         
         captureContext();
         inferenceUnitTestDef(improve.str());

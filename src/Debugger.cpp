@@ -6998,6 +6998,13 @@ void Debugger::reviewGiHistoryForFix(CCodeProject* project)
 
 bool Debugger::saveTestToDirectory(CCodeProject* project, const std::string& testJsonDir, const std::string& testDirectory, TestDef& test)
 {
+    if(trim(test.name).empty())
+    {
+        std::cout << "ERROR: refusing to save debug test with empty name from: "
+                  << testJsonDir << "/test.json" << std::endl;
+        return false;
+    }
+
     if(boost_fs::exists(testDirectory))
     {
         boost_fs::remove_all(testDirectory);
@@ -7058,6 +7065,13 @@ bool Debugger::deployToWorkingDirectory(CCodeProject* project, const std::string
     
     if(!test.load(testJsonDir + "/test.json"))
     {
+        return false;
+    }
+
+    if(trim(test.name).empty())
+    {
+        std::cout << "ERROR: refusing to debug test with empty name from: "
+                  << testJsonDir << "/test.json" << std::endl;
         return false;
     }
     
