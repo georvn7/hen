@@ -109,11 +109,18 @@ namespace hen {
     //Client endpoint does serial send/receive only
     class ClientEP : public EndPoint
     {
+        unsigned short m_localPort;
+        std::string m_serverAddress;
         std::shared_ptr<RemoteEP> m_session;
+        std::mutex m_sessionMutex;
+
+        std::shared_ptr<RemoteEP> connectSession();
     public:
         ClientEP(unsigned short port, const std::string serverIP);
-        
-        std::shared_ptr<RemoteEP>& session() { return m_session; }
+
+        std::shared_ptr<RemoteEP> session();
+        void reconnect();
+        void disconnected(std::shared_ptr<RemoteEP> session) override;
     };
 
     std::pair<std::string, std::string> getHostAndPort(const std::string& address);

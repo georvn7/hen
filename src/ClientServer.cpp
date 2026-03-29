@@ -222,45 +222,90 @@ std::pair<std::string, std::string> getHostAndPort(const std::string& address)
     return std::make_pair(host, port);
 }
 
-ClientEP::ClientEP(unsigned short localPort, const std::string serverAddress):
-EndPoint(localPort)
+std::shared_ptr<RemoteEP> ClientEP::connectSession()
 {
-    std::cout << "Client starting on local port " << localPort << std::endl;
-    std::cout << "Attempting to connect to " << serverAddress << std::endl;
-    
+    std::cout << "Client starting on local port " << m_localPort << std::endl;
+    std::cout << "Attempting to connect to " << m_serverAddress << std::endl;
+
     tcp::socket socket(*getAsioContext());
-    socket.open(tcp::v4());  // Explicitly open socket
-    
+    socket.open(tcp::v4());
+
     socket.set_option(boost::asio::socket_base::linger(true, 300));
     socket.set_option(boost::asio::socket_base::keep_alive(true));
-    
+    socket.set_option(tcp::acceptor::reuse_address(true));
+
     boost::system::error_code ec;
     socket.bind(m_endpoint, ec);
-    
+
     if (ec) {
         std::cout << "Bind failed with error: " << ec.message() << std::endl;
         throw std::runtime_error("Socket bind failed: " + ec.message());
     }
 
-    // Now create session with the bound socket
-    m_session = std::make_shared<RemoteEP>(std::move(socket), *this);
-    
-    auto hostInfo = getHostAndPort(serverAddress);
-    
+    auto session = std::make_shared<RemoteEP>(std::move(socket), *this);
+
+    auto hostInfo = getHostAndPort(m_serverAddress);
+
     std::cout << "Resolving " << hostInfo.first << ":" << hostInfo.second << std::endl;
-    
+
     tcp::resolver resolver(*getAsioContext());
     auto endpoints = resolver.resolve(hostInfo.first, hostInfo.second);
-    
+
     std::cout << "Connecting..." << std::endl;
-    boost::asio::connect(m_session->socket(), endpoints, ec);
+    boost::asio::connect(session->socket(), endpoints, ec);
 
     if (ec) {
         std::cout << "Connect failed with error: " << ec.message() << std::endl;
         throw std::runtime_error("Connect failed: " + ec.message());
     }
-    
+
     std::cout << "Connected successfully" << std::endl;
+    return session;
+}
+
+ClientEP::ClientEP(unsigned short localPort, const std::string serverAddress):
+EndPoint(localPort),
+m_localPort(localPort),
+m_serverAddress(serverAddress)
+{
+    reconnect();
+}
+
+std::shared_ptr<RemoteEP> ClientEP::session()
+{
+    std::lock_guard<std::mutex> lock(m_sessionMutex);
+    return m_session;
+}
+
+void ClientEP::reconnect()
+{
+    std::shared_ptr<RemoteEP> oldSession;
+    {
+        std::lock_guard<std::mutex> lock(m_sessionMutex);
+        oldSession = m_session;
+        m_session.reset();
+    }
+
+    if(oldSession)
+    {
+        boost::system::error_code ec;
+        oldSession->socket().cancel(ec);
+        oldSession->socket().shutdown(tcp::socket::shutdown_both, ec);
+        oldSession->socket().close(ec);
+    }
+
+    auto newSession = connectSession();
+    std::lock_guard<std::mutex> lock(m_sessionMutex);
+    m_session = std::move(newSession);
+}
+
+void ClientEP::disconnected(std::shared_ptr<RemoteEP> session)
+{
+    std::lock_guard<std::mutex> lock(m_sessionMutex);
+    if(m_session == session)
+    {
+        m_session.reset();
+    }
 }
 
 RemoteEP::RemoteEP(tcp::socket socket, EndPoint& localEP):

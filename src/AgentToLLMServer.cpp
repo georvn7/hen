@@ -42,12 +42,31 @@ std::string framePreview(const Message& msg, std::size_t maxBytes = 16)
 void Client::sendToServer(const json::value& requestBody, json::value& responseBody)
 {
     auto requestStr = utility::conversions::to_utf8string(requestBody.serialize());
-    
-    m_llmClientEP->session()->send((void*)requestStr.c_str(), (uint32_t)requestStr.size()+1);
-    
-    auto msg = m_llmClientEP->session()->receive();
-    if(msg)
+
+    try
     {
+        auto session = m_llmClientEP->session();
+        if(!session || !session->isConnected())
+        {
+            m_llmClientEP->reconnect();
+            session = m_llmClientEP->session();
+        }
+
+        if(!session)
+        {
+            std::cerr << "Client::sendToServer has no connected local LLM session" << std::endl;
+            return;
+        }
+
+        session->send((void*)requestStr.c_str(), (uint32_t)requestStr.size()+1);
+
+        auto msg = session->receive();
+        if(!msg)
+        {
+            m_llmClientEP->reconnect();
+            return;
+        }
+
         try
         {
             responseBody = msg->json();
@@ -68,6 +87,19 @@ void Client::sendToServer(const json::value& requestBody, json::value& responseB
             {
                 responseBody[U("request_id")] = requestBody.at(U("request_id"));
             }
+        }
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << "Client::sendToServer transport error: " << e.what() << std::endl;
+        try
+        {
+            m_llmClientEP->reconnect();
+        }
+        catch(const std::exception& reconnectError)
+        {
+            std::cerr << "Client::sendToServer reconnect failed: "
+                      << reconnectError.what() << std::endl;
         }
     }
 }

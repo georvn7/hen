@@ -19,8 +19,12 @@ void Client::connectToServer()
     m_clientEP = std::make_unique<ClientEP>(0, m_serverIP);
     if(m_clientEP)
     {
-        m_clientEP->session()->send((void*)m_projectId.c_str(), (uint32_t)m_projectId.length()+1);
-        std::cout << "Sending projectId to the server: " << m_project << std::endl;
+        auto session = m_clientEP->session();
+        if(session)
+        {
+            session->send((void*)m_projectId.c_str(), (uint32_t)m_projectId.length()+1);
+            std::cout << "Sending projectId to the server: " << m_project << std::endl;
+        }
     }
 }
 

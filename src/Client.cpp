@@ -26,6 +26,7 @@ using namespace utility; // For conversions
 namespace hen {
 
 std::atomic<bool> stop_requested(false);
+static std::atomic<uint32_t> g_transportRequestId(1);
 
 struct NullBuf : std::streambuf { int overflow(int c) override { return c; } };
 
@@ -82,6 +83,18 @@ static bool getServingError(const json::value& response, std::string& code, std:
         message = utility::conversions::to_utf8string(error.at(U("message")).as_string());
     }
     return true;
+}
+
+static uint32_t nextTransportRequestId()
+{
+    while(true)
+    {
+        uint32_t id = g_transportRequestId.fetch_add(1, std::memory_order_relaxed);
+        if(id != 0xffffffffu)
+        {
+            return id;
+        }
+    }
 }
 
 static uint32_t transientServingRetryDelayMs(const std::string& code, bool missingResponse, uint32_t attempt)
@@ -897,9 +910,8 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
     bool finished = false;
     for(uint32_t i=0; i<10; ++i)
     {
-        //This will be deleted on the proxy, before sending it to the LLMs,
-        //we need to set it every iteration
-        request[U("request_id")] = json::value::number(m_requestId);
+        const uint32_t transportRequestId = nextTransportRequestId();
+        request[U("request_id")] = json::value::number(transportRequestId);
         response = json::value();
         
         Client::sendToServer(request, response);
@@ -924,6 +936,14 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
             {
                 std::cout << "Transient serving timeout/no response. Waiting " << retryDelayMs;
                 std::cout << " ms before retry." << std::endl;
+                try
+                {
+                    m_llmClientEP->reconnect();
+                }
+                catch(const std::exception& reconnectError)
+                {
+                    std::cout << "Local LLM reconnect failed: " << reconnectError.what() << std::endl;
+                }
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(retryDelayMs));
             continue;
@@ -979,9 +999,18 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
         }
         
         uint32_t requestId = (uint32_t)response[U("request_id")].as_integer();
-        if (requestId != m_requestId)
+        if (requestId != transportRequestId)
         {
-            std::cout << "Skipping response with invalid request_id: " << requestId << std::endl;
+            std::cout << "Skipping response with invalid request_id: " << requestId
+                      << " expected: " << transportRequestId << std::endl;
+            try
+            {
+                m_llmClientEP->reconnect();
+            }
+            catch(const std::exception& reconnectError)
+            {
+                std::cout << "Local LLM reconnect failed: " << reconnectError.what() << std::endl;
+            }
             continue;
         }
 
@@ -1241,12 +1270,18 @@ std::string Client::getUserInput()
     }
     else
     {
-        while(!m_clientEP || !m_clientEP->session() || !m_clientEP->session()->isConnected())
+        std::shared_ptr<RemoteEP> session;
+        while(!m_clientEP || !(session = m_clientEP->session()) || !session->isConnected())
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
         
-        std::string command = m_clientEP->session()->receive()->c_str();
+        auto msg = session->receive();
+        if(!msg)
+        {
+            return "";
+        }
+        std::string command = msg->c_str();
         std::cout << "Server command: " << command << std::endl;
         
         if(!command.empty())
@@ -1579,9 +1614,13 @@ void Client::setStepCost(uint32_t inputTokens,
 
 void Client::agentToServer(const std::string& message)
 {
-    if(!m_localUser && m_clientEP && m_clientEP->session() && m_clientEP->session()->isConnected())
+    if(!m_localUser && m_clientEP)
     {
-        m_clientEP->session()->send((void*)message.c_str(), (uint32_t)message.size()+1);
+        auto session = m_clientEP->session();
+        if(session && session->isConnected())
+        {
+            session->send((void*)message.c_str(), (uint32_t)message.size()+1);
+        }
     }
 }
 
