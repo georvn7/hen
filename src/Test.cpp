@@ -3,6 +3,73 @@
 
 namespace hen {
 
+namespace {
+
+std::string commandExecutableName(const std::string& commandLine)
+{
+    const auto args = hen::parseCommandLine(commandLine);
+    if(args.empty())
+    {
+        return std::string();
+    }
+
+    return boost_fs::path(args[0]).filename().string();
+}
+
+std::set<std::string> allowedDebugExecutables(const TestDef& test)
+{
+    std::set<std::string> allowed;
+    allowed.insert("main");
+
+    auto addOutputs = [&](const auto& stepLike) {
+        for(const auto& file : stepLike.output_files)
+        {
+            if(file && !file->empty())
+            {
+                allowed.insert(boost_fs::path(*file).filename().string());
+            }
+        }
+    };
+
+    addOutputs(test.pretest);
+    addOutputs(test.test);
+    addOutputs(test.posttest);
+    return allowed;
+}
+
+std::string validateDebugCommandUsage(const TestDef& test,
+                                      const std::string& stepName,
+                                      const std::string& rawCmd,
+                                      const std::string& cmdOnly,
+                                      bool debug)
+{
+    if(!debug)
+    {
+        return std::string();
+    }
+
+    const std::string executable = commandExecutableName(cmdOnly);
+    if(executable.empty())
+    {
+        return "Command in the '" + stepName + "' step has empty command line: " + rawCmd + "\n";
+    }
+
+    const auto allowed = allowedDebugExecutables(test);
+    if(allowed.find(executable) != allowed.end())
+    {
+        return std::string();
+    }
+
+    std::string feedback = "Command in the '" + stepName + "' step uses the 'debug' attribute on executable '";
+    feedback += executable + "', which is not allowed. ";
+    feedback += "The '[[debug]]' attribute may only be used for the main test executable 'main' ";
+    feedback += "or for executables explicitly declared as output_files of the test steps. ";
+    feedback += "Do not use '[[debug]]' on toolchain or shell commands such as compilers, linkers, or helpers.\n";
+    return feedback;
+}
+
+}
+
 
 DEFINE_TYPE(TestStep)
 DEFINE_ARRAY_FIELD(TestStep, commands)
@@ -340,6 +407,8 @@ std::string TestDef::validate(bool isPrivate)
             feedback += "Command in the 'pretest' step has empty command line: " + rawCmd + "\n";
             emptyCommands = true;
         }
+
+        feedback += validateDebugCommandUsage(*this, "pretest", rawCmd, cmdOnly, debug);
         
         //TODO: Signal here if pretest commands check the result
         if(finalResult)
@@ -370,6 +439,8 @@ std::string TestDef::validate(bool isPrivate)
             feedback += "Command in the 'posttest' step has empty command line: " + rawCmd + "\n";
             emptyCommands = true;
         }
+
+        feedback += validateDebugCommandUsage(*this, "posttest", rawCmd, cmdOnly, debug);
         
         postIndex++;
         
@@ -409,6 +480,8 @@ std::string TestDef::validate(bool isPrivate)
         {
             feedback += "For test.command the name of the executable must be 'main'.\n";
         }
+
+        feedback += validateDebugCommandUsage(*this, "test", rawCmd, cmd, debug);
         
         if(stdoutRegex.empty() && expectedResult.empty() && posttest.commands.empty())
         {
