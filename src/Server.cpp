@@ -1370,6 +1370,8 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
     {
         utility::string_t reasoningEffort;
         bool enableReasoning = false;
+        bool forceManualThinking = false;
+        uint32_t manualThinkingBudgetTokens = 0;
         if(requestFromClientBody.has_field(U("reasoning_effort")) &&
            requestFromClientBody[U("reasoning_effort")].is_string())
         {
@@ -1381,6 +1383,22 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
         {
             reasoningEffort = utility::conversions::to_string_t(llm->reasoning_effort);
             enableReasoning = true;
+        }
+
+        if(requestFromClientBody.has_field(U("anthropic_thinking_mode")) &&
+           requestFromClientBody[U("anthropic_thinking_mode")].is_string())
+        {
+            forceManualThinking =
+                requestFromClientBody[U("anthropic_thinking_mode")].as_string() == U("manual");
+            requestFromClientBody.erase(U("anthropic_thinking_mode"));
+        }
+
+        if(requestFromClientBody.has_field(U("anthropic_thinking_budget_tokens")) &&
+           requestFromClientBody[U("anthropic_thinking_budget_tokens")].is_number())
+        {
+            manualThinkingBudgetTokens =
+                static_cast<uint32_t>(requestFromClientBody[U("anthropic_thinking_budget_tokens")].as_number().to_uint64());
+            requestFromClientBody.erase(U("anthropic_thinking_budget_tokens"));
         }
 
         uint32_t maxTokens = enableReasoning ? 6000 : 4096;
@@ -1397,16 +1415,29 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
         {
             auto thinking = json::value::object();
             
-            if(startsWith(llm->model, "claude-sonnet-4-6"))
+            if(startsWith(llm->model, "claude-sonnet-4-6") ||
+               startsWith(llm->model, "claude-opus-4-6"))
             {
                 if(!hasRequestMaxTokens)
                 {
                     maxTokens = 8192;
                 }
                 
-                thinking[U("type")] = json::value::string(U("adaptive"));
-                requestFromClientBody[U("output_config")][U("effort")] =
-                    json::value::string(reasoningEffort);
+                if(forceManualThinking)
+                {
+                    thinking[U("type")] = json::value::string(U("enabled"));
+                    if(manualThinkingBudgetTokens > 0 &&
+                       manualThinkingBudgetTokens < maxTokens)
+                    {
+                        thinking[U("budget_tokens")] = json::value::number(manualThinkingBudgetTokens);
+                    }
+                }
+                else
+                {
+                    thinking[U("type")] = json::value::string(U("adaptive"));
+                    requestFromClientBody[U("output_config")][U("effort")] =
+                        json::value::string(reasoningEffort);
+                }
             }
             else
             {

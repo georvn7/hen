@@ -190,6 +190,121 @@ static uint32_t anthropicThinkingFallbackMaxTokens(const json::value& request)
     return 6000;
 }
 
+static uint32_t anthropicManualThinkingFallbackBudgetTokens(const json::value& request)
+{
+    if(!request.is_object() ||
+       !request.has_field(U("llm")) ||
+       !request.at(U("llm")).is_string())
+    {
+        return 3000;
+    }
+
+    const std::string llmCfgStr = utility::conversions::to_utf8string(request.at(U("llm")).as_string());
+    const auto llmCfg = splitByFirstOccurence(llmCfgStr, '/');
+    std::shared_ptr<LLMConfig> llm = Client::getInstance().findLLM(llmCfg.first, llmCfg.second);
+    if(!llm)
+    {
+        return 3000;
+    }
+
+    if(startsWith(llm->model, "claude-sonnet-4-6") ||
+       startsWith(llm->model, "claude-opus-4-6"))
+    {
+        return 4096;
+    }
+
+    return 3000;
+}
+
+static uint32_t usageUIntField(const json::value& usage, const utility::string_t& field)
+{
+    if(!usage.is_object() ||
+       !usage.has_field(field) ||
+       !usage.at(field).is_number())
+    {
+        return 0;
+    }
+
+    return static_cast<uint32_t>(usage.at(field).as_number().to_uint64());
+}
+
+static double usageDoubleField(const json::value& usage, const utility::string_t& field)
+{
+    if(!usage.is_object() ||
+       !usage.has_field(field) ||
+       !usage.at(field).is_number())
+    {
+        return 0.0;
+    }
+
+    return usage.at(field).as_number().to_double();
+}
+
+static void accumulateUsageObject(json::value& targetUsage, const json::value& attemptUsage)
+{
+    if(!attemptUsage.is_object())
+    {
+        return;
+    }
+
+    if(!targetUsage.is_object())
+    {
+        targetUsage = json::value::object();
+    }
+
+    const utility::string_t summedTokenFields[] = {
+        U("input_tokens"),
+        U("cache_write_tokens"),
+        U("cache_read_tokens"),
+        U("output_tokens"),
+        U("prompt_tokens"),
+        U("completion_tokens"),
+        U("total_tokens")
+    };
+
+    for(const auto& field : summedTokenFields)
+    {
+        const uint32_t mergedValue =
+            usageUIntField(targetUsage, field) +
+            usageUIntField(attemptUsage, field);
+        targetUsage[field] = json::value::number(mergedValue);
+    }
+
+    const double mergedStepCredits =
+        usageDoubleField(targetUsage, U("step_credits")) +
+        usageDoubleField(attemptUsage, U("step_credits"));
+    targetUsage[U("step_credits")] = json::value::number(mergedStepCredits);
+
+    const double mergedConsumedCredits =
+        std::max(usageDoubleField(targetUsage, U("consumed_credits")),
+                 usageDoubleField(attemptUsage, U("consumed_credits")));
+    targetUsage[U("consumed_credits")] = json::value::number(mergedConsumedCredits);
+
+    const uint32_t mergedLimitCredits =
+        std::max(usageUIntField(targetUsage, U("limit_credits")),
+                 usageUIntField(attemptUsage, U("limit_credits")));
+    targetUsage[U("limit_credits")] = json::value::number(mergedLimitCredits);
+}
+
+static void mergeAccumulatedUsageIntoResponse(json::value& response, const json::value& accumulatedUsage)
+{
+    if(!accumulatedUsage.is_object())
+    {
+        return;
+    }
+
+    json::value mergedUsage = json::value::object();
+    if(response.is_object() &&
+       response.has_field(U("usage")) &&
+       response.at(U("usage")).is_object())
+    {
+        mergedUsage = response.at(U("usage"));
+    }
+
+    accumulateUsageObject(mergedUsage, accumulatedUsage);
+    response[U("usage")] = mergedUsage;
+}
+
 static const char* llmRoleShort(LLMRole role)
 {
     switch (role)
@@ -777,6 +892,7 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
     const bool anthropicRequest = isAnthropicRequest(request);
     bool retriedAnthropicLowThinking = false;
     bool retriedAnthropicNoThinking = false;
+    json::value accumulatedAnthropicRetryUsage;
 
     bool finished = false;
     for(uint32_t i=0; i<10; ++i)
@@ -817,17 +933,23 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
            anthropicRequest &&
            isAnthropicThinkingOnlyMaxTokensFailure(response))
         {
+            mergeAccumulatedUsageIntoResponse(accumulatedAnthropicRetryUsage, response.at(U("usage")));
             request[U("max_tokens")] = json::value::number(anthropicThinkingFallbackMaxTokens(request));
             if(!retriedAnthropicLowThinking)
             {
-                request[U("reasoning_effort")] = json::value::string(U("low"));
+                request[U("reasoning_effort")] = json::value::string(U("medium"));
+                request[U("anthropic_thinking_mode")] = json::value::string(U("manual"));
+                request[U("anthropic_thinking_budget_tokens")] =
+                    json::value::number(anthropicManualThinkingFallbackBudgetTokens(request));
                 retriedAnthropicLowThinking = true;
-                std::cout << "Anthropic exhausted output budget on thinking. Retrying with low adaptive thinking." << std::endl;
+                std::cout << "Anthropic exhausted output budget on thinking. Retrying with fixed-budget thinking." << std::endl;
                 continue;
             }
             if(!retriedAnthropicNoThinking)
             {
                 request[U("reasoning_effort")] = json::value::string(U("na"));
+                request.erase(U("anthropic_thinking_mode"));
+                request.erase(U("anthropic_thinking_budget_tokens"));
                 retriedAnthropicNoThinking = true;
                 std::cout << "Anthropic exhausted output budget again. Retrying with thinking disabled." << std::endl;
                 continue;
@@ -836,6 +958,7 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
 
         if(hasServingError)
         {
+            mergeAccumulatedUsageIntoResponse(response, accumulatedAnthropicRetryUsage);
             std::cout << "Serving/provider error";
             if(!errorCode.empty())
             {
@@ -861,6 +984,8 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
             std::cout << "Skipping response with invalid request_id: " << requestId << std::endl;
             continue;
         }
+
+        mergeAccumulatedUsageIntoResponse(response, accumulatedAnthropicRetryUsage);
         
         //Strip the thinking tokens
         if (response.has_field(U("message")))

@@ -367,7 +367,7 @@ void RemoteEP::startAsyncRead(std::promise<std::shared_ptr<Message>> promise)
         }
     };
 
-    //TODO: What is a good timeout here for a thinking models, 5 min should be enoufh ?!?
+    // Long-horizon reasoning requests can legitimately take well beyond 5 minutes.
     auto st = std::make_shared<ReadState>(this, std::move(promise), std::chrono::seconds(300));
 
     // 1) Header
