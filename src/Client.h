@@ -3,6 +3,7 @@
 #include <queue>
 #include <mutex>
 #include <condition_variable>
+#include <unordered_map>
 #include <cpprest/http_listener.h>
 
 #include "Peer.h"
@@ -86,6 +87,7 @@ namespace hen {
         std::string                         m_serverIP;
         std::unique_ptr<ClientEP>           m_clientEP;
         std::string                         m_projectId;
+        std::string                         m_clientInstanceId;
         bool                                m_disableUserCommands;
         
         std::unique_ptr<ClientEP>           m_llmClientEP;

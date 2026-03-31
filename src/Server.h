@@ -7,6 +7,7 @@
 #include <cpprest/json.h>  // For JSON functionality
 #include <cpprest/http_listener.h>
 #include <sqlite3.h>
+#include <unordered_map>
 
 #include "Peer.h"
 #include "Singleton.h"
@@ -26,6 +27,7 @@ using namespace http::experimental::listener;
 namespace hen {
 
     class Server;
+    class AsyncLLMSession;
 
     class AgentServerEP : ServerEP
     {
@@ -104,9 +106,31 @@ namespace hen {
         std::chrono::time_point<std::chrono::high_resolution_clock> m_lasACTime;
         std::mutex m_anthropicCacheStateMutex;
         std::map<std::string, std::vector<std::string>> m_lastAnthropicCacheableBlocks;
+        std::mutex m_llmInFlightMutex;
+        struct ActiveLLMRequest
+        {
+            uint32_t transportRequestId = 0;
+            std::weak_ptr<AsyncLLMSession> session;
+        };
+        std::unordered_map<std::string, ActiveLLMRequest> m_llmInFlight;
         
         bool initLLMProxyListener();
         bool initChatListener();
+        std::string makeLLMInFlightKey(const std::string& clientInstanceId,
+                                       const std::string& logicalRequestId) const;
+        void registerInFlightLLMRequest(const std::string& clientInstanceId,
+                                        const std::string& logicalRequestId,
+                                        uint32_t transportRequestId,
+                                        const std::shared_ptr<AsyncLLMSession>& session,
+                                        std::shared_ptr<AsyncLLMSession>& supersededSession);
+        bool isCurrentInFlightLLMRequest(const std::string& clientInstanceId,
+                                         const std::string& logicalRequestId,
+                                         uint32_t transportRequestId,
+                                         const std::shared_ptr<AsyncLLMSession>& session);
+        void clearInFlightLLMRequest(const std::string& clientInstanceId,
+                                     const std::string& logicalRequestId,
+                                     uint32_t transportRequestId,
+                                     const std::shared_ptr<AsyncLLMSession>& session);
         
         std::pair<std::string, std::string> getLLMForTheRole(json::value& requestFromClientBody, LLMRole role, const std::string& llmRole);
         std::map<std::string, std::string> getLLMParty(json::value& requestFromClientBody);

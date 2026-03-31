@@ -868,7 +868,7 @@ namespace hen {
             defineData(item->type_name, addContext, true, allForUpdate);
         }
         
-        return loop;
+        (void)loop;
     }
 
     std::set<std::string> CCodeNode::getUnknownTypes(const std::string& review)
@@ -1231,7 +1231,7 @@ namespace hen {
         popContext();
         popMessages(1);//Remove initial response. In case of subsequent reviews required information will be provided in the prompt
         
-        return reviseMessage;
+        (void)reviseMessage;
     }
 
     void CCodeNode::reviewFunction(std::string& cache, const std::string& parentInfo, const std::string& parentInitialReview)
@@ -1988,7 +1988,7 @@ namespace hen {
         {
             std::cout << "Node: '" << getName() << "' is not called by the program entry point" << std::endl;
             hasPathToMain();//To investigate;
-            return;
+            return false;
         }*/
         
         Client::getInstance().agentToServer("\n\nTHINKING...\n\n");
@@ -6372,6 +6372,8 @@ namespace hen {
                 m_this->removeChild(child);
             }
         }
+
+        return !nodesToRemove.empty();
     }
 
     bool CCodeNode::loadOrder()
@@ -6779,6 +6781,7 @@ namespace hen {
     bool CCodeNode::updateCallsUsage(bool createNodes, bool deleteUnusedNodes)
     {
         CCodeProject* proj = (CCodeProject*)Client::getInstance().project();
+        bool changed = false;
         
         //Reomove unused function calls. We don't want child nodes for those
         std::vector<std::shared_ptr<FunctionItem>> items;
@@ -6805,15 +6808,18 @@ namespace hen {
             //We should never be here for cached node
             m_calls.items = items;
             m_calls.updateOrder();
+            changed = true;
         }
         
+        size_t libCallsBefore = m_libCalls.items.size();
         m_libCalls.items.erase(
             std::remove_if(m_libCalls.items.begin(), m_libCalls.items.end(),
                 [this](const std::shared_ptr<LibFunctionItem>& item) {
                     return !callsFunction(item->func_name);
                 }), m_libCalls.items.end());
+        changed = changed || (libCallsBefore != m_libCalls.items.size());
         
-        purgeUnusedNodes(deleteUnusedNodes);
+        return purgeUnusedNodes(deleteUnusedNodes) || changed;
     }
 
     void CCodeNode::getRefactorExcludeCalls(std::set<std::string>& exclude)
@@ -6955,7 +6961,7 @@ namespace hen {
         {
             //Invalid types, will be reported by other checks
             //Return to avoid regex exceptions
-            return;
+            return false;
         }
         
         bool hasIssues = false;

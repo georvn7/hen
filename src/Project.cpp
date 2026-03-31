@@ -675,7 +675,7 @@ namespace hen {
         std::ofstream fileJson(path);
         if (!fileJson.is_open()) {
             std::cout << "Can't save references! Unable to create file " << path << std::endl;
-            return false;
+            return;
         }
 
         fileJson << strJson << std::endl;

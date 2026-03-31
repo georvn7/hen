@@ -1579,7 +1579,7 @@ public:
             parsePrefixFlags(rawCmd, debug, testResult, expectedResult, stdoutRegex, cmd);
             
             log += "Test command:\n\n";
-            log += cmd + "\n\n";
+            log += "main " + cmd + "\n\n";
             
             std::string consoleLog = getFileContent(m_workingDirectory + "/console.log");
             

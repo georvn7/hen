@@ -1562,7 +1562,7 @@ bool Debugger::rewardHackingAnalysis(CCodeProject* project,
         review += " but there are indications for reward-hacking practices or other issues:\n\n";
         review += fitInContextIssues;
        // review += "\n\nAll the issues mentioned MUST BE FIXED in order to successfully pass the reward hacking evaluation for this test!\n\n";
-        return;
+        return false;
     }
     
     std::string privateTestInfo;
@@ -4857,7 +4857,7 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
     {
         //TODO: I need to keep an eye on this feedback
         std::string direcoty = boost_fs::path(m_nextStep.action_subject).parent_path().string();
-        if(!direcoty.empty() && direcoty != "./")
+        if(!direcoty.empty() && !(direcoty == ".") && !(direcoty == "./"))
         {
             feedback += "I see you specify directory part in your file name. ";
             feedback += "Note that file_info command is only for the files in the test working directory";
@@ -6792,6 +6792,8 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
                 {
                     return true;
                 }
+                
+                std::this_thread::sleep_for(std::chrono::seconds(attempt*30));
             }
             
             if(!m_trajectory.empty())

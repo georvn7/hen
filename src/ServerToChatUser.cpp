@@ -201,7 +201,7 @@ std::string Server::setupContextForAgent(const std::string& context)
     {
         if(foundProjectId.empty())
         {
-            return 0;
+            return "";
         }
         
         boost_fs::create_directory(projectPath);
@@ -216,7 +216,7 @@ std::string Server::setupContextForAgent(const std::string& context)
             std::ofstream contextFile(contextFilePath);
             if (!contextFile.is_open()) {
                 std::cerr << "Failed to open " << contextFilePath << " for writing." << std::endl;
-                return;
+                return "";
             }
             contextFile << context;
             contextFile.close();
@@ -262,7 +262,7 @@ std::string Server::setupDescriptionForAgent(const std::string& description)
         std::ofstream descFile(descFilePath);
         if (!descFile.is_open()) {
             std::cerr << "Failed to open " << descFilePath << " for writing." << std::endl;
-            return;
+            return "";
         }
         descFile << description;
         descFile.close();

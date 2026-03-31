@@ -1299,6 +1299,8 @@ CXCursor isNestedCallWithinTemplatedCall(CXCursor cursor) {
     {
         return callingFunc;
     }
+
+    return clang_getNullCursor();
 }
 
 bool isFunctionCallWithTemplates(CXCursor cursor) {
@@ -3463,4 +3465,3 @@ std::string extractBrief(std::string& source) {
 
     return brief;
 }
-

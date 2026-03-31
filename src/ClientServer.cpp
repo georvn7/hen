@@ -1,5 +1,9 @@
 #include "ClientServer.h"
 
+#ifndef HEN_REMOTE_RECEIVE_TIMEOUT_SECONDS
+#define HEN_REMOTE_RECEIVE_TIMEOUT_SECONDS 600
+#endif
+
 namespace hen {
 
 json::value Message::json() const
@@ -198,7 +202,7 @@ void ServerEP::accept(std::shared_ptr<RemoteEP> remote)
 
 bool ServerEP::receive(std::shared_ptr<RemoteEP> remote, std::shared_ptr<Message> msg)
 {
-    
+    return false;
 }
 
 std::pair<std::string, std::string> getHostAndPort(const std::string& address)
@@ -412,8 +416,10 @@ void RemoteEP::startAsyncRead(std::promise<std::shared_ptr<Message>> promise)
         }
     };
 
-    // Long-horizon reasoning requests can legitimately take well beyond 5 minutes.
-    auto st = std::make_shared<ReadState>(this, std::move(promise), std::chrono::seconds(300));
+    auto st = std::make_shared<ReadState>(
+        this,
+        std::move(promise),
+        std::chrono::seconds(HEN_REMOTE_RECEIVE_TIMEOUT_SECONDS));
 
     // 1) Header
     st->arm_timer();

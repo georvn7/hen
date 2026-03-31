@@ -6,6 +6,8 @@
 #include "Server.h"
 #include "Utils.h"
 
+#include <atomic>
+
 using namespace utility;                    // Common utilities like string conversions
 using namespace web;                        // Common features like URIs.
 using namespace web::http;                  // Common HTTP functionality
@@ -380,12 +382,16 @@ public:
                     std::shared_ptr<RemoteEP> remote,
                     boost::beast::http::request<boost::beast::http::string_body> req,
                     std::shared_ptr<LLMConfig> llm,
-                    const std::string& projectId)
+                    const std::string& projectId,
+                    const std::string& clientInstanceId,
+                    const std::string& logicalRequestId)
       : server_(std::move(server)),
         remote_(std::move(remote)),
         req_(std::move(req)),
         llm_(std::move(llm)),
         projectId_(projectId),
+        clientInstanceId_(clientInstanceId),
+        logicalRequestId_(logicalRequestId),
         requestId_(INVALID_REQUEST_ID),
         resolver_(*getAsioContext()),  // You presumably have getAsioContext() returning a shared_ptr<io_context>
         sslContext_(ssl::context::tlsv12_client),
@@ -431,11 +437,64 @@ public:
     }
     
     void setRequestId(uint32_t requestId) { requestId_ = requestId; }
+    
+    void cancel()
+    {
+        bool wasCancelled = cancelled_.exchange(true);
+        if(wasCancelled)
+        {
+            return;
+        }
+        
+        boost::system::error_code ec;
+        resolver_.cancel();
+        stream_.next_layer().socket().cancel(ec);
+        stream_.next_layer().socket().shutdown(tcp::socket::shutdown_both, ec);
+        stream_.next_layer().socket().close(ec);
+    }
 
 private:
+    bool shouldReply(const std::shared_ptr<AsyncLLMSession>& self)
+    {
+        if(cancelled_.load())
+        {
+            return false;
+        }
+        
+        if(clientInstanceId_.empty() || logicalRequestId_.empty())
+        {
+            return true;
+        }
+        
+        return server_->isCurrentInFlightLLMRequest(clientInstanceId_,
+                                                    logicalRequestId_,
+                                                    requestId_,
+                                                    self);
+    }
+    
+    void finish(const std::shared_ptr<AsyncLLMSession>& self)
+    {
+        if(finished_.exchange(true))
+        {
+            return;
+        }
+        
+        if(!clientInstanceId_.empty() && !logicalRequestId_.empty())
+        {
+            server_->clearInFlightLLMRequest(clientInstanceId_,
+                                             logicalRequestId_,
+                                             requestId_,
+                                             self);
+        }
+    }
+    
     // Step 1: onResolve
     void onResolve(boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type results)
     {
+        if(cancelled_.load()) {
+            finish(shared_from_this());
+            return;
+        }
         if(ec) {
             handleError("resolve", ec);
             return;
@@ -454,6 +513,10 @@ private:
     // Step 2: onConnect
     void onConnect(boost::beast::error_code ec)
     {
+        if(cancelled_.load()) {
+            finish(shared_from_this());
+            return;
+        }
         if(ec) {
             handleError("connect", ec);
             return;
@@ -480,6 +543,10 @@ private:
     // Step 3: onHandshake
     void onHandshake(boost::beast::error_code ec)
     {
+        if(cancelled_.load()) {
+            finish(shared_from_this());
+            return;
+        }
         if(ec) {
             handleError("handshake", ec);
             return;
@@ -516,6 +583,10 @@ private:
     // Step 4: onWrite
     void onWrite(boost::beast::error_code ec)
     {
+        if(cancelled_.load()) {
+            finish(shared_from_this());
+            return;
+        }
         if(ec) {
             handleError("write", ec);
             return;
@@ -545,6 +616,10 @@ private:
     // Step 5: onRead
     void onRead(boost::beast::error_code ec)
     {
+        if(cancelled_.load()) {
+            finish(shared_from_this());
+            return;
+        }
         if(ec) {
             handleError("read", ec);
             return;
@@ -570,6 +645,13 @@ private:
     // Step 6: onShutdown
     void onShutdown()
     {
+        auto self = shared_from_this();
+        if(!shouldReply(self))
+        {
+            finish(self);
+            return;
+        }
+        
         // At this point, we can parse JSON and send the result back to `remote_`
         try
         {
@@ -590,6 +672,7 @@ private:
                                 processedResponse.serialize());
             remote_->send((void*)replyStr.c_str(),
                           static_cast<uint32_t>(replyStr.size() + 1));
+            finish(self);
         }
         catch(const std::exception& e)
         {
@@ -601,6 +684,13 @@ private:
 
     void handleError(const std::string& what, boost::beast::error_code ec = {})
     {
+        auto self = shared_from_this();
+        if(cancelled_.load() || !shouldReply(self))
+        {
+            finish(self);
+            return;
+        }
+        
         if(ec)
             std::cerr << "AsyncLLMSession error in " << what << ": "
                       << ec.message() << "\n";
@@ -619,6 +709,7 @@ private:
         auto errorStr = utility::conversions::to_utf8string(errorReply.serialize());
         remote_->send((void*)errorStr.c_str(),
                       static_cast<uint32_t>(errorStr.size()+1));
+        finish(self);
     }
 
 private:
@@ -629,6 +720,10 @@ private:
     boost::beast::http::request<boost::beast::http::string_body> req_;
     std::shared_ptr<LLMConfig> llm_;
     std::string projectId_;
+    std::string clientInstanceId_;
+    std::string logicalRequestId_;
+    std::atomic<bool> cancelled_{false};
+    std::atomic<bool> finished_{false};
 
     boost::asio::ip::tcp::resolver resolver_;
     ssl::context sslContext_;
@@ -674,6 +769,16 @@ bool LLMServerEP::receive(std::shared_ptr<RemoteEP> remote, std::shared_ptr<Mess
         requestId = requestBody[U("request_id")].as_number().to_uint32();
         requestBody.erase(U("request_id"));
     }
+    std::string clientInstanceId;
+    if(requestBody.has_field(U("client_instance_id"))) {
+        clientInstanceId = utility::conversions::to_utf8string(requestBody[U("client_instance_id")].as_string());
+        requestBody.erase(U("client_instance_id"));
+    }
+    std::string logicalRequestId;
+    if(requestBody.has_field(U("logical_request_id"))) {
+        logicalRequestId = utility::conversions::to_utf8string(requestBody[U("logical_request_id")].as_string());
+        requestBody.erase(U("logical_request_id"));
+    }
 
     // Prepare the request
     std::shared_ptr<LLMConfig> llm;
@@ -695,10 +800,24 @@ bool LLMServerEP::receive(std::shared_ptr<RemoteEP> remote, std::shared_ptr<Mess
         remote,
         beastRequest,
         llm,
-        projectId
+        projectId,
+        clientInstanceId,
+        logicalRequestId
     );
-    session->run();  // schedule async operations
     session->setRequestId(requestId);
+    
+    std::shared_ptr<AsyncLLMSession> supersededSession;
+    m_appServer->registerInFlightLLMRequest(clientInstanceId,
+                                            logicalRequestId,
+                                            requestId,
+                                            session,
+                                            supersededSession);
+    if(supersededSession)
+    {
+        supersededSession->cancel();
+    }
+    
+    session->run();  // schedule async operations
 
     // Return immediately. The chain will complete in background.
     return true;
@@ -707,6 +826,93 @@ bool LLMServerEP::receive(std::shared_ptr<RemoteEP> remote, std::shared_ptr<Mess
 Server::Server():
 m_db(nullptr)
 {
+}
+
+std::string Server::makeLLMInFlightKey(const std::string& clientInstanceId,
+                                       const std::string& logicalRequestId) const
+{
+    if(clientInstanceId.empty() || logicalRequestId.empty())
+    {
+        return "";
+    }
+    
+    return clientInstanceId + "\n" + logicalRequestId;
+}
+
+void Server::registerInFlightLLMRequest(const std::string& clientInstanceId,
+                                        const std::string& logicalRequestId,
+                                        uint32_t transportRequestId,
+                                        const std::shared_ptr<AsyncLLMSession>& session,
+                                        std::shared_ptr<AsyncLLMSession>& supersededSession)
+{
+    supersededSession.reset();
+    std::string key = makeLLMInFlightKey(clientInstanceId, logicalRequestId);
+    if(key.empty())
+    {
+        return;
+    }
+    
+    std::lock_guard<std::mutex> lock(m_llmInFlightMutex);
+    auto it = m_llmInFlight.find(key);
+    if(it != m_llmInFlight.end())
+    {
+        auto activeSession = it->second.session.lock();
+        if(activeSession && activeSession != session)
+        {
+            supersededSession = activeSession;
+        }
+    }
+    
+    m_llmInFlight[key] = ActiveLLMRequest{transportRequestId, session};
+}
+
+bool Server::isCurrentInFlightLLMRequest(const std::string& clientInstanceId,
+                                         const std::string& logicalRequestId,
+                                         uint32_t transportRequestId,
+                                         const std::shared_ptr<AsyncLLMSession>& session)
+{
+    std::string key = makeLLMInFlightKey(clientInstanceId, logicalRequestId);
+    if(key.empty())
+    {
+        return true;
+    }
+    
+    std::lock_guard<std::mutex> lock(m_llmInFlightMutex);
+    auto it = m_llmInFlight.find(key);
+    if(it == m_llmInFlight.end())
+    {
+        return false;
+    }
+    
+    auto activeSession = it->second.session.lock();
+    return activeSession == session &&
+           it->second.transportRequestId == transportRequestId;
+}
+
+void Server::clearInFlightLLMRequest(const std::string& clientInstanceId,
+                                     const std::string& logicalRequestId,
+                                     uint32_t transportRequestId,
+                                     const std::shared_ptr<AsyncLLMSession>& session)
+{
+    std::string key = makeLLMInFlightKey(clientInstanceId, logicalRequestId);
+    if(key.empty())
+    {
+        return;
+    }
+    
+    std::lock_guard<std::mutex> lock(m_llmInFlightMutex);
+    auto it = m_llmInFlight.find(key);
+    if(it == m_llmInFlight.end())
+    {
+        return;
+    }
+    
+    auto activeSession = it->second.session.lock();
+    if(activeSession == session &&
+       it->second.transportRequestId == transportRequestId)
+    {
+        m_llmInFlight.erase(it);
+    }
 }
 
 std::string Server::doBeastRequest(

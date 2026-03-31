@@ -2992,7 +2992,7 @@ namespace hen {
         std::ofstream fileJson(path);
         if (!fileJson.is_open()) {
             std::cout << "Can't save data definitions! Unable to create file " << path << std::endl;
-            return false;
+            return;
         }
 
         std::string strJson = conversions::to_utf8string(jsonDataDefinitions.serialize());

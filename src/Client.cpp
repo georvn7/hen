@@ -97,7 +97,15 @@ static uint32_t nextTransportRequestId()
     }
 }
 
-static uint32_t transientServingRetryDelayMs(const std::string& code, bool missingResponse, uint32_t attempt)
+static bool isTransientServingPhaseError(const std::string& message)
+{
+    return message == "read" || message == "write";
+}
+
+static uint32_t transientServingRetryDelayMs(const std::string& code,
+                                             const std::string& message,
+                                             bool missingResponse,
+                                             uint32_t attempt)
 {
     if(code == "1305")
     {
@@ -106,6 +114,10 @@ static uint32_t transientServingRetryDelayMs(const std::string& code, bool missi
     if(code == "1302")
     {
         return std::min<uint32_t>(300000, 60000u * attempt);
+    }
+    if(isTransientServingPhaseError(message))
+    {
+        return std::min<uint32_t>(30000, 5000u * attempt);
     }
     if(missingResponse)
     {
@@ -405,6 +417,7 @@ int Client::init(int argc, char* argv[])
     }
 
     m_requestId = 0;
+    m_clientInstanceId = generateUUID();
     
     setupEnv();
     initClient(m_llmProxyIP);
@@ -874,6 +887,7 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
     std::lock_guard<std::mutex> llmRequestLock(m_llmRequestMutex);
     
     json::value request;
+    const std::string logicalRequestId = generateUUID();
     
     request[U("messages")] = messages;
 
@@ -887,6 +901,11 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
     {
         request[U("projectId")] = json::value::string(utility::conversions::to_string_t(m_projectId));
     }
+    if(!m_clientInstanceId.empty())
+    {
+        request[U("client_instance_id")] = json::value::string(utility::conversions::to_string_t(m_clientInstanceId));
+    }
+    request[U("logical_request_id")] = json::value::string(utility::conversions::to_string_t(logicalRequestId));
     
     checkLLMContextSize(messages, request);
 
@@ -920,7 +939,7 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
         std::string errorMessage;
         bool hasServingError = getServingError(response, errorCode, errorMessage);
         bool missingResponse = !response.has_field(U("request_id"));
-        uint32_t retryDelayMs = transientServingRetryDelayMs(errorCode, missingResponse, i + 1);
+        uint32_t retryDelayMs = transientServingRetryDelayMs(errorCode, errorMessage, missingResponse, i + 1);
         if(retryDelayMs > 0)
         {
             if(hasServingError)
