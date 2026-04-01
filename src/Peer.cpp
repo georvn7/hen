@@ -17,7 +17,7 @@ std::string Peer::getHeader()
     std::stringstream scout;
     scout << MERCH_PRODUCT_NAME << " - a personal educational project." << std::endl;
     scout << "Experimental research software." << std::endl;
-    scout << std::endl << "Created by " << AUTHOR_NAME << ", © 2025" << std::endl;
+    scout << std::endl << "Created by " << AUTHOR_NAME << ", © 2026" << std::endl;
     scout << AUTHOR_CONTACTS << std::endl;
     
     return scout.str();

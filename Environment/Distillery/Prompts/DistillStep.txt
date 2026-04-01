@@ -122,6 +122,7 @@ Repeating details that belong in motivation (save those for the conclusion)
 
 The analysis should feel like watching someone's reasoning unfold in real-time.
 [[new_functions]]
+[[shortcut_guidance]]
 GENERATION CHECKLIST
 
 Before submitting your response, verify:

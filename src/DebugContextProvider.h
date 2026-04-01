@@ -1579,7 +1579,13 @@ public:
             parsePrefixFlags(rawCmd, debug, testResult, expectedResult, stdoutRegex, cmd);
             
             log += "Test command:\n\n";
-            log += "main " + cmd + "\n\n";
+            
+            if(cmd != "main" && !startsWith(cmd, "main "))
+            {
+                log += "main ";
+            }
+            
+            log += cmd + "\n\n";
             
             std::string consoleLog = getFileContent(m_workingDirectory + "/console.log");
             
@@ -1753,7 +1759,7 @@ public:
         return log;
     }
     
-    bool getStepTrajecotyCfg(CCodeProject* project, const TestDef& test, int stepId, web::json::value& cfg)
+    bool getStepTrajectoryCfg(CCodeProject* project, const TestDef& test, int stepId, web::json::value& cfg)
     {
         std::string info;
 
@@ -1799,7 +1805,7 @@ public:
         std::string stepIdDir = "/step_" + stepIdStr;
 
         web::json::value trajectoryCfg;
-        if(getStepTrajecotyCfg(project, test, stepId, trajectoryCfg))
+        if(getStepTrajectoryCfg(project, test, stepId, trajectoryCfg))
         {
             info += "\nUnable to load information for the requested step " + stepIdStr + ". The data might be corrupted!\n";
             return info;
@@ -2005,7 +2011,14 @@ public:
         std::string stdoutRegex;
         parsePrefixFlags(testRawCmd, testDebug, testResult, testResultStr, stdoutRegex, testCmd);
         
-        std::string commandLine = "main " + testCmd;
+        std::string commandLine;
+        
+        if(testCmd != "main" && !startsWith(testCmd, "main "))
+        {
+            commandLine += "main ";
+        }
+        
+        commandLine += testCmd;
         
         commands << "Test command:" << std::endl;
         commands << commandLine << std::endl;

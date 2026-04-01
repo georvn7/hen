@@ -2115,7 +2115,14 @@ std::string Debugger::getTestDescription(CCodeProject* project, const TestDef& t
     std::string stdoutRegex;
     parsePrefixFlags(testRawCmd, testDebug, testResult, testResultStr, stdoutRegex, testCmd);
     
-    std::string commandLine = testCmd;
+    std::string commandLine;
+    
+    if(testCmd != "main" && !startsWith(testCmd, "main "))
+    {
+        commandLine += "main ";
+    }
+    
+    commandLine += testCmd;
     
     commands << "Test command:" << std::endl;
     commands << commandLine << std::endl;
@@ -2426,6 +2433,12 @@ bool Debugger::execTestScript(CCodeProject* project,
     parsePrefixFlags(rawCmd, testDebug, testResult, expectedResult, stdoutRegex, cmd);
     
     debugLogTest << "Test command:" << std::endl << std::endl;
+    
+    if(cmd != "main" && !startsWith(cmd, "main "))
+    {
+        debugLogTest << "main ";
+    }
+    
     debugLogTest << cmd << std::endl << std::endl;
     
     checkTestStepInput(debugLogTest, project, test.test.input_files, test.test.output_files, "test", true);
@@ -4857,7 +4870,7 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
     {
         //TODO: I need to keep an eye on this feedback
         std::string direcoty = boost_fs::path(m_nextStep.action_subject).parent_path().string();
-        if(!direcoty.empty() && !(direcoty == ".") && !(direcoty == "./"))
+        if(!direcoty.empty() && direcoty != "." && direcoty != "./")
         {
             feedback += "I see you specify directory part in your file name. ";
             feedback += "Note that file_info command is only for the files in the test working directory";
@@ -5222,6 +5235,12 @@ std::string Debugger::loadTestLogFromStep(CCodeProject* project, const TestDef& 
         //std::string expectedResultStr = std::to_string(expectedResult);
         
         log += "Test command:\n\n";
+        
+        if(cmd != "main" && !startsWith(cmd, "main "))
+        {
+            log += "main ";
+        }
+        
         log += cmd + "\n\n";
         
         std::string consoleLog = getFileContent(m_workingDirectory + "/console.log");

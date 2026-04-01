@@ -11,7 +11,7 @@
 #include "LogAnalyzer.h"
 
 #define OPTIMIZE_TRACK_MAX_INFO_REQUESTS 3
-#define MAX_OPTIMAL_FIX_TRACK_ROLLOUTS 3
+#define MAX_OPTIMAL_FIX_TRACK_ROLLOUTS 2
 
 namespace hen {
 
@@ -227,10 +227,23 @@ namespace hen {
         
         int getSummaryStepForStep(CCodeProject* project, int step, std::string& summary);
         
-        std::string distillSummaryBefore(CCodeProject* project, int runStep, int fixStep);
+        std::string distillSummaryBefore(CCodeProject* project,
+                                         int runStep,
+                                         int fixStep,
+                                         const EditSourceSequence& optimalSequence);
         std::string getTrajectoryPrologue(CCodeProject* project, int originalRunStep, int distilledRunStep, const std::string& summary);
         std::string getOriginalTrajectory(CCodeProject* project, int stepFromIdx, int stepToIdx);
-        std::pair<std::string, std::string> validateSequence(CCodeProject* project, const EditSourceSequence& optimalSequence, int originalSize, int startStep);
+        std::pair<std::string, std::string> validateSequence(CCodeProject* project,
+                                                             const EditSourceSequence& optimalSequence,
+                                                             int originalSize,
+                                                             int startStep,
+                                                             const std::string* summaryOverride = nullptr);
+        std::set<std::string> collectSummaryDependentFunctions(CCodeProject* project,
+                                                               const EditSourceSequence& optimalSequence,
+                                                               int startStep,
+                                                               const std::string& originalSummary);
+        std::set<std::string> collectMissingSummaryFunctions(const std::string& summary,
+                                                             const std::set<std::string>& requiredFunctions);
         std::string optimizeFixTrack(CCodeProject* project,
                                      Cache& cache,
                                      const std::string& trajectoryAnalysis,
@@ -253,7 +266,8 @@ namespace hen {
                                 const std::string& requestedInfo,
                                 std::string& newInfo,
                                 DistilledStep& nextStep,
-                                const StepDisclosureMapEntry* disclosureEntry);
+                                const StepDisclosureMapEntry* disclosureEntry,
+                                const std::string& shortcutGuidance);
         
         web::json::value buildTrainingData(CCodeProject* project,
                                            const std::string& trajectory,

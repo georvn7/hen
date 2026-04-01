@@ -1495,7 +1495,7 @@ namespace hen {
         setupSchema<TrajectoryAnalysis>(schema);
 
         //Cache _cache(dir, cache);
-        Cache cache(datasetDir, "/trajecoty_analysis.json");
+        Cache cache(datasetDir, "/trajectory_analysis.json");
         project->captureContext(std::string());
 
         project->inference(cache, promptScoreTrajectory, schema, object);
@@ -1505,7 +1505,7 @@ namespace hen {
 
         project->popContext();
 
-        saveJson(object, datasetDir + "/trajecoty_analysis.json");
+        saveJson(object, datasetDir + "/trajectory_analysis.json");
 
         for(auto b : trackAnalysis.blockers)
         {
@@ -1753,7 +1753,7 @@ namespace hen {
     int Distillery::getSummaryStepForStep(CCodeProject* project, int step, std::string& summary)
     {
         web::json::value trajectoryCfg;
-        if(!m_debugContext.getStepTrajecotyCfg(project, m_test, step, trajectoryCfg))
+        if(!m_debugContext.getStepTrajectoryCfg(project, m_test, step, trajectoryCfg))
         {
             return -1;
         }
@@ -1823,7 +1823,10 @@ namespace hen {
         return trajectory;
     }
 
-    std::string Distillery::distillSummaryBefore(CCodeProject* project, int runStep, int fixStep)
+    std::string Distillery::distillSummaryBefore(CCodeProject* project,
+                                                 int runStep,
+                                                 int fixStep,
+                                                 const EditSourceSequence& optimalSequence)
     {
         std::string oldSummary;
         int summaryStep = getSummaryStepForStep(project, runStep, oldSummary);
@@ -1866,63 +1869,114 @@ namespace hen {
                             {"sequence_to_summarize", sequenceToSummarize}
         });
 
+        const std::set<std::string> requiredSummaryFunctions =
+            collectSummaryDependentFunctions(project,
+                                             optimalSequence,
+                                             runStep,
+                                             oldSummary);
+
         std::string message = promptDistillSummary.str();
+        if (!requiredSummaryFunctions.empty())
+        {
+            message += "\n\nPreserve the following already-grounded function names in the distilled summary, ";
+            message += "because later optimized steps depend on them remaining visible: ";
+            message += getAsCsv(requiredSummaryFunctions, 30) + "\n";
+            message += "Do not add new claims about these functions. ";
+            message += "Only keep the names visible if they are already supported by OLD SUMMARY or DEBUGGING STEPS TO SUMMARIZE.\n";
+        }
         project->captureContext(std::string());
 
         Cache cache;
         bool truncated = false;
-        std::string summary = "review";
-        project->inference(cache, message, summary, &truncated);
-        int attempts = 0;
-        while(summary.length() > 2048 && attempts < 3)
-        {
-            std::string feedback = "\n\nThe summary is too long. It should be less than 2000 characters. 15-20 concise sentences!\n\n";
 
-            summary = "review";
-            truncated = false;
-            project->inference(cache, feedback, summary, &truncated);
-
-            //TODO: Investigate in the future, we want something substantial
-            if(summary.length() <= 512)
+        auto enforceSummaryLength = [&](std::string& candidate) {
+            int lengthAttempts = 0;
+            while(candidate.length() > 2048 && lengthAttempts < 3)
             {
-                //break;
+                std::string feedback = "\n\nThe summary is too long. It should be less than 2000 characters. 15-20 concise sentences!\n\n";
+
+                candidate = "review";
+                truncated = false;
+                project->inference(cache, feedback, candidate, &truncated);
+
+                ++lengthAttempts;
             }
+        };
 
-            attempts++;
-        }
+        auto validateDistilledSummary = [&](const std::string& candidate,
+                                            std::string& outFeedback) -> bool {
+            outFeedback.clear();
 
-        std::string causalityFeedback = validateSummaryCausality(project,
-                                                                 summary,
-                                                                 oldSummary,
-                                                                 summarizeTrajectory,
-                                                                 runStep,
-                                                                 currentFixSubject);
-        if (!causalityFeedback.empty())
-        {
-            std::string feedback = "\n\nThe summary leaks future information relative to run_test step ";
-            feedback += std::to_string(runStep) + ". Regenerate once.\n";
-            feedback += "Problem: " + causalityFeedback + "\n";
-            feedback += "Use only information already visible in OLD SUMMARY and DEBUGGING STEPS TO SUMMARIZE.\n";
-            feedback += "Do not mention outcomes, fixes, recent fixes, or resolved blockers from the current fix track.\n";
-
-            summary = "review";
-            truncated = false;
-            project->inference(cache, feedback, summary, &truncated);
-
-            causalityFeedback = validateSummaryCausality(project,
-                                                         summary,
-                                                         oldSummary,
-                                                         summarizeTrajectory,
-                                                         runStep,
-                                                         currentFixSubject);
+            std::string causalityFeedback = validateSummaryCausality(project,
+                                                                     candidate,
+                                                                     oldSummary,
+                                                                     summarizeTrajectory,
+                                                                     runStep,
+                                                                     currentFixSubject);
             if (!causalityFeedback.empty())
             {
-                std::cout << "Summary distillation leaked future context for run_test step ";
-                std::cout << runStep << ". Falling back to prior safe summary. Reason: ";
-                std::cout << causalityFeedback << std::endl;
-                project->popContext();
-                return safeFallbackSummary;
+                outFeedback += "\n\nThe summary leaks future information relative to run_test step ";
+                outFeedback += std::to_string(runStep) + ". Regenerate once.\n";
+                outFeedback += "Problem: " + causalityFeedback + "\n";
+                outFeedback += "Use only information already visible in OLD SUMMARY and DEBUGGING STEPS TO SUMMARIZE.\n";
+                outFeedback += "Do not mention outcomes, fixes, recent fixes, or resolved blockers from the current fix track.\n";
             }
+
+            const std::set<std::string> missingRequiredFunctions =
+                collectMissingSummaryFunctions(candidate, requiredSummaryFunctions);
+            if (!missingRequiredFunctions.empty())
+            {
+                if (!outFeedback.empty()) outFeedback += "\n";
+                outFeedback += "The distilled summary dropped function names that the optimized sequence still needs before any earlier disclosure step introduces them.\n";
+                outFeedback += "Preserve these already-grounded function names in the summary: ";
+                outFeedback += getAsCsv(missingRequiredFunctions, 30) + "\n";
+                outFeedback += "Do not add new diagnosis or stronger claims about them; only keep the names visible if already grounded in OLD SUMMARY or DEBUGGING STEPS TO SUMMARIZE.\n";
+            }
+
+            if (!optimalSequence.steps.empty())
+            {
+                const int originalSize = fixStep - runStep + 1;
+                auto sequenceFeedback = validateSequence(project,
+                                                         optimalSequence,
+                                                         originalSize,
+                                                         runStep,
+                                                         &candidate);
+                if (!sequenceFeedback.first.empty())
+                {
+                    if (!outFeedback.empty()) outFeedback += "\n";
+                    outFeedback += "The distilled summary no longer keeps the optimized sequence grounded.\n";
+                    outFeedback += summarizeFeedbackText(sequenceFeedback.first) + "\n";
+                    outFeedback += "Regenerate the summary so it preserves any already-grounded names the optimized sequence depends on, without introducing future knowledge.\n";
+                }
+            }
+
+            return outFeedback.empty();
+        };
+
+        std::string summary = "review";
+        project->inference(cache, message, summary, &truncated);
+        enforceSummaryLength(summary);
+
+        std::string summaryFeedback;
+        uint32_t attempts = 0;
+        const uint32_t kMaxAttempts = 4;
+        while (attempts < kMaxAttempts &&
+               !validateDistilledSummary(summary, summaryFeedback))
+        {
+            summary = "review";
+            truncated = false;
+            project->inference(cache, summaryFeedback, summary, &truncated);
+            enforceSummaryLength(summary);
+            ++attempts;
+        }
+
+        if (!validateDistilledSummary(summary, summaryFeedback))
+        {
+            std::cout << "Summary distillation failed to preserve grounded sequence context for run_test step ";
+            std::cout << runStep << ". Falling back to prior safe summary. Reason: ";
+            std::cout << summarizeFeedbackText(summaryFeedback) << std::endl;
+            project->popContext();
+            return safeFallbackSummary;
         }
 
         project->popContext();
@@ -3150,7 +3204,107 @@ namespace hen {
         return out;
     }
 
-    std::pair<std::string, std::string> Distillery::validateSequence(CCodeProject* project, const EditSourceSequence& optimalSequence, int originalSize, int startStep)
+    std::set<std::string> Distillery::collectSummaryDependentFunctions(CCodeProject* project,
+                                                                       const EditSourceSequence& optimalSequence,
+                                                                       int startStep,
+                                                                       const std::string& originalSummary)
+    {
+        std::set<std::string> required;
+        if (!project || optimalSequence.steps.empty())
+        {
+            return required;
+        }
+
+        const auto disclosureWithSummary =
+            buildDisclosureMap(project, optimalSequence, startStep, originalSummary);
+        const auto disclosureWithoutSummary =
+            buildDisclosureMap(project, optimalSequence, startStep, std::string());
+        const std::set<std::string> functionCandidates =
+            (m_project ? m_project : project)->getNodeNames();
+
+        int stepIndex = 1;
+        for (const auto& step : optimalSequence.steps)
+        {
+            const int stepId = startStep + stepIndex - 1;
+            if (stepIndex > 1)
+            {
+                std::set<std::string> referencedFunctions;
+
+                if ((step->action_type == "function_info" ||
+                     step->action_type == "fix_function" ||
+                     step->action_type == "call_graph" ||
+                     step->action_type == "debug_function") &&
+                    !step->action_subject.empty() &&
+                    step->action_subject != "none" &&
+                    functionCandidates.count(step->action_subject))
+                {
+                    referencedFunctions.insert(step->action_subject);
+                }
+
+                if (step->action_type == "search_source")
+                {
+                    std::set<std::string> regexTokens;
+                    extractIdentifierTokensFromRegex(step->action_subject, regexTokens);
+                    for (const auto& tok : regexTokens)
+                    {
+                        if (functionCandidates.count(tok))
+                        {
+                            referencedFunctions.insert(tok);
+                        }
+                    }
+                }
+
+                auto withIt = disclosureWithSummary.find(stepId);
+                auto withoutIt = disclosureWithoutSummary.find(stepId);
+                for (const auto& fn : referencedFunctions)
+                {
+                    const bool visibleWithSummary =
+                        withIt != disclosureWithSummary.end() &&
+                        withIt->second.visible_functions.count(fn) > 0;
+                    const bool visibleWithoutSummary =
+                        withoutIt != disclosureWithoutSummary.end() &&
+                        withoutIt->second.visible_functions.count(fn) > 0;
+
+                    if (visibleWithSummary && !visibleWithoutSummary)
+                    {
+                        required.insert(fn);
+                    }
+                }
+            }
+
+            ++stepIndex;
+        }
+
+        return required;
+    }
+
+    std::set<std::string> Distillery::collectMissingSummaryFunctions(const std::string& summary,
+                                                                     const std::set<std::string>& requiredFunctions)
+    {
+        std::set<std::string> missing;
+        if (requiredFunctions.empty())
+        {
+            return missing;
+        }
+
+        std::set<std::string> mentionedFunctions;
+        addMentionedFunctionsFromText(summary, requiredFunctions, mentionedFunctions);
+        for (const auto& fn : requiredFunctions)
+        {
+            if (!mentionedFunctions.count(fn))
+            {
+                missing.insert(fn);
+            }
+        }
+
+        return missing;
+    }
+
+    std::pair<std::string, std::string> Distillery::validateSequence(CCodeProject* project,
+                                                                     const EditSourceSequence& optimalSequence,
+                                                                     int originalSize,
+                                                                     int startStep,
+                                                                     const std::string* summaryOverride)
     {
         std::string feedback;
         std::string recommendation;
@@ -3162,7 +3316,14 @@ namespace hen {
         }
 
         std::string summary;
-        getSummaryStepForStep(project, startStep, summary);
+        if(summaryOverride)
+        {
+            summary = *summaryOverride;
+        }
+        else
+        {
+            getSummaryStepForStep(project, startStep, summary);
+        }
         auto disclosure = buildDisclosureMap(project, optimalSequence, startStep, summary);
 
         if((int)optimalSequence.steps.size() > originalSize + 2)
@@ -3743,7 +3904,8 @@ namespace hen {
                                         const std::string& requestedInfo,
                                         std::string& newInfo,
                                         DistilledStep& nextStep,
-                                        const StepDisclosureMapEntry* disclosureEntry)
+                                        const StepDisclosureMapEntry* disclosureEntry,
+                                        const std::string& shortcutGuidance)
     {
         web::json::value object;
 
@@ -3817,6 +3979,7 @@ namespace hen {
         Prompt promptDistillStep("DistillStep.txt",{
                             {"current_trajectory", currentTrajectory},
                             {"new_functions", newFunctionsHint},
+                            {"shortcut_guidance", shortcutGuidance},
                             {"step_id", stepIdStr}
         });
 
@@ -4216,10 +4379,23 @@ namespace hen {
             }
         }
 
+        std::string summary = distillSummaryBefore(project, startStep, fixStep, optimalSequence);
+
+        {
+            const int originalSize = fixStep - startStep + 1;
+            auto finalSummaryValidation =
+                validateSequence(project, optimalSequence, originalSize, startStep, &summary);
+            if (!finalSummaryValidation.first.empty())
+            {
+                std::cout << "Skipping fix track because distilled summary broke sequence grounding.\n";
+                std::cout << summarizeFeedbackText(finalSummaryValidation.first) << std::endl;
+                project->popContext();
+                return;
+            }
+        }
+
         //Save optimized sequence
         saveJson(optimalSequence.to_json(), datasetDir + "/" + optimizedJson);
-
-        std::string summary = distillSummaryBefore(project, startStep, fixStep);
 
         auto disclosure = buildDisclosureMap(project, optimalSequence, startStep, summary);
 
@@ -4272,11 +4448,51 @@ namespace hen {
         std::string startStepStr = std::to_string(startStep);
         int currentStep = startStep;
         web::json::value messages = web::json::value::array();
+        int lastMappedOriginalStep = startStep;
 #if 1
         for(std::size_t sequenceIndex = 0; sequenceIndex < optimalSequence.steps.size(); ++sequenceIndex)
         {
             auto step = optimalSequence.steps[sequenceIndex];
             std::string currentStepStr = std::to_string(currentStep);
+            auto buildShortcutGuidance = [&]() -> std::string {
+                if (step->original_step <= 0 || step->action_type == "run_test")
+                {
+                    return std::string();
+                }
+
+                if (step->original_step <= lastMappedOriginalStep + 1)
+                {
+                    return std::string();
+                }
+
+                const int skippedCount = step->original_step - lastMappedOriginalStep - 1;
+                if (skippedCount < 3)
+                {
+                    return std::string();
+                }
+
+                std::string guidance;
+                guidance += "\n\nOPTIMIZATION NOTE:\n";
+                guidance += "This optimized step skips ";
+                guidance += std::to_string(skippedCount);
+                guidance += " original intermediate step";
+                if (skippedCount != 1) guidance += "s";
+                guidance += ".\n\nOPTIONAL SHORTCUT JUSTIFICATION\n";
+                guidance += "If and only if the CURRENT TRAJECTORY already makes the locked action directly justified, ";
+                guidance += "you may include at most one short sentence in analysis explaining why it is reasonable to go directly to '";
+                guidance += step->action_subject;
+                guidance += "'.\n";
+                guidance += "- Frame it as direct-path reasoning, not hidden chronology\n";
+                guidance += "- Do not imply you performed skipped actions\n";
+                guidance += "- Do not mention functions, files, or steps that are not visible in CURRENT TRAJECTORY\n";
+                guidance += "- Explain only why the current evidence already localizes the problem enough to justify the shortcut\n";
+                guidance += "Good example: \"The current evidence already narrows this to declaration lowering, so I can go straight to the responsible function instead of spending another step on the dispatcher.\"\n";
+                guidance += "Bad examples: \"I first checked cg_stmt and then decided to skip to cg_decl_stmt.\" / ";
+                guidance += "\"After reviewing a few intermediate functions, I know this is cg_decl_stmt.\" / ";
+                guidance += "\"I can skip three hidden steps because they were dead ends.\"";
+                return guidance;
+            };
+            const std::string shortcutGuidance = buildShortcutGuidance();
 
             prevSteps = prevStepsSummary(distilledTrajectory, startStep);
 
@@ -4439,7 +4655,7 @@ namespace hen {
                 if (dIt != disclosure.end()) disclosureEntry = &dIt->second;
 
                 std::string currentTrajectory = distillStep(project, step->original_step, startStep, fixStep, currentStep,
-                                                            summary, prevSteps, requestedInfo, newInfo, nextStep, disclosureEntry);
+                                                            summary, prevSteps, requestedInfo, newInfo, nextStep, disclosureEntry, shortcutGuidance);
 
                 std::string content = utility::conversions::to_utf8string(nextStep.debug_step.to_json().serialize());
                 web::json::value schema;
@@ -4495,7 +4711,7 @@ namespace hen {
 
                 std::string newInfo;
                 std::string currentTrajectory = distillStep(project, step->original_step, startStep, fixStep, currentStep,
-                                                            summary, prevSteps, requestedInfo, newInfo, nextStep, disclosureEntry);
+                                                            summary, prevSteps, requestedInfo, newInfo, nextStep, disclosureEntry, shortcutGuidance);
 
                 if(!newInfo.empty())
                 {
@@ -4520,6 +4736,11 @@ namespace hen {
                 {
                     addStepToMessages(project, nextStep, currentStep, newInfo, messages);
                 }
+            }
+
+            if (step->original_step > 0)
+            {
+                lastMappedOriginalStep = step->original_step;
             }
 
             currentStep++;
