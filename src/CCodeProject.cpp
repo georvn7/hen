@@ -18,6 +18,28 @@
 
 namespace hen {
 
+    namespace {
+
+        bool isNonEmptyRegularFile(const std::string& path)
+        {
+            const boost_fs::path p(path);
+            if(!boost_fs::exists(p) || !boost_fs::is_regular_file(p))
+            {
+                return false;
+            }
+
+            return boost_fs::file_size(p) > 0;
+        }
+
+        bool hasCompletedDistillationArtifacts(const std::string& datasetDir)
+        {
+            return isNonEmptyRegularFile(datasetDir + "/trajectory_analysis.json") &&
+                   isNonEmptyRegularFile(datasetDir + "/train_dbg_sft.jsonl") &&
+                   isNonEmptyRegularFile(datasetDir + "/train_run_sft.jsonl");
+        }
+
+    }
+
 	DEFINE_TYPE(CCodeProject)
 	DEFINE_FIELD(CCodeProject, coding_style)
     DEFINE_FIELD(CCodeProject, libraries)
@@ -2325,6 +2347,15 @@ namespace hen {
 
                     if(boost_fs::exists(testWD))
                     {
+                        std::string datasetDir = getProjDir() + "/dataset/" + testName + "/" + runKey;
+                        if(hasCompletedDistillationArtifacts(datasetDir))
+                        {
+                            std::cout << "Skipping data synthesis for trajectory because completed dataset artifacts already exist: "
+                                      << datasetDir
+                                      << std::endl;
+                            continue;
+                        }
+
                         int startFrom = 0;
                         Distillery::getInstance().distillTrajectory(this,
                                                                    testWD,

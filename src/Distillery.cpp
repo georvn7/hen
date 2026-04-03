@@ -67,6 +67,116 @@ namespace hen {
                                                 const std::string& priorTrajectory,
                                                 int runStep,
                                                 const std::string& currentFixSubject);
+    static bool loadRecordedStep(const std::string& trajectoryRootDir,
+                                 int stepNumber,
+                                 DebugStep& outStep);
+    static int alignFromStepToRunTestBoundary(const std::string& trajectoryRootDir,
+                                              int candidateFromStep,
+                                              int nextStepIndex);
+    static bool isValidFixTrackRange(const std::pair<int, int>& range,
+                                     std::size_t trajectorySize);
+
+    static bool loadRecordedStep(const std::string& trajectoryRootDir,
+                                 int stepNumber,
+                                 DebugStep& outStep)
+    {
+        if (stepNumber <= 0)
+        {
+            return false;
+        }
+
+        const std::string stepDir = trajectoryRootDir + "/step_" + std::to_string(stepNumber);
+        const std::string dbgStepPath = stepDir + "/dbgStep.json";
+        if (!boost_fs::exists(dbgStepPath))
+        {
+            return false;
+        }
+
+        outStep.load(dbgStepPath);
+        return true;
+    }
+
+    static int alignFromStepToRunTestBoundary(const std::string& trajectoryRootDir,
+                                              int candidateFromStep,
+                                              int nextStepIndex)
+    {
+        static constexpr int MAX_BACKWARD_RUN_TEST_ALIGNMENT_STEPS = 10;
+
+        if (candidateFromStep <= 0)
+        {
+            return 0;
+        }
+
+        const int candidateStep = candidateFromStep + 1;
+        DebugStep stepInfo;
+        const int backwardLimit = std::max(1, candidateStep - MAX_BACKWARD_RUN_TEST_ALIGNMENT_STEPS);
+
+        for (int step = candidateStep; step >= backwardLimit; --step)
+        {
+            if (!loadRecordedStep(trajectoryRootDir, step, stepInfo))
+            {
+                continue;
+            }
+
+            if (stepInfo.m_action == "run_test")
+            {
+                const int alignedFromStep = step - 1;
+                if (alignedFromStep != candidateFromStep)
+                {
+                    std::cout << "Adjusted distillation slice start from step "
+                              << candidateStep
+                              << " back to run_test step "
+                              << step
+                              << " to preserve a complete fix track."
+                              << std::endl;
+                }
+                return alignedFromStep;
+            }
+        }
+
+        for (int step = candidateStep + 1; step < nextStepIndex; ++step)
+        {
+            if (!loadRecordedStep(trajectoryRootDir, step, stepInfo))
+            {
+                continue;
+            }
+
+            if (stepInfo.m_action == "run_test")
+            {
+                const int alignedFromStep = step - 1;
+                std::cout << "Skipped partial leading fragment by moving distillation slice start "
+                          << "forward from step "
+                          << candidateStep
+                          << " to run_test step "
+                          << step
+                          << "."
+                          << std::endl;
+                return alignedFromStep;
+            }
+        }
+
+        std::cout << "Unable to align distillation slice start around step "
+                  << candidateStep
+                  << "; keeping the original truncated boundary."
+                  << std::endl;
+        return candidateFromStep;
+    }
+
+    static bool isValidFixTrackRange(const std::pair<int, int>& range,
+                                     std::size_t trajectorySize)
+    {
+        if (range.first < 0 || range.second < 0)
+        {
+            return false;
+        }
+
+        if (range.second <= range.first)
+        {
+            return false;
+        }
+
+        return range.second <= static_cast<int>(trajectorySize);
+    }
 
     static bool tryParseJsonText(const std::string& text, web::json::value& out)
     {
@@ -739,8 +849,8 @@ namespace hen {
     {
         int fixStepIndex = stepToTrajectoryIndex(fixStep);
 
-        int startFixIndex;
-        int endFixIndex;
+        int startFixIndex = -1;
+        int endFixIndex = -1;
         for(auto fix : m_mergedFixes)
         {
             if(fix.first <= fixStepIndex && fixStepIndex <= fix.second)
@@ -751,11 +861,44 @@ namespace hen {
             }
         }
 
+        if(startFixIndex < 0 || endFixIndex < startFixIndex)
+        {
+            std::cout << "Rejecting fix track for step "
+                      << fixStep
+                      << " because it was not found in merged fix ranges."
+                      << std::endl;
+            return std::make_pair(-1, -1);
+        }
+
         int startFixStep = trajectoryIndexToStep(startFixIndex);
         int firstRunIndex = getLastIndexBefore(startFixStep, "run_test");
         //int nextRunStep = fixStep + 1;
 
+        if(firstRunIndex < 0)
+        {
+            std::cout << "Rejecting fix track for step "
+                      << fixStep
+                      << " because no preceding run_test is available in the loaded trajectory slice."
+                      << std::endl;
+            return std::make_pair(-1, -1);
+        }
+
         int lastRunIndex = endFixIndex + 1; //stepToTrajectoryIndex(nextRunStep);
+
+        if(lastRunIndex <= firstRunIndex || lastRunIndex > static_cast<int>(m_trajectory.size()))
+        {
+            std::cout << "Rejecting fix track for step "
+                      << fixStep
+                      << " due to invalid trajectory range ["
+                      << firstRunIndex
+                      << ", "
+                      << lastRunIndex
+                      << ") with trajectory size "
+                      << m_trajectory.size()
+                      << "."
+                      << std::endl;
+            return std::make_pair(-1, -1);
+        }
 
         return std::make_pair(firstRunIndex, lastRunIndex);
     }
@@ -763,6 +906,10 @@ namespace hen {
     std::string Distillery::trackForFix(CCodeProject* project, int fixStep)
     {
         auto range = getFixTrackRange(project, fixStep);
+        if(!isValidFixTrackRange(range, m_trajectory.size()))
+        {
+            return std::string();
+        }
 
         m_debugContext.clear();
 
@@ -1515,9 +1662,12 @@ namespace hen {
             //if(fixStep != 34) continue;
 
             int fixIndex = stepToTrajectoryIndex(fixStep);
-            if(fixIndex < 0 || fixIndex > m_trajectory.size())
+            if(fixIndex < 0 || fixIndex >= static_cast<int>(m_trajectory.size()))
             {
-                //Somthing is not cool here
+                std::cout << "Skipping blocker step "
+                          << fixStep
+                          << " because it is outside the loaded trajectory slice."
+                          << std::endl;
                 continue;
             }
 
@@ -1525,6 +1675,14 @@ namespace hen {
             {
                 fixStep = trajectoryIndexToStep(fixIndex);
                 fixIndex = getFirstIndexAfter(fixStep, "fix_function");
+                if(fixIndex < 0 || fixIndex >= static_cast<int>(m_trajectory.size()))
+                {
+                    std::cout << "Skipping blocker step "
+                              << fixStep
+                              << " because no matching fix_function exists after it in the loaded trajectory slice."
+                              << std::endl;
+                    continue;
+                }
                 fixStep = trajectoryIndexToStep(fixIndex);
             }
 
@@ -1665,7 +1823,10 @@ namespace hen {
             uint32_t nextStepIndex = (uint32_t)nextIndex(trajectoryRootDir, "step_");
             if(nextStepIndex > 300)
             {
-                fromStep = nextStepIndex - 300;
+                int desiredFromStep = static_cast<int>(nextStepIndex) - 300;
+                fromStep = alignFromStepToRunTestBoundary(trajectoryRootDir,
+                                                          desiredFromStep,
+                                                          static_cast<int>(nextStepIndex));
             }
         }
 
@@ -4281,8 +4442,25 @@ namespace hen {
     void Distillery::distillFixTrack(CCodeProject* project, const std::string& trajectoryAnalysis, uint32_t fixStep)
     {
         auto fixRange = getFixTrackRange(project, fixStep);
+        if(!isValidFixTrackRange(fixRange, m_trajectory.size()))
+        {
+            std::cout << "Skipping fix track for step "
+                      << fixStep
+                      << " due to invalid or incomplete range."
+                      << std::endl;
+            return;
+        }
+
         bool needsOptimization = fixRange.second - fixRange.first > 3;
         std::string fixTrack = trackForFix(project, fixStep);
+        if(fixTrack.empty())
+        {
+            std::cout << "Skipping fix track for step "
+                      << fixStep
+                      << " because the distilled context track is empty."
+                      << std::endl;
+            return;
+        }
 
         int startStep = trajectoryIndexToStep(fixRange.first);
         std::string testStepStr = std::to_string(startStep);

@@ -102,6 +102,19 @@ static bool isTransientServingPhaseError(const std::string& message)
     return message == "read" || message == "write";
 }
 
+static bool isTransientServingRequestParseError(const std::string& message)
+{
+    if(message.empty())
+    {
+        return false;
+    }
+
+    const std::string lowerMessage = toLower(message);
+    return lowerMessage.find("could not parse the json body of your request") != std::string::npos ||
+           lowerMessage.find("parse/handle error") != std::string::npos ||
+           lowerMessage.find("malformed token") != std::string::npos;
+}
+
 static uint32_t transientServingRetryDelayMs(const std::string& code,
                                              const std::string& message,
                                              bool missingResponse,
@@ -115,7 +128,8 @@ static uint32_t transientServingRetryDelayMs(const std::string& code,
     {
         return std::min<uint32_t>(300000, 60000u * attempt);
     }
-    if(isTransientServingPhaseError(message))
+    if(isTransientServingPhaseError(message) ||
+       isTransientServingRequestParseError(message))
     {
         return std::min<uint32_t>(30000, 5000u * attempt);
     }
