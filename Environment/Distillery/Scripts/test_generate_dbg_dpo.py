@@ -304,6 +304,70 @@ class GenerateDbgDpoTest(unittest.TestCase):
             self.assertEqual(trace_payload["selected_reject"]["reject_kind"], "hard_negative")
             self.assertEqual(record["meta"]["reject_kind"], "hard_negative")
 
+    def test_process_step_file_emits_utf8_without_ascii_escaping(self):
+        with tempfile.TemporaryDirectory() as td:
+            leaf = Path(td) / "leaf"
+            leaf.mkdir()
+            step_path = leaf / "step_1_2.json"
+            write_json(
+                step_path,
+                {
+                    "messages": [
+                        {"role": "system", "content": "Debugger"},
+                        {"role": "user", "content": "Tree:\n└── main"},
+                        {
+                            "role": "assistant",
+                            "content": json.dumps(
+                                {
+                                    "action_type": "function_info",
+                                    "action_subject": "foo",
+                                    "invocation": 1,
+                                    "line_number": 0,
+                                    "motivation": "Chosen optimized step.",
+                                    "breakpoints": [],
+                                }
+                            ),
+                        },
+                    ]
+                },
+            )
+
+            reject = self.mod.Candidate(
+                raw_content=json.dumps(
+                    {
+                        "action_type": "search_source",
+                        "action_subject": "bar",
+                        "invocation": 1,
+                        "line_number": 0,
+                        "motivation": "Rejected alternative.",
+                        "breakpoints": [],
+                    }
+                ),
+                action=self.mod.ActionKey("search_source", "bar"),
+                parsed={"action_type": "search_source", "action_subject": "bar"},
+                reasons=["action_type_mismatch"],
+                score=1,
+                reject_kind="efficiency_negative",
+            )
+            trace = self.mod.SelectionTrace(sample_outcomes=["synthetic"])
+            args = SimpleNamespace(model="test-model", overwrite=True, verbose=False)
+            writer = io.StringIO()
+
+            with mock.patch.object(self.mod, "choose_best_reject", return_value=(reject, trace)):
+                kept = self.mod.process_step_file(
+                    step_path=step_path,
+                    leaf_dir=leaf,
+                    step_meta_index={},
+                    train_writer=writer,
+                    args=args,
+                )
+
+            self.assertTrue(kept)
+            self.assertIn("└── main", writer.getvalue())
+            self.assertNotIn("\\u2514", writer.getvalue())
+            self.assertIn("└── main", (leaf / "step_1_2_prefer.json").read_text(encoding="utf-8"))
+            self.assertNotIn("\\u2514", (leaf / "step_1_2_prefer.json").read_text(encoding="utf-8"))
+
     def test_choose_best_reject_skips_request_failures(self):
         args = SimpleNamespace(
             api_base="http://127.0.0.1:8000/v1",

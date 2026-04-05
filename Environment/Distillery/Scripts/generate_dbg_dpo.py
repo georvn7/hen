@@ -780,7 +780,7 @@ def render_pair_text(prompt_messages: Sequence[dict], chosen_message: dict, reje
     rendered += "\n>> rejected_assistant\n\n\n"
     rendered += str(rejected_message.get("content", "")) + "\n"
     rendered += "\n>> meta\n\n\n"
-    rendered += json.dumps(meta, indent=2, ensure_ascii=True) + "\n"
+    rendered += json.dumps(meta, indent=2, ensure_ascii=False) + "\n"
     return rendered
 
 
@@ -824,7 +824,7 @@ def process_step_file(
         args=args,
     )
     trace_payload = build_trace_payload(step_name, chosen_parsed, chosen_action, trace, reject)
-    save_text(trace_file, json.dumps(trace_payload, ensure_ascii=True, indent=2))
+    save_text(trace_file, json.dumps(trace_payload, ensure_ascii=False, indent=2))
     if reject is None:
         if args.verbose:
             print(f"[skip] {step_name}: outcomes={';'.join(trace.sample_outcomes)}")
@@ -865,8 +865,8 @@ def process_step_file(
     prefer_payload = {"messages": prompt_messages + [chosen_message]}
     reject_payload = {"messages": prompt_messages + [rejected_message]}
 
-    save_text(prefer_file, json.dumps(prefer_payload, ensure_ascii=True))
-    save_text(reject_file, json.dumps(reject_payload, ensure_ascii=True))
+    save_text(prefer_file, json.dumps(prefer_payload, ensure_ascii=False))
+    save_text(reject_file, json.dumps(reject_payload, ensure_ascii=False))
     save_text(pair_file, render_pair_text(prompt_messages, chosen_message, rejected_message, meta))
 
     dpo_record = {
@@ -875,7 +875,7 @@ def process_step_file(
         "rejected": [rejected_message],
         "meta": meta,
     }
-    train_writer.write(json.dumps(dpo_record, ensure_ascii=True) + "\n")
+    train_writer.write(json.dumps(dpo_record, ensure_ascii=False) + "\n")
     train_writer.flush()
 
     if args.verbose:
