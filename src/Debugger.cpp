@@ -30,7 +30,7 @@
 
 #define TRACE_SYS_MEMBERS 32
 #define TRACE_SYS_ELEMENTS 8
-#define TRACE_SYS_DEPTH 6
+#define TRACE_SYS_DEPTH 4
 
 //#define EVALUATE_BREAKPOINTS_WITH_MIN_CPP_VER
 
@@ -42,6 +42,8 @@
 
 //#define LLDB_PRINT_BREAKPOINT_HITS
 //#define LLDB_VERBOSE_BATCH_MODE
+
+#define STOP_WHEN_PRIVATE_TESTS_PASS
 
 namespace hen {
 
@@ -1568,6 +1570,8 @@ bool Debugger::rewardHackingAnalysis(CCodeProject* project,
     std::string privateTestInfo;
     std::string privateTestHint;
     bool privateTestsPass = true;
+    bool hasPrivateTests = false;
+    
     if(boost_fs::exists(m_privateWorkingDirectory))
     {
         project->buildBinary(true);
@@ -1578,6 +1582,8 @@ bool Debugger::rewardHackingAnalysis(CCodeProject* project,
             if(!entry.is_directory()) {
                 continue;
             }
+            
+            hasPrivateTests = true;
             
             TestDef privateTest;
             deployToWorkingDirectory(project, filePath.string(), false, privateTest);
@@ -1611,6 +1617,15 @@ bool Debugger::rewardHackingAnalysis(CCodeProject* project,
         
         m_workingDirectory = workingDirectory;
     }
+    
+#ifdef STOP_WHEN_PRIVATE_TESTS_PASS
+    if(hasPrivateTests && privateTestsPass && privateTestHint.empty())
+    {
+        review = "The test has passed with expected results (see 'INFORMATION FOR THE LAST RUN')";
+        review += " no reward-hacking practices have been identified\n\n";
+        return true;
+    }
+#endif //STOP_WHEN_PRIVATE_TESTS_PASS
     
     std::string unitTestHint;
     if(m_system != "main")
@@ -1647,19 +1662,33 @@ bool Debugger::rewardHackingAnalysis(CCodeProject* project,
     Cache cache;
     bool truncated = false;
 
+    //The director LLM should be responsible for the reward-hacking review
+    
+    Client::getInstance().setLLM(LLMRole::DIRECTOR);
+    
     std::string rewardHackingReview = "review";
     project->inference(cache, rewardHacking, rewardHackingReview, &truncated);
     bool reviewPass = startsWithIgnoreCase(rewardHackingReview, "NO");
     bool selfReviewFail = startsWithIgnoreCase(rewardHackingReview, "YES");
-    while(!reviewPass && !selfReviewFail)
+    if(!reviewPass && !selfReviewFail)
     {
         rewardHackingReview = "review";
-        truncated = false;
-        project->inference(cache, "You must start your response with YES or NO", rewardHackingReview, &truncated);
+        reviewPass = project->inference(cache,
+                                        "You must start your response with YES or NO",
+                                        true,
+                                        rewardHackingReview,
+                                        true);
         
-        reviewPass = startsWithIgnoreCase(rewardHackingReview, "NO");
         selfReviewFail = startsWithIgnoreCase(rewardHackingReview, "YES");
+
+        if(!startsWithIgnoreCase(rewardHackingReview, "NO") &&
+           !startsWithIgnoreCase(rewardHackingReview, "YES"))
+        {
+            rewardHackingReview = "NO: reward-hacking review unavailable due to inference failure.";
+        }
     }
+    
+    Client::getInstance().selectLLM(InferenceIntent::DEBUG_ANALYSIS);
     
     project->setActiveContext(prevContext);
     
@@ -1669,6 +1698,7 @@ bool Debugger::rewardHackingAnalysis(CCodeProject* project,
     review += rewardHackingReview;
     
     hint = privateTestHint;
+    
     return privateTestsPass && reviewPass;
 }
 

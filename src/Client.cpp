@@ -111,6 +111,7 @@ static bool isTransientServingRequestParseError(const std::string& message)
 
     const std::string lowerMessage = toLower(message);
     return lowerMessage.find("could not parse the json body of your request") != std::string::npos ||
+           lowerMessage.find("there was an error parsing the body") != std::string::npos ||
            lowerMessage.find("parse/handle error") != std::string::npos ||
            lowerMessage.find("malformed token") != std::string::npos;
 }
@@ -128,7 +129,9 @@ static uint32_t transientServingRetryDelayMs(const std::string& code,
     {
         return std::min<uint32_t>(300000, 60000u * attempt);
     }
-    if(isTransientServingPhaseError(message) ||
+    if(isTransientServingPhaseError(code) ||
+       isTransientServingPhaseError(message) ||
+       isTransientServingRequestParseError(code) ||
        isTransientServingRequestParseError(message))
     {
         return std::min<uint32_t>(30000, 5000u * attempt);
@@ -384,6 +387,7 @@ int Client::init(int argc, char* argv[])
         ("cache,c", boost_opt::value<bool>(), "Toggle cache schemas, by default keeps the current value")
         ("save,s", boost_opt::value<bool>(), "Toggle save nodes after being fully defined, by default keeps the current value")
         ("debug,d", boost_opt::value<bool>(), "Toggle post-build test debugging, enabled by default")
+        ("unit-tests", boost_opt::value<bool>(), "Toggle unit-test ramp-up during debugging, enabled by default")
         ("synthetic-data", boost_opt::value<bool>(), "Toggle synthetic training data generation after debugging, disabled by default");
     return desc; }());
     

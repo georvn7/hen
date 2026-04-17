@@ -2034,189 +2034,191 @@ namespace hen {
                 
                 for(int i=0; i<2; ++i)
                 {
-#if 1 //this is basically ramp up the solution space via unit tests
+                    if(m_runUnitTests)
+                    {
                     
-                    //Here we need to build/update unit tests and initially compile and link them
-                    std::multimap<uint32_t, std::string, std::greater<uint32_t>> unitTests;
-                    if (!config.current_unit_test.empty() && config.ramp_unit_tests.size() > 0)
-                    {
-                        generateDataHeader();
-                        // TODO: handle starting from specific unit test if needed
-                        for(auto test : config.ramp_unit_tests)
+                        //This is basically ramp up the solution space via unit tests
+                        //Here we need to build/update unit tests and initially compile and link them
+                        std::multimap<uint32_t, std::string, std::greater<uint32_t>> unitTests;
+                        if (!config.current_unit_test.empty() && config.ramp_unit_tests.size() > 0)
                         {
-                            std::vector<std::string> functionAndDepth;
-                            boost::split(functionAndDepth, *test, boost::is_any_of(":"));
-                            
-                            CCodeNode* ccNode = (CCodeNode*)getNodeByName(functionAndDepth[0]);
-                            if(!ccNode) continue;
-                            
-                            //Ensure all required files are in the test directory
-                            ccNode->storeUnitTestContent();
-                            buildUnitTest(functionAndDepth[0], true);
-                            
-                            auto testPair = std::make_pair((uint32_t)std::atoi(functionAndDepth[1].c_str()), functionAndDepth[0]);
-                            unitTests.insert(testPair);
+                            generateDataHeader();
+                            // TODO: handle starting from specific unit test if needed
+                            for(auto test : config.ramp_unit_tests)
+                            {
+                                std::vector<std::string> functionAndDepth;
+                                boost::split(functionAndDepth, *test, boost::is_any_of(":"));
+                                
+                                CCodeNode* ccNode = (CCodeNode*)getNodeByName(functionAndDepth[0]);
+                                if(!ccNode) continue;
+                                
+                                //Ensure all required files are in the test directory
+                                ccNode->storeUnitTestContent();
+                                buildUnitTest(functionAndDepth[0], true);
+                                
+                                auto testPair = std::make_pair((uint32_t)std::atoi(functionAndDepth[1].c_str()), functionAndDepth[0]);
+                                unitTests.insert(testPair);
+                            }
                         }
-                    }
-                    else
-                    {
-                        unitTests = generateUnitTests(publicTestPath, prevPublicTestPath, fullTestRecommendation);
+                        else
+                        {
+                            unitTests = generateUnitTests(publicTestPath, prevPublicTestPath, fullTestRecommendation);
+                            
+                            std::string commitMessage = config.current + "_unit_tests";
+                            std::string afterUnitTestsCommit = commit(commitMessage);
+                            
+                            //Setup and record the config with generated unit tests
+                            std::string utKey;
+                            for(auto test : unitTests)
+                            {
+                                std::string testKey = test.second + ":" + std::to_string(test.first);
+                                
+                                //pickup the first as starting point
+                                if(utKey.empty())
+                                {
+                                    utKey = testKey;
+                                }
+                                
+                                config.ramp_unit_tests.push_back(std::make_shared<std::string>(testKey));
+                            }
+                            
+                            config.current_unit_test = utKey;
+                            saveJson(config.to_json(), testDirecotry + "/config.json");
+                        }
                         
-                        std::string commitMessage = config.current + "_unit_tests";
-                        std::string afterUnitTestsCommit = commit(commitMessage);
-                        
-                        //Setup and record the config with generated unit tests
-                        std::string utKey;
+                        bool utStarted = false;
                         for(auto test : unitTests)
                         {
-                            std::string testKey = test.second + ":" + std::to_string(test.first);
+                            std::string utKey = test.second + ":" + std::to_string(test.first);
                             
-                            //pickup the first as starting point
-                            if(utKey.empty())
+                            std::string unitTestPath = getProjDir() + "/build/source/" + test.second + "/test";
+                            
+                            if(utKey == config.current_unit_test)
                             {
-                                utKey = testKey;
+                                utStarted = true;
                             }
                             
-                            config.ramp_unit_tests.push_back(std::make_shared<std::string>(testKey));
-                        }
-                        
-                        config.current_unit_test = utKey;
-                        saveJson(config.to_json(), testDirecotry + "/config.json");
-                    }
-                    
-                    bool utStarted = false;
-                    for(auto test : unitTests)
-                    {
-                        std::string utKey = test.second + ":" + std::to_string(test.first);
-                        
-                        std::string unitTestPath = getProjDir() + "/build/source/" + test.second + "/test";
-                        
-                        if(utKey == config.current_unit_test)
-                        {
-                            utStarted = true;
-                        }
-                        
-                        if(!utStarted)
-                        {
-                            continue;
-                        }
-                        
-                        //Archive the previous trajectory
-                        std::string trajectoryDir;
-                        uint32_t utAttempt = 1;
-                        std::string archiveFailureReason;
-                        if(!archiveTest(unitTestPath, trajectoryDir, utAttempt, archiveFailureReason))
-                        {
-                            std::cout << "Unable to prepare a fresh unit-test trajectory for: " << unitTestPath << std::endl;
-                            if(!archiveFailureReason.empty())
+                            if(!utStarted)
                             {
-                                std::cout << archiveFailureReason << std::endl;
-                            }
-                            return;
-                        }
-                        if(boost_fs::exists(trajectoryDir))
-                        {
-                            std::cout << "Unable to start unit-test debugging with a clean trajectory. Existing path was not removed: "
-                                      << trajectoryDir << std::endl;
-                            return;
-                        }
-                        
-                        std::string branchName = "before_" + config.current + "_" + std::to_string(utAttempt);
-                        
-                        branchName += "_" + test.second + "_" + std::to_string(utAttempt);
-                        std::string beforeTheUTest = createBranchFromCurrent(getProjDir() + "/dag", branchName);
-                        
-                        config.current_unit_test = utKey;
-                        saveJson(config.to_json(), testDirecotry + "/config.json");
-                        
-                        bool uintTestPass = false;
-                        bool hasBeenReset = false;
-                        int j=0;
-                        while(j<3)
-                        {
-                            CCodeNode* ccNode = (CCodeNode*)getNodeByName(test.second);
-                            if(!ccNode->unitTestExists())
-                            {
-                                std::cout << "Unit test doesn't exist: " << ccNode->getName() << std::endl;
-                                break;
+                                continue;
                             }
                             
-                            ccNode->storeUnitTestContent();
-                            
-                            auto dbgResult = Debugger::getInstance().debug(this,
-                                                                         100,
-                                                                         test.second,
-                                                                         unitTestPath,
-                                                                         std::string(),
-                                                                         std::string(),
-                                                                         Client::getInstance().getDebugPort());
-                            
-                            uintTestPass = dbgResult.first;
-                            
-                            if(uintTestPass)
+                            //Archive the previous trajectory
+                            std::string trajectoryDir;
+                            uint32_t utAttempt = 1;
+                            std::string archiveFailureReason;
+                            if(!archiveTest(unitTestPath, trajectoryDir, utAttempt, archiveFailureReason))
                             {
-                                //TODO: Consider learning after each unit test
-                                //Distillery::getInstance().distillTrajectory(this, unitTestPath, 0 , -1);
-                                break;
-                            }
-                            else
-                            {
-                                //Check if the unit test needs improvements
-                                Distillery::getInstance().clear();
-                                Distillery::getInstance().loadTrajectory(this, unitTestPath, 0 , -1);
-                                std::string trajectory = Distillery::getInstance().printTrajectory();
-                                
-                                TestDef fullTest;
-                                fullTest.load(publicTestPath + "/test.json");
-                                
-                                std::string fullTestDesc = fullTest.getDescription(publicTestPath);
-                                
-                                captureContext("");
-                                
-                                bool isBroken = ccNode->unitTestIsBroken(trajectory, fullTestDesc, dbgResult.second);
-                                bool stopTest = false;
-                                if(isBroken && !hasBeenReset && j < 2)
+                                std::cout << "Unable to prepare a fresh unit-test trajectory for: " << unitTestPath << std::endl;
+                                if(!archiveFailureReason.empty())
                                 {
-                                    //Destructive hard reset
-                                    std::string revertToCommit = resetBranchToBranchedFromCommit(getProjDir() + "/dag", branchName);
-                                    assert(revertToCommit == beforeTheUTest);
-                                    j=0;
-                                    hasBeenReset = true;
-                                    
-                                    //Get pointer to the new node after reload
-                                    ccNode = getNodeByName(test.second);
-                                    ccNode->improveUnitTest();
-                                    
-                                    std::string brokenArchiveFailureReason;
-                                    if(!archiveBrokenTest(unitTestPath, brokenArchiveFailureReason))
-                                    {
-                                        std::cout << "Unable to archive the broken unit-test trajectory for: " << unitTestPath << std::endl;
-                                        if(!brokenArchiveFailureReason.empty())
-                                        {
-                                            std::cout << brokenArchiveFailureReason << std::endl;
-                                        }
-                                        return;
-                                    }
+                                    std::cout << archiveFailureReason << std::endl;
+                                }
+                                return;
+                            }
+                            if(boost_fs::exists(trajectoryDir))
+                            {
+                                std::cout << "Unable to start unit-test debugging with a clean trajectory. Existing path was not removed: "
+                                          << trajectoryDir << std::endl;
+                                return;
+                            }
+                            
+                            std::string branchName = "before_" + config.current + "_" + std::to_string(utAttempt);
+                            
+                            branchName += "_" + test.second + "_" + std::to_string(utAttempt);
+                            std::string beforeTheUTest = createBranchFromCurrent(getProjDir() + "/dag", branchName);
+                            
+                            config.current_unit_test = utKey;
+                            saveJson(config.to_json(), testDirecotry + "/config.json");
+                            
+                            bool uintTestPass = false;
+                            bool hasBeenReset = false;
+                            int j=0;
+                            while(j<3)
+                            {
+                                CCodeNode* ccNode = (CCodeNode*)getNodeByName(test.second);
+                                if(!ccNode->unitTestExists())
+                                {
+                                    std::cout << "Unit test doesn't exist: " << ccNode->getName() << std::endl;
+                                    break;
+                                }
+                                
+                                ccNode->storeUnitTestContent();
+                                
+                                auto dbgResult = Debugger::getInstance().debug(this,
+                                                                             100,
+                                                                             test.second,
+                                                                             unitTestPath,
+                                                                             std::string(),
+                                                                             std::string(),
+                                                                             Client::getInstance().getDebugPort());
+                                
+                                uintTestPass = dbgResult.first;
+                                
+                                if(uintTestPass)
+                                {
+                                    //TODO: Consider learning after each unit test
+                                    //Distillery::getInstance().distillTrajectory(this, unitTestPath, 0 , -1);
+                                    break;
                                 }
                                 else
                                 {
-                                    j++;
-                                    stopTest = isBroken;
+                                    //Check if the unit test needs improvements
+                                    Distillery::getInstance().clear();
+                                    Distillery::getInstance().loadTrajectory(this, unitTestPath, 0 , -1);
+                                    std::string trajectory = Distillery::getInstance().printTrajectory();
+                                    
+                                    TestDef fullTest;
+                                    fullTest.load(publicTestPath + "/test.json");
+                                    
+                                    std::string fullTestDesc = fullTest.getDescription(publicTestPath);
+                                    
+                                    captureContext("");
+                                    
+                                    bool isBroken = ccNode->unitTestIsBroken(trajectory, fullTestDesc, dbgResult.second);
+                                    bool stopTest = false;
+                                    if(isBroken && !hasBeenReset && j < 2)
+                                    {
+                                        //Destructive hard reset
+                                        std::string revertToCommit = resetBranchToBranchedFromCommit(getProjDir() + "/dag", branchName);
+                                        assert(revertToCommit == beforeTheUTest);
+                                        j=0;
+                                        hasBeenReset = true;
+                                        
+                                        //Get pointer to the new node after reload
+                                        ccNode = getNodeByName(test.second);
+                                        ccNode->improveUnitTest();
+                                        
+                                        std::string brokenArchiveFailureReason;
+                                        if(!archiveBrokenTest(unitTestPath, brokenArchiveFailureReason))
+                                        {
+                                            std::cout << "Unable to archive the broken unit-test trajectory for: " << unitTestPath << std::endl;
+                                            if(!brokenArchiveFailureReason.empty())
+                                            {
+                                                std::cout << brokenArchiveFailureReason << std::endl;
+                                            }
+                                            return;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        j++;
+                                        stopTest = isBroken;
+                                    }
+                                    
+                                    popContext();
+                                    
+                                    if(stopTest) break;
                                 }
-                                
-                                popContext();
-                                
-                                if(stopTest) break;
+                            }
+                            
+                            if(!uintTestPass)
+                            {
+                                //Inform, but continue with other unit tests
+                                std::cout << "Couldn't pass the unit test: " << test.second << std::endl;
                             }
                         }
-                        
-                        if(!uintTestPass)
-                        {
-                            //Inform, but continue with other unit tests
-                            std::cout << "Couldn't pass the unit test: " << test.second << std::endl;
-                        }
                     }
-#endif
                     
                     //We start with different unit tests each run. So it can't be continuation of the previous trajectory!
                     std::string trajectoryDirFullTest;
@@ -2380,6 +2382,11 @@ namespace hen {
             if(args.count("debug"))
             {
                 m_runDebugTests = args["debug"].as<bool>();
+            }
+            
+            if(args.count("unit-tests"))
+            {
+                m_runUnitTests = args["unit-tests"].as<bool>();
             }
 
             if(args.count("synthetic-data"))

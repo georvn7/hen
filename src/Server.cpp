@@ -7,6 +7,8 @@
 #include "Utils.h"
 
 #include <atomic>
+#include <iomanip>
+#include <sstream>
 
 using namespace utility;                    // Common utilities like string conversions
 using namespace web;                        // Common features like URIs.
@@ -20,6 +22,130 @@ using namespace http::experimental::listener;
 namespace hen {
 
 namespace {
+
+bool decodeUtf8CodeUnit(const unsigned char* s, size_t len, size_t& adv)
+{
+    adv = 0;
+    if (len == 0) {
+        return true;
+    }
+
+    const unsigned char b0 = s[0];
+    if (b0 < 0x80) {
+        adv = 1;
+        if (b0 == 0x09 || b0 == 0x0A || b0 == 0x0B || b0 == 0x0C || b0 == 0x0D) {
+            return true;
+        }
+        return b0 >= 0x20 && b0 <= 0x7E;
+    }
+
+    auto need = [&](size_t n) { return len >= n; };
+    auto cont = [&](unsigned char b) { return (b & 0xC0) == 0x80; };
+
+    if (b0 >= 0xC2 && b0 <= 0xDF) {
+        if (!need(2) || !cont(s[1])) return false;
+        adv = 2;
+        return true;
+    }
+    if (b0 == 0xE0) {
+        if (!need(3) || !(s[1] >= 0xA0 && s[1] <= 0xBF) || !cont(s[2])) return false;
+        adv = 3;
+        return true;
+    }
+    if (b0 >= 0xE1 && b0 <= 0xEC) {
+        if (!need(3) || !cont(s[1]) || !cont(s[2])) return false;
+        adv = 3;
+        return true;
+    }
+    if (b0 == 0xED) {
+        if (!need(3) || !(s[1] >= 0x80 && s[1] <= 0x9F) || !cont(s[2])) return false;
+        adv = 3;
+        return true;
+    }
+    if (b0 >= 0xEE && b0 <= 0xEF) {
+        if (!need(3) || !cont(s[1]) || !cont(s[2])) return false;
+        adv = 3;
+        return true;
+    }
+    if (b0 == 0xF0) {
+        if (!need(4) || !(s[1] >= 0x90 && s[1] <= 0xBF) || !cont(s[2]) || !cont(s[3])) return false;
+        adv = 4;
+        return true;
+    }
+    if (b0 >= 0xF1 && b0 <= 0xF3) {
+        if (!need(4) || !cont(s[1]) || !cont(s[2]) || !cont(s[3])) return false;
+        adv = 4;
+        return true;
+    }
+    if (b0 == 0xF4) {
+        if (!need(4) || !(s[1] >= 0x80 && s[1] <= 0x8F) || !cont(s[2]) || !cont(s[3])) return false;
+        adv = 4;
+        return true;
+    }
+
+    return false;
+}
+
+size_t sanitizeUtf8ForProvider(std::string& text)
+{
+    std::string sanitized;
+    sanitized.reserve(text.size());
+
+    size_t replaced = 0;
+    size_t i = 0;
+    while (i < text.size()) {
+        size_t adv = 0;
+        const auto* ptr = reinterpret_cast<const unsigned char*>(text.data() + i);
+        if (decodeUtf8CodeUnit(ptr, text.size() - i, adv)) {
+            if (adv == 0) {
+                break;
+            }
+            sanitized.append(text, i, adv);
+            i += adv;
+            continue;
+        }
+
+        std::ostringstream escaped;
+        escaped << "<0x" << std::uppercase << std::hex << std::setw(2) << std::setfill('0')
+                << static_cast<unsigned int>(static_cast<unsigned char>(text[i])) << ">";
+        sanitized += escaped.str();
+        ++i;
+        ++replaced;
+    }
+
+    if (replaced > 0) {
+        text.swap(sanitized);
+    }
+    return replaced;
+}
+
+size_t sanitizeJsonStringsForProvider(web::json::value& value)
+{
+    if (value.is_string()) {
+        std::string text = utility::conversions::to_utf8string(value.as_string());
+        const size_t replaced = sanitizeUtf8ForProvider(text);
+        if (replaced > 0) {
+            value = web::json::value::string(utility::conversions::to_string_t(text));
+        }
+        return replaced;
+    }
+
+    size_t replaced = 0;
+    if (value.is_array()) {
+        auto& array = value.as_array();
+        for (auto& item : array) {
+            replaced += sanitizeJsonStringsForProvider(item);
+        }
+    }
+    else if (value.is_object()) {
+        auto& object = value.as_object();
+        for (auto& item : object) {
+            replaced += sanitizeJsonStringsForProvider(item.second);
+        }
+    }
+
+    return replaced;
+}
 
 bool isOpenAICompatibleUsageProvider(const std::string& provider)
 {
@@ -697,9 +823,21 @@ private:
         else
             std::cerr << "AsyncLLMSession error: " << what << "\n";
 
-        // Optionally return an error to remote_
+        // Return a structured error so the client can preserve both the phase
+        // ("read", "write", ...) and the underlying provider/transport detail.
         web::json::value errorReply;
-        errorReply[U("error")] = web::json::value::string(utility::conversions::to_string_t(what));
+        errorReply[U("error")][U("code")] =
+            web::json::value::string(utility::conversions::to_string_t(what));
+        if(ec)
+        {
+            errorReply[U("error")][U("message")] =
+                web::json::value::string(utility::conversions::to_string_t(ec.message()));
+        }
+        else
+        {
+            errorReply[U("error")][U("message")] =
+                web::json::value::string(utility::conversions::to_string_t(what));
+        }
         
         if(requestId_ != INVALID_REQUEST_ID)
         {
@@ -1042,6 +1180,12 @@ boost_bst::http::request<boost_bst::http::string_body> Server::prepareBeastReque
     std::shared_ptr<LLMConfig>& llm, std::string& projectId)
 {
     projectId = prepareBody(requestFromClientBody, llm);
+    const size_t replacedUtf8Bytes = sanitizeJsonStringsForProvider(requestFromClientBody);
+    if(replacedUtf8Bytes > 0)
+    {
+        std::cout << "Sanitized outbound provider request: replaced "
+                  << replacedUtf8Bytes << " invalid UTF-8 bytes." << std::endl;
+    }
 
     // Build a JSON string from requestFromClientBody
     std::string bodyStr = utility::conversions::to_utf8string(requestFromClientBody.serialize());
@@ -1894,6 +2038,8 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
             
             //requestFromClientBody[U("temperature")] = json::value::number(0.2);
             //requestFromClientBody[U("top_p")] = json::value::number(0.95);
+            
+            requestFromClientBody[U("max_tokens")] = json::value::number(6144);
         }
         else
         {
@@ -2071,6 +2217,11 @@ json::value Server::handleResponse(json::value& json_response, std::shared_ptr<L
     if (json_response.has_field(U("error")))
     {
         reply[U("error")] = json_response.at(U("error"));
+    }
+    else if (json_response.has_field(U("detail")) && json_response.at(U("detail")).is_string())
+    {
+        reply[U("error")][U("code")] = json::value::string(U("provider_detail"));
+        reply[U("error")][U("message")] = json_response.at(U("detail"));
     }
 
     if (json_response.has_field(U("output")) && json_response[U("output")].is_array())

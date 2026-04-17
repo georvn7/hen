@@ -107,6 +107,7 @@ namespace hen {
         std::string m_buildCacheDir;
         std::string m_plan;
         bool m_runDebugTests;
+        bool m_runUnitTests;
         bool m_runTrainingDataSynthesis;
         
         void clear();
@@ -124,6 +125,7 @@ namespace hen {
         Project(),
         m_refactoringDepth(0),
         m_runDebugTests(true),
+        m_runUnitTests(true),
         m_runTrainingDataSynthesis(false)
         {
             
