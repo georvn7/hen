@@ -2049,6 +2049,14 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
             //requestFromClientBody[U("repetition_penalty")] = json::value::number(1.05);
         }
     }
+    else if(llm->provider == "vllm")
+    {
+        requestFromClientBody[U("stream")] = json::value::boolean(false);
+        requestFromClientBody[U("max_tokens")] = json::value::number(4096);
+        requestFromClientBody[U("temperature")] = json::value::number(0.15);
+        requestFromClientBody[U("repetition_penalty")] = json::value::number(1.08);
+        requestFromClientBody[U("top_p")] = json::value::number(0.9);
+    }
     else
     {
         requestFromClientBody[U("stream")] = json::value::boolean(false);
