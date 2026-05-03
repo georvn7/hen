@@ -109,6 +109,8 @@ namespace hen {
         bool m_runDebugTests;
         bool m_runUnitTests;
         bool m_runTrainingDataSynthesis;
+        bool m_runValidationDataSynthesis;
+        bool m_runRareActionDataSynthesis;
         
         void clear();
         
@@ -126,7 +128,9 @@ namespace hen {
         m_refactoringDepth(0),
         m_runDebugTests(true),
         m_runUnitTests(true),
-        m_runTrainingDataSynthesis(false)
+        m_runTrainingDataSynthesis(false),
+        m_runValidationDataSynthesis(false),
+        m_runRareActionDataSynthesis(false)
         {
             
         }
@@ -249,7 +253,7 @@ namespace hen {
         bool archiveTest(const std::string& testPath, std::string& trajectoryDir, uint32_t& nextAttempt, std::string& failureReason);
         bool archiveBrokenTest(const std::string& testPath, std::string& failureReason);
         void debugTests();
-        void synthetizeTrainingData();
+        void synthetizeTrainingData(bool validationOnly = false, bool rareActionsOnly = false);
         std::multimap<uint32_t, std::string, std::greater<uint32_t>>
         generateUnitTests(const std::string& finalTestPath, const std::string& prevFinalTestPath, std::string& fullTestRecommendation);
         bool buildBinary(bool enableSanitizer);

@@ -43,6 +43,7 @@ namespace hen {
     DEFINE_FIELD(DistillSummary, step_samples_written)
     DEFINE_FIELD(DistillSummary, debug_samples_written)
     DEFINE_FIELD(DistillSummary, system_samples_written)
+    DEFINE_FIELD(DistillSummary, validation_samples_written)
     DEFINE_FIELD(DistillSummary, system_samples_skipped)
     DEFINE_ARRAY_FIELD(DistillSummary, skipped_items)
 
@@ -75,6 +76,166 @@ namespace hen {
                                               int nextStepIndex);
     static bool isValidFixTrackRange(const std::pair<int, int>& range,
                                      std::size_t trajectorySize);
+
+    static bool isRareDebugAction(const std::string& action)
+    {
+        static const std::set<std::string> rareActions = {
+            "file_info",
+            "search_source",
+            "functions_summary",
+            "call_graph",
+            "data_info",
+            "log_info",
+            "debug_function"
+        };
+
+        return rareActions.count(action) > 0;
+    }
+
+    static bool isActionKeyword(const std::string& value)
+    {
+        static const std::set<std::string> actionKeywords = {
+            "file_info",
+            "search_source",
+            "functions_summary",
+            "call_graph",
+            "data_info",
+            "log_info",
+            "debug_function",
+            "function_info",
+            "step_info",
+            "fix_function",
+            "run_test"
+        };
+
+        return actionKeywords.count(value) > 0;
+    }
+
+    static bool isValidRareDebugActionStep(const OptimizedStep& step, std::string& reason)
+    {
+        reason.clear();
+
+        if(!isRareDebugAction(step.action_type))
+        {
+            return true;
+        }
+
+        if(step.action_subject.empty() || step.action_subject == "none")
+        {
+            reason = "empty action_subject";
+            return false;
+        }
+
+        if(isActionKeyword(step.action_subject))
+        {
+            reason = "action_subject is an action keyword";
+            return false;
+        }
+
+        return true;
+    }
+
+    static std::string optimizedStepSignature(const OptimizedStep& step)
+    {
+        return step.action_type + "\x1f" +
+               step.action_subject + "\x1f" +
+               std::to_string(step.line_number) + "\x1f" +
+               std::to_string(step.invocation) + "\x1f" +
+               std::to_string(step.original_step);
+    }
+
+    static std::vector<OptimizedStep> collectRareDebugActions(const EditSourceSequence& sequence)
+    {
+        std::vector<OptimizedStep> rare;
+        for(const auto& step : sequence.steps)
+        {
+            if(step && isRareDebugAction(step->action_type))
+            {
+                std::string reason;
+                if(isValidRareDebugActionStep(*step, reason))
+                {
+                    rare.push_back(*step);
+                }
+            }
+        }
+
+        return rare;
+    }
+
+    static std::vector<OptimizedStep> missingRareDebugActions(const EditSourceSequence& sequence,
+                                                             const std::vector<OptimizedStep>& requiredRareActions)
+    {
+        std::vector<OptimizedStep> missing;
+        std::vector<std::string> sequenceSignatures;
+        for(const auto& step : sequence.steps)
+        {
+            if(step)
+            {
+                sequenceSignatures.push_back(optimizedStepSignature(*step));
+            }
+        }
+
+        std::size_t cursor = 0;
+        for(const auto& required : requiredRareActions)
+        {
+            const std::string requiredSignature = optimizedStepSignature(required);
+            bool found = false;
+            while(cursor < sequenceSignatures.size())
+            {
+                if(sequenceSignatures[cursor] == requiredSignature)
+                {
+                    found = true;
+                    ++cursor;
+                    break;
+                }
+                ++cursor;
+            }
+
+            if(!found)
+            {
+                missing.push_back(required);
+            }
+        }
+
+        return missing;
+    }
+
+    static std::string rareDebugActionsText(const std::vector<OptimizedStep>& rareActions)
+    {
+        std::string out;
+        int index = 1;
+        for(const auto& step : rareActions)
+        {
+            out += std::to_string(index) + ". ";
+            out += "original_step=" + std::to_string(step.original_step);
+            out += ", action_type=" + step.action_type;
+            out += ", action_subject=" + step.action_subject;
+            out += ", invocation=" + std::to_string(step.invocation);
+            out += ", line_number=" + std::to_string(step.line_number);
+            out += "\n";
+            ++index;
+        }
+
+        if(out.empty())
+        {
+            out = "<none>\n";
+        }
+
+        return out;
+    }
+
+    static bool loadEditSourceSequence(const std::string& path, EditSourceSequence& out)
+    {
+        web::json::value value;
+        if(!loadJson(value, path))
+        {
+            return false;
+        }
+
+        out.clear();
+        out.from_json(value);
+        return true;
+    }
 
     static bool loadRecordedStep(const std::string& trajectoryRootDir,
                                  int stepNumber,
@@ -293,6 +454,249 @@ namespace hen {
         return true;
     }
 
+    static bool normalizeActionPayloadFromText(const std::string& text,
+                                               web::json::value& actionObj)
+    {
+        if (!tryParseJsonText(text, actionObj) || !actionObj.is_object())
+        {
+            return false;
+        }
+
+        std::string reason;
+        return normalizeActionPayload(actionObj, reason);
+    }
+
+    static bool hasRareAssistantActionTargetOrHistory(const web::json::value& chatSample)
+    {
+        if (!chatSample.is_object() ||
+            !chatSample.has_field(U("messages")) ||
+            !chatSample.at(U("messages")).is_array())
+        {
+            return false;
+        }
+
+        const auto& messages = chatSample.at(U("messages")).as_array();
+        for (size_t i = 0; i < messages.size(); ++i)
+        {
+            const auto& msg = messages.at(i);
+            if (!msg.is_object() ||
+                !msg.has_field(U("role")) ||
+                !msg.at(U("role")).is_string() ||
+                !msg.has_field(U("content")) ||
+                !msg.at(U("content")).is_string())
+            {
+                continue;
+            }
+
+            const std::string role =
+                utility::conversions::to_utf8string(msg.at(U("role")).as_string());
+            if (role != "assistant")
+            {
+                continue;
+            }
+
+            const std::string content =
+                utility::conversions::to_utf8string(msg.at(U("content")).as_string());
+            web::json::value actionObj;
+            if (!normalizeActionPayloadFromText(content, actionObj))
+            {
+                continue;
+            }
+
+            const std::string actionType =
+                utility::conversions::to_utf8string(actionObj.at(U("action_type")).as_string());
+            if (isRareDebugAction(actionType))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    static bool extractAssistantContent(const web::json::value& response,
+                                        std::string& content)
+    {
+        content.clear();
+        if (!response.is_object())
+        {
+            return false;
+        }
+
+        if (response.has_field(U("message")) &&
+            response.at(U("message")).is_object())
+        {
+            const auto& message = response.at(U("message"));
+            if (message.has_field(U("content")) &&
+                message.at(U("content")).is_string())
+            {
+                content =
+                utility::conversions::to_utf8string(message.at(U("content")).as_string());
+                return true;
+            }
+        }
+
+        if (response.has_field(U("choices")) &&
+            response.at(U("choices")).is_array() &&
+            response.at(U("choices")).as_array().size() > 0)
+        {
+            const auto& choice = response.at(U("choices")).as_array().at(0);
+            if (choice.is_object() &&
+                choice.has_field(U("message")) &&
+                choice.at(U("message")).is_object())
+            {
+                const auto& message = choice.at(U("message"));
+                if (message.has_field(U("content")) &&
+                    message.at(U("content")).is_string())
+                {
+                    content =
+                    utility::conversions::to_utf8string(message.at(U("content")).as_string());
+                    return true;
+                }
+            }
+        }
+
+        if (response.has_field(U("content")) &&
+            response.at(U("content")).is_string())
+        {
+            content =
+            utility::conversions::to_utf8string(response.at(U("content")).as_string());
+            return true;
+        }
+
+        return false;
+    }
+
+    static bool extractLastUserContent(const web::json::value& request,
+                                       std::string& content)
+    {
+        content.clear();
+        if (!request.is_object() ||
+            !request.has_field(U("messages")) ||
+            !request.at(U("messages")).is_array())
+        {
+            return false;
+        }
+
+        const auto& messages = request.at(U("messages")).as_array();
+        for (int i = static_cast<int>(messages.size()) - 1; i >= 0; --i)
+        {
+            const auto& msg = messages.at(i);
+            if (!msg.is_object() ||
+                !msg.has_field(U("role")) ||
+                !msg.at(U("role")).is_string() ||
+                !msg.has_field(U("content")) ||
+                !msg.at(U("content")).is_string())
+            {
+                continue;
+            }
+
+            const std::string role =
+            utility::conversions::to_utf8string(msg.at(U("role")).as_string());
+            if (role != "user")
+            {
+                continue;
+            }
+
+            content =
+            utility::conversions::to_utf8string(msg.at(U("content")).as_string());
+            return true;
+        }
+
+        return false;
+    }
+
+    static bool looksLikeValidationFeedback(const std::string& text)
+    {
+        static const std::vector<std::string> markers = {
+            "Invalid JSON object",
+            "Received invalid JSON",
+            "Required string field is empty",
+            "Couldn't evaluate breakpoints",
+            "Couldn't validate breakpoints",
+            "Step action_type is:",
+            "Breakpoints can be listed only",
+            "Check againts the schema",
+            "Check against the schema",
+            "Invalid JSON"
+        };
+
+        for (const auto& marker : markers)
+        {
+            if (text.find(marker) != std::string::npos)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    static bool actionPayloadsEquivalent(const web::json::value& lhs,
+                                         const web::json::value& rhs)
+    {
+        auto stringField = [](const web::json::value& obj,
+                              const utility::string_t& field) -> std::string {
+            if (obj.is_object() && obj.has_field(field) && obj.at(field).is_string())
+            {
+                return utility::conversions::to_utf8string(obj.at(field).as_string());
+            }
+            return std::string();
+        };
+
+        auto intField = [](const web::json::value& obj,
+                           const utility::string_t& field) -> int {
+            if (!obj.is_object() || !obj.has_field(field) || !obj.at(field).is_number())
+            {
+                return 0;
+            }
+
+            try
+            {
+                return obj.at(field).as_integer();
+            }
+            catch (...)
+            {
+                return static_cast<int>(obj.at(field).as_double());
+            }
+        };
+
+        if (stringField(lhs, U("action_type")) != stringField(rhs, U("action_type")) ||
+            stringField(lhs, U("action_subject")) != stringField(rhs, U("action_subject")) ||
+            intField(lhs, U("line_number")) != intField(rhs, U("line_number")) ||
+            intField(lhs, U("invocation")) != intField(rhs, U("invocation")))
+        {
+            return false;
+        }
+
+        if (!lhs.has_field(U("breakpoints")) || !lhs.at(U("breakpoints")).is_array() ||
+            !rhs.has_field(U("breakpoints")) || !rhs.at(U("breakpoints")).is_array())
+        {
+            return false;
+        }
+
+        const auto& leftBreakpoints = lhs.at(U("breakpoints")).as_array();
+        const auto& rightBreakpoints = rhs.at(U("breakpoints")).as_array();
+        if (leftBreakpoints.size() != rightBreakpoints.size())
+        {
+            return false;
+        }
+
+        for (size_t i = 0; i < leftBreakpoints.size(); ++i)
+        {
+            const auto& leftBp = leftBreakpoints.at(i);
+            const auto& rightBp = rightBreakpoints.at(i);
+            if (intField(leftBp, U("source_line")) != intField(rightBp, U("source_line")) ||
+                stringField(leftBp, U("condition")) != stringField(rightBp, U("condition")) ||
+                stringField(leftBp, U("expression")) != stringField(rightBp, U("expression")))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     static bool sanitizeTrainingSampleByName(const std::string& sampleName,
                                              web::json::value& chatSample,
                                              std::string& reason)
@@ -367,19 +771,19 @@ namespace hen {
 
         std::string lastContent = utility::conversions::to_utf8string(last.at(U("content")).as_string());
 
-        if (startsWith(sampleName, "step_"))
+        if (startsWith(sampleName, "step_") || startsWith(sampleName, "validation_"))
         {
             web::json::value parsed;
             if (!tryParseJsonText(lastContent, parsed))
             {
-                reason = "step sample assistant content is not valid JSON";
+                reason = "step/validation sample assistant content is not valid JSON";
                 return false;
             }
 
             std::string localReason;
             if (!normalizeActionPayload(parsed, localReason))
             {
-                reason = "step sample assistant content invalid: " + localReason;
+                reason = "step/validation sample assistant content invalid: " + localReason;
                 return false;
             }
 
@@ -619,6 +1023,10 @@ namespace hen {
         {
             ++m_distillSummary.system_samples_written;
         }
+        else if(startsWith(sampleName, "validation_"))
+        {
+            ++m_distillSummary.validation_samples_written;
+        }
         else
         {
             return;
@@ -678,6 +1086,34 @@ namespace hen {
             --m_distillSummary.system_samples_written;
             saveDistillSummary();
         }
+    }
+
+    void Distillery::removeValidationTrainingData(const std::string& datasetDir)
+    {
+        if(!boost_fs::exists(datasetDir) || !boost_fs::is_directory(datasetDir))
+        {
+            return;
+        }
+
+        for (boost_fs::directory_iterator it(datasetDir), end; it != end; ++it)
+        {
+            if (!boost_fs::is_regular_file(*it))
+            {
+                continue;
+            }
+
+            const boost_fs::path& p = it->path();
+            const std::string name = p.filename().string();
+            if ((p.extension() == ".json" || p.extension() == ".txt") &&
+                startsWith(name, "validation_"))
+            {
+                boost_fs::remove(p);
+            }
+        }
+
+        boost_fs::remove(datasetDir + "/train_dbg_validation_sft.jsonl");
+        m_distillSummary.validation_samples_written = 0;
+        saveDistillSummary();
     }
 
     bool Distillery::hasRecordedStepArtifact(int step, const std::string& suffix)
@@ -1607,6 +2043,127 @@ namespace hen {
                 }
             }
         }
+
+        compileValidationDataset(datasetDir);
+    }
+
+    void Distillery::compileRareActionDataset(const std::string& datasetDir)
+    {
+        const boost_fs::path root(datasetDir);
+
+        if (!boost_fs::exists(root) || !boost_fs::is_directory(root)) {
+            throw std::runtime_error("compileRareActionDataset(): datasetDir is not a directory: " + datasetDir);
+        }
+
+        std::vector<boost_fs::path> files;
+        for (boost_fs::directory_iterator it(root), end; it != end; ++it)
+        {
+            if (boost_fs::is_regular_file(*it))
+            {
+                files.push_back(it->path());
+            }
+        }
+
+        std::sort(files.begin(), files.end(),
+                  [](const boost_fs::path& a, const boost_fs::path& b) {
+            return a.filename().string() < b.filename().string();
+        });
+
+        boost_fs::remove(datasetDir + "/train_dbg_rare_actions_sft.jsonl");
+
+        for (const auto& p : files)
+        {
+            if (p.extension() == ".json" && startsWith(p.filename().string(), "step_"))
+            {
+                std::string jsonSample = getFileContent(p.string());
+                web::json::value chatSample;
+                if (!tryParseJsonText(jsonSample, chatSample))
+                {
+                    std::cout << "Skipping malformed rare-action training sample during compileRareActionDataset: ";
+                    std::cout << p.string() << std::endl;
+                    continue;
+                }
+
+                std::string sanitizeReason;
+                const std::string sampleName = p.stem().string();
+                if (!sanitizeTrainingSampleByName(sampleName, chatSample, sanitizeReason))
+                {
+                    std::cout << "Skipping invalid rare-action training sample during compileRareActionDataset: ";
+                    std::cout << p.string() << "\nReason: " << sanitizeReason << std::endl;
+                    continue;
+                }
+
+                if (!hasRareAssistantActionTargetOrHistory(chatSample))
+                {
+                    std::cout << "Skipping sample without rare assistant action target or history during compileRareActionDataset: ";
+                    std::cout << p.string() << std::endl;
+                    continue;
+                }
+
+                jsonSample = utility::conversions::to_utf8string(chatSample.serialize());
+                std::ofstream trainFile(datasetDir + "/train_dbg_rare_actions_sft.jsonl", std::ios::app);
+                if(trainFile.good())
+                {
+                    trainFile << jsonSample << std::endl;
+                }
+            }
+        }
+    }
+
+    void Distillery::compileValidationDataset(const std::string& datasetDir)
+    {
+        const boost_fs::path root(datasetDir);
+
+        if (!boost_fs::exists(root) || !boost_fs::is_directory(root)) {
+            throw std::runtime_error("compileValidationDataset(): datasetDir is not a directory: " + datasetDir);
+        }
+
+        std::vector<boost_fs::path> files;
+        for (boost_fs::directory_iterator it(root), end; it != end; ++it)
+        {
+            if (boost_fs::is_regular_file(*it))
+            {
+                files.push_back(it->path());
+            }
+        }
+
+        std::sort(files.begin(), files.end(),
+                  [](const boost_fs::path& a, const boost_fs::path& b) {
+            return a.filename().string() < b.filename().string();
+        });
+
+        boost_fs::remove(datasetDir + "/train_dbg_validation_sft.jsonl");
+
+        for (const auto& p : files)
+        {
+            if (p.extension() == ".json" && startsWith(p.filename().string(), "validation_"))
+            {
+                std::string jsonSample = getFileContent(p.string());
+                web::json::value chatSample;
+                if (!tryParseJsonText(jsonSample, chatSample))
+                {
+                    std::cout << "Skipping malformed validation training sample during compileValidationDataset: ";
+                    std::cout << p.string() << std::endl;
+                    continue;
+                }
+
+                std::string sanitizeReason;
+                const std::string sampleName = p.stem().string();
+                if (!sanitizeTrainingSampleByName(sampleName, chatSample, sanitizeReason))
+                {
+                    std::cout << "Skipping invalid validation training sample during compileValidationDataset: ";
+                    std::cout << p.string() << "\nReason: " << sanitizeReason << std::endl;
+                    continue;
+                }
+
+                jsonSample = utility::conversions::to_utf8string(chatSample.serialize());
+                std::ofstream trainFile(datasetDir + "/train_dbg_validation_sft.jsonl", std::ios::app);
+                if(trainFile.good())
+                {
+                    trainFile << jsonSample << std::endl;
+                }
+            }
+        }
     }
 
     void Distillery::scoreTrajectory(CCodeProject* project, const std::string& testDirectory, const std::string& mergedTrajectory)
@@ -1688,6 +2245,8 @@ namespace hen {
 
             distillFixTrack(project, trackAnalysis.analysis, fixStep);
         }
+
+        distillValidationDialogs(project);
 
         //Compile train.jsonl
         compileDataset(datasetDir);
@@ -1899,6 +2458,221 @@ namespace hen {
 
         scoreTrajectory(project, testDirectory, mergedTrajectory);
 
+
+        Prompt::clearSearchPaths();
+        std::string promptsDirEnv = Client::getInstance().getEnvironmentDir() + "/Prompts";
+        Prompt::addSearchPath(promptsDirEnv);
+
+        Client::getInstance().unlockLLM();
+        project->switchToCompileContext();
+
+        clear();
+    }
+
+    void Distillery::distillRareActionTracks(CCodeProject* project, const std::string& mergedTrajectory)
+    {
+        std::string datasetDir = getDatasetDir(project);
+        if(!boost_fs::exists(datasetDir))
+        {
+            boost_fs::create_directories(datasetDir);
+        }
+
+        saveToFile(mergedTrajectory, datasetDir + "/merged_trajectory.txt");
+
+        std::string trajectoryAnalysis;
+        trajectoryAnalysis += "Rare-action preservation data pass. ";
+        trajectoryAnalysis += "Distill only fix tracks whose original trajectory contains rare debugger actions ";
+        trajectoryAnalysis += "that were dropped by the normal optimized dataset.";
+
+        for(const auto& fixRange : m_mergedFixes)
+        {
+            if(fixRange.second < 0 || fixRange.second >= (int)m_trajectory.size())
+            {
+                continue;
+            }
+
+            uint32_t fixStep = (uint32_t)trajectoryIndexToStep(fixRange.second);
+            distillFixTrack(project, trajectoryAnalysis, fixStep, true);
+        }
+
+        compileRareActionDataset(datasetDir);
+    }
+
+    void Distillery::distillRareActionsTrajectory(CCodeProject* project,
+                                                  const std::string& testDirectory,
+                                                  const std::string& trajectoryRootDir,
+                                                  const std::string& logsRootDir,
+                                                  const std::string& datasetRunKey,
+                                                  int& fromStep, int toStep)
+    {
+        {
+            uint32_t nextStepIndex = (uint32_t)nextIndex(trajectoryRootDir, "step_");
+            if(nextStepIndex > 300)
+            {
+                int desiredFromStep = static_cast<int>(nextStepIndex) - 300;
+                fromStep = alignFromStepToRunTestBoundary(trajectoryRootDir,
+                                                          desiredFromStep,
+                                                          static_cast<int>(nextStepIndex));
+            }
+        }
+
+        std::string rareDatasetRunKey = datasetRunKey.empty() ? "rare_actions" : datasetRunKey + "_rare_actions";
+        if(loadTrajectory(project, testDirectory, trajectoryRootDir, logsRootDir, rareDatasetRunKey, fromStep, toStep) <= 0)
+        {
+            return;
+        }
+
+        initializeDistillSummary(project);
+        saveDistillSummary();
+
+        std::cout << printTrajectory();
+
+        for(auto perS : m_newFunctionsPerStep)
+        {
+            m_newFunctions.insert(perS.second.begin(), perS.second.end());
+        }
+
+        if(!m_newFunctions.empty())
+        {
+            std::cout << "ALL NEW FUNCTIONS: " << getAsCsv(m_newFunctions) << std::endl;
+        }
+
+        std::string promptsDir = Client::getInstance().getEnvironmentDir();
+        std::string promptsDirDebugger = promptsDir + "/Debugger/Prompts";
+        std::string promptsDirDistillery = promptsDir + "/Distillery/Prompts";
+
+        m_distilleryContext.reset();
+        project->setActiveContext(&m_distilleryContext);
+
+        Prompt::clearSearchPaths();
+        Prompt::addSearchPath(promptsDirDistillery);
+
+        Prompt role("DistilleryRole.txt",{});
+        project->pushMessage(role, "system", true);
+
+        Prompt distillationWorkflow("DistillationWorkflow.txt",{});
+        project->pushMessage(distillationWorkflow, "user", true);
+
+        Prompt::clearSearchPaths();
+        Prompt::addSearchPath(promptsDirDebugger);
+
+        m_projDesc = "PROJECT DESCRIPTION: " + project->getProjectBrief();
+        project->pushMessage(m_projDesc, "user", true);
+
+        std::string hitCount = std::to_string(MAX_BREKPOINT_HITCOUNT);
+        Prompt workflow("Workflow.txt",{{"project", project->getProjectName()},
+                                        {"hit_count", hitCount}});
+
+        project->pushMessage(workflow, "user", true);
+
+        m_dbgSystemPrompt = "\nHey, you are a Large Language Model specialized in complex debugging workflows for applications written on C++ and STL.\n\n";
+
+        m_nextStepPrompt = "Analyze the provided information and current progress debugging the application. ";
+        m_nextStepPrompt += "What should be the next action in order to debug the application?\n\n";
+
+        m_debugAnalysisPrompt = getFileContent(promptsDirDebugger + "/SystemDebugAnalysis.txt");
+
+        Prompt::clearSearchPaths();
+        Prompt::addSearchPath(promptsDirDistillery);
+
+        std::string logDir = getDistillLogDir(project);
+        boost_fs::create_directories(logDir);
+        Client::getInstance().setContextLogDir(logDir);
+
+        Client::getInstance().selectLLM(InferenceIntent::DEBUG_ANALYSIS);
+
+        std::string mergedTrajectory = mergeFixes();
+        distillRareActionTracks(project, mergedTrajectory);
+
+        Prompt::clearSearchPaths();
+        std::string promptsDirEnv = Client::getInstance().getEnvironmentDir() + "/Prompts";
+        Prompt::addSearchPath(promptsDirEnv);
+
+        Client::getInstance().unlockLLM();
+        project->switchToCompileContext();
+
+        clear();
+    }
+
+    void Distillery::distillValidationTrajectory(CCodeProject* project,
+                                                 const std::string& testDirectory,
+                                                 const std::string& trajectoryRootDir,
+                                                 const std::string& logsRootDir,
+                                                 const std::string& datasetRunKey,
+                                                 int& fromStep, int toStep)
+    {
+        {
+            uint32_t nextStepIndex = (uint32_t)nextIndex(trajectoryRootDir, "step_");
+            if(nextStepIndex > 300)
+            {
+                int desiredFromStep = static_cast<int>(nextStepIndex) - 300;
+                fromStep = alignFromStepToRunTestBoundary(trajectoryRootDir,
+                                                          desiredFromStep,
+                                                          static_cast<int>(nextStepIndex));
+            }
+        }
+
+        if(loadTrajectory(project, testDirectory, trajectoryRootDir, logsRootDir, datasetRunKey, fromStep, toStep) <= 0)
+        {
+            return;
+        }
+
+        initializeDistillSummary(project);
+        {
+            web::json::value existingSummaryJson;
+            if(loadJson(existingSummaryJson, m_datasetDir + "/distill_summary.json"))
+            {
+                DistillSummary existingSummary;
+                existingSummary.from_json(existingSummaryJson);
+                m_distillSummary = existingSummary;
+                m_distillSummary.trajectory_id = m_test.name;
+                m_distillSummary.dataset_run_key = m_datasetRunKey;
+                m_distillSummary.source_test_directory = m_testDirectory;
+                m_distillSummary.source_trajectory_root = m_trajectoryRootDir;
+                m_distillSummary.source_logs_root = m_logsRootDir;
+            }
+        }
+        saveDistillSummary();
+
+        std::cout << printTrajectory();
+
+        for(auto perS : m_newFunctionsPerStep)
+        {
+            m_newFunctions.insert(perS.second.begin(), perS.second.end());
+        }
+
+        if(!m_newFunctions.empty())
+        {
+            std::cout << "ALL NEW FUNCTIONS: " << getAsCsv(m_newFunctions) << std::endl;
+        }
+
+        std::string promptsDir = Client::getInstance().getEnvironmentDir();
+        std::string promptsDirDebugger = promptsDir + "/Debugger/Prompts";
+        std::string promptsDirDistillery = promptsDir + "/Distillery/Prompts";
+
+        m_distilleryContext.reset();
+        project->setActiveContext(&m_distilleryContext);
+
+        Prompt::clearSearchPaths();
+        Prompt::addSearchPath(promptsDirDebugger);
+
+        m_projDesc = "PROJECT DESCRIPTION: " + project->getProjectBrief();
+        m_dbgSystemPrompt = "\nHey, you are a Large Language Model specialized in complex debugging workflows for applications written on C++ and STL.\n\n";
+
+        m_nextStepPrompt = "Analyze the provided information and current progress debugging the application. ";
+        m_nextStepPrompt += "What should be the next action in order to debug the application?\n\n";
+
+        m_debugAnalysisPrompt = getFileContent(promptsDirDebugger + "/SystemDebugAnalysis.txt");
+
+        Prompt::clearSearchPaths();
+        Prompt::addSearchPath(promptsDirDistillery);
+
+        std::string logDir = getDistillLogDir(project);
+        boost_fs::create_directories(logDir);
+        Client::getInstance().setContextLogDir(logDir);
+
+        distillValidationDialogs(project);
+        compileValidationDataset(getDatasetDir(project));
 
         Prompt::clearSearchPaths();
         std::string promptsDirEnv = Client::getInstance().getEnvironmentDir() + "/Prompts";
@@ -2347,7 +3121,8 @@ namespace hen {
                                     int fixStep,
                                     const std::set<std::string>& requiredFunctions,
                                     const std::set<std::string>& requiredDataTypes,
-                                    std::string& debugNotes)
+                                    std::string& debugNotes,
+                                    bool saveSample)
     {
         m_debugContext.clear();
 
@@ -2617,6 +3392,7 @@ namespace hen {
 
         std::string sysAnalysisSample = "system_" + testStepStr + "_" + fixStepStr;
 
+        if(saveSample)
         {
             std::string content = utility::conversions::to_utf8string(distilledSystemAnalysis.system_analysis.to_json().serialize());
             json::value jsonSample = buildTrainingData(project, currentTrajectory, content, distilledSystemAnalysis.thinking_analysis);
@@ -2719,13 +3495,302 @@ namespace hen {
         return std::make_pair(jsonRequest, jsonResponse);
     }
 
+    std::string Distillery::loadRecordedSystemAnalysisForStep(int step)
+    {
+        const std::string stepLogsDir = getLogsStepDir(step);
+        const std::pair<bool, uint32_t> requestId =
+            findRequestIdForPattern(stepLogsDir, "request_", "_SystemAnalysis.json");
+        if(!requestId.first)
+        {
+            return std::string();
+        }
+
+        const std::string responsePath =
+            stepLogsDir + "/response_" + std::to_string(requestId.second) + "_SystemAnalysis.json";
+
+        web::json::value response;
+        if(!loadJson(response, responsePath))
+        {
+            return std::string();
+        }
+
+        std::string content;
+        if(!extractAssistantContent(response, content))
+        {
+            return std::string();
+        }
+
+        content = trim(content);
+        web::json::value contentJson;
+        if(tryParseJsonText(content, contentJson))
+        {
+            content = formatJson(utility::conversions::to_utf8string(contentJson.serialize()),
+                                 "  ");
+        }
+
+        return content;
+    }
+
+    std::vector<uint32_t> Distillery::collectNextStepAttemptIds(int step)
+    {
+        std::vector<uint32_t> ids;
+        const std::string stepLogsDir = getLogsStepDir(step);
+        const boost_fs::path dir(stepLogsDir);
+        if(!boost_fs::exists(dir) || !boost_fs::is_directory(dir))
+        {
+            return ids;
+        }
+
+        const std::regex rx(R"(^request_(\d+)_NextStep\.json$)",
+                            std::regex::ECMAScript);
+
+        for (boost_fs::directory_iterator it(dir), end; it != end; ++it)
+        {
+            if (!boost_fs::is_regular_file(*it))
+            {
+                continue;
+            }
+
+            const std::string name = it->path().filename().string();
+            std::smatch match;
+            if (!std::regex_match(name, match, rx))
+            {
+                continue;
+            }
+
+            uint32_t id = 0;
+            try
+            {
+                id = static_cast<uint32_t>(std::stoul(match[1].str()));
+            }
+            catch (...)
+            {
+                continue;
+            }
+
+            const std::string responsePath =
+            stepLogsDir + "/response_" + std::to_string(id) + "_NextStep.json";
+            if (boost_fs::exists(responsePath))
+            {
+                ids.push_back(id);
+            }
+        }
+
+        std::sort(ids.begin(), ids.end());
+        ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+        return ids;
+    }
+
+    std::string Distillery::buildValidationRepairContext(CCodeProject* project, int step)
+    {
+        const int stepIndex = stepToTrajectoryIndex(step);
+        const int lastRunIndex = getLastIndexBefore(step, "run_test");
+        if(lastRunIndex < 0)
+        {
+            return std::string();
+        }
+
+        const int lastRunStep = trajectoryIndexToStep(lastRunIndex);
+
+        goTo(project, step);
+
+        std::string summary;
+        const int summaryStep = getSummaryStepForStep(project, lastRunStep, summary);
+        if(summaryStep <= m_fromStep)
+        {
+            summary.clear();
+        }
+
+        std::string context = getTrajectoryPrologue(project, lastRunStep, lastRunStep, summary);
+        const std::string lastRunInfo = m_trajectory[lastRunIndex].fullInfo();
+        context += "\nRECORDED LAST RUN STEP ANALYSIS:\n\n";
+        context += "\nSTEP " + std::to_string(lastRunStep) + ":\n\n";
+        context += lastRunInfo + "\n\n";
+
+        if(lastRunInfo.find("SYSTEM ANALYSIS") == std::string::npos)
+        {
+            const std::string systemAnalysis = loadRecordedSystemAnalysisForStep(lastRunStep);
+            if(!systemAnalysis.empty())
+            {
+                context += "\nSYSTEM ANALYSIS FOR THE LAST RUN STEP: ";
+                context += std::to_string(lastRunStep);
+                context += " STARTS HERE\n\n";
+                context += systemAnalysis;
+                context += "\n\nSYSTEM ANALYSIS FOR THE LAST RUN STEP ENDS HERE\n\n";
+            }
+        }
+
+        context += "\nRECORDED DEBUGGING STEPS SINCE THE LAST RUN STEP:\n\n";
+
+        for(int i = lastRunIndex + 1; i <= stepIndex; ++i)
+        {
+            const int recordedStep = trajectoryIndexToStep(i);
+            context += "\nSTEP " + std::to_string(recordedStep) + ":\n\n";
+            context += m_trajectory[i].fullInfo() + "\n\n";
+        }
+
+        return context;
+    }
+
+    void Distillery::distillValidationDialogs(CCodeProject* project)
+    {
+        const std::string datasetDir = getDatasetDir(project);
+        if(!boost_fs::exists(datasetDir))
+        {
+            boost_fs::create_directories(datasetDir);
+        }
+
+        removeValidationTrainingData(datasetDir);
+
+        uint32_t samplesWritten = 0;
+        for(int index = 0; index < static_cast<int>(m_trajectory.size()); ++index)
+        {
+            const int step = trajectoryIndexToStep(index);
+            const std::vector<uint32_t> attemptIds = collectNextStepAttemptIds(step);
+            if(attemptIds.size() < 2)
+            {
+                continue;
+            }
+
+            web::json::value acceptedAction;
+            const std::string acceptedPath = getTrajectoryStepDir(step) + "/nextStep.json";
+            if(!loadJson(acceptedAction, acceptedPath) || !acceptedAction.is_object())
+            {
+                continue;
+            }
+
+            std::string acceptedReason;
+            if(!normalizeActionPayload(acceptedAction, acceptedReason))
+            {
+                continue;
+            }
+
+            for(size_t i = 0; i + 1 < attemptIds.size(); ++i)
+            {
+                const uint32_t rejectedId = attemptIds[i];
+                const uint32_t repairedId = attemptIds[i + 1];
+                const std::string stepLogsDir = getLogsStepDir(step);
+
+                web::json::value rejectedResponse;
+                web::json::value repairRequest;
+                web::json::value repairedResponse;
+
+                if(!loadJson(rejectedResponse,
+                             stepLogsDir + "/response_" + std::to_string(rejectedId) + "_NextStep.json") ||
+                   !loadJson(repairRequest,
+                             stepLogsDir + "/request_" + std::to_string(repairedId) + "_NextStep.json") ||
+                   !loadJson(repairedResponse,
+                             stepLogsDir + "/response_" + std::to_string(repairedId) + "_NextStep.json"))
+                {
+                    continue;
+                }
+
+                std::string rejectedContent;
+                std::string validationFeedback;
+                std::string repairedContent;
+                if(!extractAssistantContent(rejectedResponse, rejectedContent) ||
+                   !extractLastUserContent(repairRequest, validationFeedback) ||
+                   !extractAssistantContent(repairedResponse, repairedContent))
+                {
+                    continue;
+                }
+
+                if(!looksLikeValidationFeedback(validationFeedback))
+                {
+                    continue;
+                }
+
+                web::json::value repairedAction;
+                if(!normalizeActionPayloadFromText(repairedContent, repairedAction))
+                {
+                    continue;
+                }
+
+                if(!actionPayloadsEquivalent(repairedAction, acceptedAction))
+                {
+                    continue;
+                }
+
+                web::json::value rejectedAction;
+                if(normalizeActionPayloadFromText(rejectedContent, rejectedAction) &&
+                   actionPayloadsEquivalent(rejectedAction, repairedAction))
+                {
+                    continue;
+                }
+
+                std::string repairContext = buildValidationRepairContext(project, step);
+                if(repairContext.empty())
+                {
+                    continue;
+                }
+
+                web::json::value schema;
+                setupSchema<NextDebugStep>(schema);
+
+                web::json::value messages = web::json::value::array();
+
+                web::json::value systemMessage;
+                systemMessage[U("role")] = web::json::value::string(U("system"));
+                systemMessage[U("content")] =
+                    web::json::value::string(utility::conversions::to_string_t(m_dbgSystemPrompt));
+                messages[messages.size()] = systemMessage;
+
+                std::string contextPrompt = m_projDesc + "\n\n";
+                contextPrompt += repairContext;
+                contextPrompt += "\n\n" + m_nextStepPrompt;
+                contextPrompt += project->getInstrumentationMessage(schema);
+
+                web::json::value contextMessage;
+                contextMessage[U("role")] = web::json::value::string(U("user"));
+                contextMessage[U("content")] =
+                    web::json::value::string(utility::conversions::to_string_t(contextPrompt));
+                messages[messages.size()] = contextMessage;
+
+                web::json::value rejectedMessage;
+                rejectedMessage[U("role")] = web::json::value::string(U("assistant"));
+                rejectedMessage[U("content")] =
+                    web::json::value::string(utility::conversions::to_string_t(trim(rejectedContent)));
+                messages[messages.size()] = rejectedMessage;
+
+                web::json::value feedbackMessage;
+                feedbackMessage[U("role")] = web::json::value::string(U("user"));
+                feedbackMessage[U("content")] =
+                    web::json::value::string(utility::conversions::to_string_t(trim(validationFeedback)));
+                messages[messages.size()] = feedbackMessage;
+
+                web::json::value repairedMessage;
+                repairedMessage[U("role")] = web::json::value::string(U("assistant"));
+                repairedMessage[U("thinking")] = web::json::value::string(U(""));
+                repairedMessage[U("content")] =
+                    web::json::value::string(utility::conversions::to_string_t(trim(repairedContent)));
+                messages[messages.size()] = repairedMessage;
+
+                web::json::value jsonSample;
+                jsonSample[U("messages")] = messages;
+
+                const std::string sampleName =
+                "validation_" + std::to_string(step) + "_" + std::to_string(repairedId);
+                saveTrainingData(datasetDir, sampleName, jsonSample, true);
+                ++samplesWritten;
+            }
+        }
+
+        if(samplesWritten > 0)
+        {
+            std::cout << "Distillery wrote " << samplesWritten;
+            std::cout << " validation repair training samples for " << m_test.name << std::endl;
+        }
+    }
+
     std::string Distillery::distillDebugStep(CCodeProject* project,
                                              const std::string& summary,
                                              std::string& prevSteps,
                                              std::string& newInfo,
                                              DistilledStep& distilledStep,
                                              int originalStep,
-                                             int testStep, int debugStep)
+                                             int testStep,
+                                             int debugStep,
+                                             bool saveAnalysisSample)
     {
         std::string debugInfo = getTrajectoryPrologue(project, originalStep, debugStep, summary);
         debugInfo += prevSteps;
@@ -2903,7 +3968,14 @@ namespace hen {
 
         std::string datasetDir = getDatasetDir(project);
         std::string testStepStr = std::to_string(testStep);
-        saveDebugAnalysis(project, datasetDir, "debug_" + testStepStr + "_" + debugStepStr, distilledDebugAnalysis, debugInfo);
+        if(saveAnalysisSample)
+        {
+            saveDebugAnalysis(project,
+                              datasetDir,
+                              "debug_" + testStepStr + "_" + debugStepStr,
+                              distilledDebugAnalysis,
+                              debugInfo);
+        }
 
         return currentTrajectory;
     }
@@ -3465,7 +4537,8 @@ namespace hen {
                                                                      const EditSourceSequence& optimalSequence,
                                                                      int originalSize,
                                                                      int startStep,
-                                                                     const std::string* summaryOverride)
+                                                                     const std::string* summaryOverride,
+                                                                     const std::vector<OptimizedStep>* requiredRareActions)
     {
         std::string feedback;
         std::string recommendation;
@@ -3495,6 +4568,23 @@ namespace hen {
             feedback += originalSizeStr + "). Maximum allowed expansion is +2 steps.\n\n";
         }
 
+        if(requiredRareActions && !requiredRareActions->empty())
+        {
+            std::vector<OptimizedStep> missingRare = missingRareDebugActions(optimalSequence, *requiredRareActions);
+            if(!missingRare.empty())
+            {
+                feedback += "Rare-action preservation violation.\n";
+                feedback += "This rare-action distillation pass must preserve every required rare action exactly, ";
+                feedback += "in the same order as the original trajectory.\n";
+                feedback += "Missing required rare actions:\n";
+                feedback += rareDebugActionsText(missingRare);
+                feedback += "\nRequired rare actions:\n";
+                feedback += rareDebugActionsText(*requiredRareActions);
+                feedback += "\nRecovery: regenerate the optimized sequence while keeping these rare actions unchanged: ";
+                feedback += "same action_type, action_subject, invocation, line_number, and original_step.\n\n";
+            }
+        }
+
         std::string firstAction = optimalSequence.steps.front()->action_type;
         if(firstAction != "run_test")
         {
@@ -3521,6 +4611,15 @@ namespace hen {
             {
                 feedback += "Step " + std::to_string(stepId) + " has empty action_type.\n";
                 feedback += "Every optimized step must have a valid non-empty action_type.\n\n";
+            }
+
+            std::string invalidRareReason;
+            if(!isValidRareDebugActionStep(*step, invalidRareReason))
+            {
+                feedback += "Step " + std::to_string(stepId) + " has invalid rare action fields: ";
+                feedback += invalidRareReason + ".\n";
+                feedback += "action_type='" + step->action_type + "', action_subject='" + step->action_subject + "'.\n";
+                feedback += "Do not preserve or synthesize rare actions with malformed subjects.\n\n";
             }
 
             if (step->invocation == 0)
@@ -3789,7 +4888,8 @@ namespace hen {
                                              const std::string& fixTrack,
                                              uint32_t fixStep,
                                              uint32_t idealMaxCount,
-                                             EditSourceSequence& optimalSequence)
+                                             EditSourceSequence& optimalSequence,
+                                             const std::vector<OptimizedStep>* requiredRareActions)
     {
         auto range = getFixTrackRange(project, fixStep);
         int runStepIndex = range.first;
@@ -3868,6 +4968,19 @@ namespace hen {
         auto disclosureForOptimize = buildDisclosureMap(project, originalSequence, runStep, summary);
         std::string disclosureContract = buildDisclosureContractText(disclosureForOptimize, 45);
 
+        std::string rareActionGuidance;
+        if(requiredRareActions && !requiredRareActions->empty())
+        {
+            rareActionGuidance += "\nRARE ACTION PRESERVATION MODE (HARD):\n";
+            rareActionGuidance += "This pass is specifically for rare action diversification. ";
+            rareActionGuidance += "You may optimize ordinary/non-rare steps, but you MUST preserve every required rare action below exactly.\n\n";
+            rareActionGuidance += "REQUIRED RARE ACTIONS TO PRESERVE:\n";
+            rareActionGuidance += rareDebugActionsText(*requiredRareActions);
+            rareActionGuidance += "\nFor each required rare action, keep the same action_type, action_subject, invocation, line_number, and original_step. ";
+            rareActionGuidance += "Keep them in the same relative order. ";
+            rareActionGuidance += "Do not replace them with a function_info shortcut or fold them into analysis.\n";
+        }
+
         goTo(project, fixStep-1);
         std::string appInfo = m_debugContext.getHighLevelAppInfo(m_project, "", PRINT_MAX_FUNCTIONS_DEPTH, PRINT_MAX_FUNCTIONS_DEPTH);
 
@@ -3876,7 +4989,8 @@ namespace hen {
                             {"trajectory", trajecotry},
                             {"fix_track", fixTrack},
                             {"disclosure_contract", disclosureContract},
-                            {"ideal_target_guidance", idealTargetGuidance}
+                            {"ideal_target_guidance", idealTargetGuidance},
+                            {"rare_action_guidance", rareActionGuidance}
         });
 
         web::json::value object;
@@ -3906,7 +5020,7 @@ namespace hen {
 
         optimalSequence.from_json(object);
 
-        auto feedback = validateSequence(project, optimalSequence, originalSize, runStep);
+        auto feedback = validateSequence(project, optimalSequence, originalSize, runStep, nullptr, requiredRareActions);
         bool firstFb = true;
         uint32_t attempts = 0;
         while(attempts < 8 &&
@@ -3921,7 +5035,7 @@ namespace hen {
 
             optimalSequence.clear();
             optimalSequence.from_json(object);
-            feedback = validateSequence(project, optimalSequence, originalSize, runStep);
+            feedback = validateSequence(project, optimalSequence, originalSize, runStep, nullptr, requiredRareActions);
 
             firstFb = false;
 
@@ -4376,7 +5490,8 @@ namespace hen {
         boost_fs::remove(systemAnalysisFile + ".json");
         boost_fs::remove(systemAnalysisFile + ".txt");
 
-        std::string prefix = "step_" + startStepStr + "_";
+        std::string stepPrefix = "step_" + startStepStr + "_";
+        std::string debugPrefix = "debug_" + startStepStr + "_";
         for (boost_fs::directory_iterator it(datasetDir), end; it != end; ++it)
         {
             if (!boost_fs::is_regular_file(*it))
@@ -4385,7 +5500,8 @@ namespace hen {
             const boost_fs::path& p = it->path();
 
             if ((p.extension() == ".json" || p.extension() == ".txt") &&
-                startsWith(p.filename().string(), prefix))
+                (startsWith(p.filename().string(), stepPrefix) ||
+                 startsWith(p.filename().string(), debugPrefix)))
             {
                 boost_fs::remove(p);
             }
@@ -4439,7 +5555,10 @@ namespace hen {
         return summary;
     }
 
-    void Distillery::distillFixTrack(CCodeProject* project, const std::string& trajectoryAnalysis, uint32_t fixStep)
+    void Distillery::distillFixTrack(CCodeProject* project,
+                                     const std::string& trajectoryAnalysis,
+                                     uint32_t fixStep,
+                                     bool preserveRareActions)
     {
         auto fixRange = getFixTrackRange(project, fixStep);
         if(!isValidFixTrackRange(fixRange, m_trajectory.size()))
@@ -4473,12 +5592,68 @@ namespace hen {
         }
 
         EditSourceSequence originalSequence = buildOriginalFixTrack(fixRange.first, fixRange.second);
+        std::vector<OptimizedStep> requiredRareActions;
+        if(preserveRareActions)
+        {
+            requiredRareActions = collectRareDebugActions(originalSequence);
+            if(requiredRareActions.empty())
+            {
+                return;
+            }
+
+            std::string baseRunKey = m_datasetRunKey;
+            const std::string rareSuffix = "_rare_actions";
+            if(baseRunKey == "rare_actions")
+            {
+                baseRunKey.clear();
+            }
+            else if(baseRunKey.size() > rareSuffix.size() &&
+                    baseRunKey.compare(baseRunKey.size() - rareSuffix.size(), rareSuffix.size(), rareSuffix) == 0)
+            {
+                baseRunKey.erase(baseRunKey.size() - rareSuffix.size());
+            }
+
+            std::string standardDatasetDir = project->getProjDir() + "/dataset/" + m_test.name;
+            if(!baseRunKey.empty())
+            {
+                standardDatasetDir += "/" + baseRunKey;
+            }
+
+            EditSourceSequence standardOptimized;
+            const std::string standardOptimizedPath =
+                standardDatasetDir + "/optimized_fix_" + testStepStr + "_" + fixStepStr + ".json";
+            if(!loadEditSourceSequence(standardOptimizedPath, standardOptimized))
+            {
+                std::cout << "Skipping rare-action fix track "
+                          << testStepStr << " -> " << fixStepStr
+                          << " because normal optimized sequence is missing: "
+                          << standardOptimizedPath << std::endl;
+                return;
+            }
+
+            {
+                std::vector<OptimizedStep> missingFromStandard =
+                    missingRareDebugActions(standardOptimized, requiredRareActions);
+                if(missingFromStandard.empty())
+                {
+                    return;
+                }
+
+                requiredRareActions = missingFromStandard;
+            }
+
+            if(requiredRareActions.empty())
+            {
+                return;
+            }
+        }
+
         std::string originalJson = "original_fix_" + testStepStr + "_" + fixStepStr + ".json";
         saveJson(originalSequence.to_json(), datasetDir + "/" + originalJson) ;
 
         std::string sysAnalysisSample = "system_" + testStepStr + "_" + fixStepStr;
 
-        if(checkFixTrackData(project, startStep, fixStep))
+        if(!preserveRareActions && checkFixTrackData(project, startStep, fixStep))
         {
             return ;
         }
@@ -4500,7 +5675,8 @@ namespace hen {
                                                            trajectoryAnalysis,
                                                            fixTrack, fixStep,
                                                            (uint32_t)optimalSequence.steps.size(),
-                                                           sequence);
+                                                           sequence,
+                                                           preserveRareActions ? &requiredRareActions : nullptr);
 
                 if(sequence.steps.size() > 0 &&
                    (i==0 || sequence.steps.size() < optimalSequence.steps.size()))
@@ -4547,7 +5723,12 @@ namespace hen {
 
         {
             const int originalSize = fixStep - startStep + 1;
-            auto finalValidation = validateSequence(project, optimalSequence, originalSize, startStep);
+            auto finalValidation = validateSequence(project,
+                                                    optimalSequence,
+                                                    originalSize,
+                                                    startStep,
+                                                    nullptr,
+                                                    preserveRareActions ? &requiredRareActions : nullptr);
             if (!finalValidation.first.empty())
             {
                 std::cout << "Skipping fix track due to invalid optimized sequence after validation.\n";
@@ -4563,6 +5744,16 @@ namespace hen {
             const int originalSize = fixStep - startStep + 1;
             auto finalSummaryValidation =
                 validateSequence(project, optimalSequence, originalSize, startStep, &summary);
+            if(preserveRareActions)
+            {
+                finalSummaryValidation =
+                    validateSequence(project,
+                                     optimalSequence,
+                                     originalSize,
+                                     startStep,
+                                     &summary,
+                                     &requiredRareActions);
+            }
             if (!finalSummaryValidation.first.empty())
             {
                 std::cout << "Skipping fix track because distilled summary broke sequence grounding.\n";
@@ -4627,11 +5818,16 @@ namespace hen {
         int currentStep = startStep;
         web::json::value messages = web::json::value::array();
         int lastMappedOriginalStep = startStep;
+        bool rareActionVisibleInTrack = false;
 #if 1
         for(std::size_t sequenceIndex = 0; sequenceIndex < optimalSequence.steps.size(); ++sequenceIndex)
         {
             auto step = optimalSequence.steps[sequenceIndex];
             std::string currentStepStr = std::to_string(currentStep);
+            const bool saveStepSample =
+                !preserveRareActions ||
+                isRareDebugAction(step->action_type) ||
+                rareActionVisibleInTrack;
             auto buildShortcutGuidance = [&]() -> std::string {
                 if (step->original_step <= 0 || step->action_type == "run_test")
                 {
@@ -4735,7 +5931,8 @@ namespace hen {
                                    fixStep,
                                    requiredFunctions,
                                    requiredDataTypes,
-                                   systemAnalysis);
+                                   systemAnalysis,
+                                   !preserveRareActions);
 
                 const bool hasRewardHackingArtifacts =
                     hasRecordedStepArtifact(currentStep, "_RewardHacking.json");
@@ -4835,11 +6032,14 @@ namespace hen {
                 std::string currentTrajectory = distillStep(project, step->original_step, startStep, fixStep, currentStep,
                                                             summary, prevSteps, requestedInfo, newInfo, nextStep, disclosureEntry, shortcutGuidance);
 
-                std::string content = utility::conversions::to_utf8string(nextStep.debug_step.to_json().serialize());
-                web::json::value schema;
-                setupSchema<NextDebugStep>(schema);
-                json::value jsonSample = buildTrainingData(project, currentTrajectory, content, nextStep.analysis, &schema, &messages);
-                saveTrainingData(datasetDir, "step_" + startStepStr + "_" + currentStepStr, jsonSample, true);
+                if(saveStepSample)
+                {
+                    std::string content = utility::conversions::to_utf8string(nextStep.debug_step.to_json().serialize());
+                    web::json::value schema;
+                    setupSchema<NextDebugStep>(schema);
+                    json::value jsonSample = buildTrainingData(project, currentTrajectory, content, nextStep.analysis, &schema, &messages);
+                    saveTrainingData(datasetDir, "step_" + startStepStr + "_" + currentStepStr, jsonSample, true);
+                }
 
                 distilledTrajectory.push_back(nextStep);
 
@@ -4864,7 +6064,9 @@ namespace hen {
                                                           newInfo,
                                                           nextStep,
                                                           step->original_step,
-                                                          startStep, currentStep);
+                                                          startStep,
+                                                          currentStep,
+                                                          !preserveRareActions);
 
                 //Now tempPrevSteps is updated in the distillDebugStep to contain only the debug_function step full info
                 //so add it to the steps trajectory
@@ -4903,12 +6105,15 @@ namespace hen {
 
                 //TODO: Find the proper way to save the data!!!
 
-                std::string content = utility::conversions::to_utf8string(nextStep.debug_step.to_json().serialize());
-                web::json::value schema;
-                setupSchema<NextDebugStep>(schema);
-                json::value jsonSample = buildTrainingData(project, currentTrajectory, content, nextStep.analysis, &schema, &messages);
+                if(saveStepSample)
+                {
+                    std::string content = utility::conversions::to_utf8string(nextStep.debug_step.to_json().serialize());
+                    web::json::value schema;
+                    setupSchema<NextDebugStep>(schema);
+                    json::value jsonSample = buildTrainingData(project, currentTrajectory, content, nextStep.analysis, &schema, &messages);
 
-                saveTrainingData(datasetDir, "step_" + startStepStr + "_" + currentStepStr, jsonSample, true);
+                    saveTrainingData(datasetDir, "step_" + startStepStr + "_" + currentStepStr, jsonSample, true);
+                }
 
                 if(NextDebugStep::isInformationRequest(step->action_type))
                 {
@@ -4919,6 +6124,11 @@ namespace hen {
             if (step->original_step > 0)
             {
                 lastMappedOriginalStep = step->original_step;
+            }
+
+            if(isRareDebugAction(step->action_type))
+            {
+                rareActionVisibleInTrack = true;
             }
 
             currentStep++;

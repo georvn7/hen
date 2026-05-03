@@ -269,6 +269,20 @@
     {
       "provider": "openai",
       "url": "https://api.openai.com/v1/chat/completions",
+      "model": "gpt-5.5",
+      "reasoning_effort": "xhigh",
+      "verbosity": "low",
+      "context_size": 1024,
+      "rate_limit": -1,
+      "rate_limit_rpm": -1,
+      "roles": "director",
+      "input_tokens_price": 5.00,
+      "cache_read_tokens_price": 0.50,
+      "output_tokens_price": 30.00
+    },
+    {
+      "provider": "openai",
+      "url": "https://api.openai.com/v1/chat/completions",
       "model": "gpt-5-mini-high",
       "reasoning_effort": "high",
       "verbosity": "low",

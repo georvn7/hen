@@ -87,6 +87,7 @@ namespace hen {
         DECLARE_FIELD(uint32_t, step_samples_written, "Number of step_* samples written during this distillation run")
         DECLARE_FIELD(uint32_t, debug_samples_written, "Number of debug_* samples written during this distillation run")
         DECLARE_FIELD(uint32_t, system_samples_written, "Number of system_* samples written during this distillation run")
+        DECLARE_FIELD(uint32_t, validation_samples_written, "Number of validation_* samples written during this distillation run")
         DECLARE_FIELD(uint32_t, system_samples_skipped, "Number of system_* samples intentionally skipped during this distillation run")
         DECLARE_ARRAY_FIELD(DistillSkipItem, skipped_items, "Detailed entries for intentionally skipped samples")
     };
@@ -165,6 +166,7 @@ namespace hen {
                             int fixStep,
                             const std::string& reason);
         void removeTrainingDataSample(const std::string& sampleName);
+        void removeValidationTrainingData(const std::string& datasetDir);
         bool hasRecordedStepArtifact(int step, const std::string& suffix);
         bool isPassingRunStepForRewardReview(const DebugStep& stepInfo) const;
 
@@ -237,7 +239,8 @@ namespace hen {
                                                              const EditSourceSequence& optimalSequence,
                                                              int originalSize,
                                                              int startStep,
-                                                             const std::string* summaryOverride = nullptr);
+                                                             const std::string* summaryOverride = nullptr,
+                                                             const std::vector<OptimizedStep>* requiredRareActions = nullptr);
         std::set<std::string> collectSummaryDependentFunctions(CCodeProject* project,
                                                                const EditSourceSequence& optimalSequence,
                                                                int startStep,
@@ -250,14 +253,17 @@ namespace hen {
                                      const std::string& fixTrack,
                                      uint32_t fixStep,
                                      uint32_t idealMaxCount,
-                                     EditSourceSequence& optimalSequence);
+                                     EditSourceSequence& optimalSequence,
+                                     const std::vector<OptimizedStep>* requiredRareActions = nullptr);
         void pushOptimizedFixTrack(CCodeProject* project, const std::string& message, EditSourceSequence& optimalSequence);
         EditSourceSequence buildOriginalFixTrack(int fromTrajectoryIndex, int toTrajectoryIndex);
 
         bool checkFixTrackData(CCodeProject* project, uint32_t startStep, uint32_t fixStep);
         void removeFixTrackData(CCodeProject* project, uint32_t startStep, uint32_t fixStep);
         
-        void distillFixTrack(CCodeProject* project, const std::string& trajectoryAnalysis, uint32_t fixStep);
+        void compileRareActionDataset(const std::string& datasetDir);
+        void distillRareActionTracks(CCodeProject* project, const std::string& mergedTrajectory);
+        void distillFixTrack(CCodeProject* project, const std::string& trajectoryAnalysis, uint32_t fixStep, bool preserveRareActions = false);
         std::string distillStep(CCodeProject* project,
                                 int originalStep,
                                 int lastOriginalRunStep,
@@ -322,7 +328,8 @@ namespace hen {
                             int fixStep,
                             const std::set<std::string>& requiredFunctions,
                             const std::set<std::string>& requiredDataTypes,
-                            std::string& debugNotes);
+                            std::string& debugNotes,
+                            bool saveSample = true);
         
         std::string distillDebugStep(CCodeProject* project,
                                      const std::string& summary,
@@ -330,13 +337,20 @@ namespace hen {
                                      std::string& newInfo,
                                      DistilledStep& distilledStep,
                                      int originalStep,
-                                     int testStep, int debugStep);
+                                     int testStep,
+                                     int debugStep,
+                                     bool saveAnalysisSample = true);
         
         void saveTrainingData(const std::string& datasetDir, const std::string& sampleName, web::json::value& chatSample, bool jsonReponse);
         void compileDataset(const std::string& datasetDir);
-        
+        void compileValidationDataset(const std::string& datasetDir);
+
         std::pair<std::string, std::string> getChat(CCodeProject* project, const std::string& sufix, int step);
-        
+        std::string loadRecordedSystemAnalysisForStep(int step);
+        std::vector<uint32_t> collectNextStepAttemptIds(int step);
+        std::string buildValidationRepairContext(CCodeProject* project, int step);
+        void distillValidationDialogs(CCodeProject* project);
+
         std::string prevStepsSummary(const std::vector<DistilledStep>& distilledTrajectory, int startStep);
         
         std::map<int, StepDisclosureMapEntry> buildDisclosureMap(CCodeProject* project,
@@ -363,6 +377,18 @@ namespace hen {
                                const std::string& logsRootDir,
                                const std::string& datasetRunKey,
                                int& fromStep, int toStep);
+        void distillValidationTrajectory(CCodeProject* project,
+                                          const std::string& testDirectory,
+                                          const std::string& trajectoryRootDir,
+                                          const std::string& logsRootDir,
+                                          const std::string& datasetRunKey,
+                                          int& fromStep, int toStep);
+        void distillRareActionsTrajectory(CCodeProject* project,
+                                          const std::string& testDirectory,
+                                          const std::string& trajectoryRootDir,
+                                          const std::string& logsRootDir,
+                                          const std::string& datasetRunKey,
+                                          int& fromStep, int toStep);
         
         void printTrajectoryInfo();
         void printFixesAndTests();

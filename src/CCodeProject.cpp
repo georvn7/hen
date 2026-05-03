@@ -2279,7 +2279,7 @@ namespace hen {
         saveJson(config.to_json(), testDirecotry + "/config.json");
     }
 
-    void CCodeProject::synthetizeTrainingData()
+    void CCodeProject::synthetizeTrainingData(bool validationOnly, bool rareActionsOnly)
     {
         std::string debugDir = getProjDir() + "/debug";
         
@@ -2316,8 +2316,14 @@ namespace hen {
                 std::string lastStepPath = lastStepDir + "/dbgStep.json";
                 lastStep.load(lastStepPath);
                 
-                if(lastStep.m_debugNotes == "PASS")
+                if(lastStep.m_debugNotes == "PASS" || validationOnly)
                 {
+                    if(validationOnly && lastStep.m_debugNotes != "PASS")
+                    {
+                        std::cout << "Running validation-only data synthesis for unfinished/unsuccessful debug trajectory: ";
+                        std::cout << it->path().string() << std::endl;
+                    }
+
                     std::string trajectoryRootDir = it->path().string();
                     std::string testWD = trajectoryRootDir + "/test";
                     if(!boost_fs::exists(testWD))
@@ -2349,22 +2355,56 @@ namespace hen {
 
                     if(boost_fs::exists(testWD))
                     {
-                        std::string datasetDir = getProjDir() + "/dataset/" + testName + "/" + runKey;
-                        if(hasCompletedDistillationArtifacts(datasetDir))
+                        std::string datasetRunKey = runKey;
+                        if(rareActionsOnly)
+                        {
+                            datasetRunKey += "_rare_actions";
+                        }
+
+                        std::string datasetDir = getProjDir() + "/dataset/" + testName + "/" + datasetRunKey;
+                        if(!validationOnly && !rareActionsOnly && hasCompletedDistillationArtifacts(datasetDir))
                         {
                             std::cout << "Skipping data synthesis for trajectory because completed dataset artifacts already exist: "
                                       << datasetDir
                                       << std::endl;
                             continue;
                         }
+                        if(rareActionsOnly && isNonEmptyRegularFile(datasetDir + "/train_dbg_rare_actions_sft.jsonl"))
+                        {
+                            std::cout << "Skipping rare-action data synthesis for trajectory because completed rare-action dataset already exists: "
+                                      << datasetDir
+                                      << std::endl;
+                            continue;
+                        }
 
                         int startFrom = 0;
-                        Distillery::getInstance().distillTrajectory(this,
-                                                                   testWD,
-                                                                   trajectoryRootDir,
-                                                                   logsDir,
-                                                                   runKey,
-                                                                   startFrom, -1);
+                        if(validationOnly)
+                        {
+                            Distillery::getInstance().distillValidationTrajectory(this,
+                                                                                  testWD,
+                                                                                  trajectoryRootDir,
+                                                                                  logsDir,
+                                                                                  runKey,
+                                                                                  startFrom, -1);
+                        }
+                        else if(rareActionsOnly)
+                        {
+                            Distillery::getInstance().distillRareActionsTrajectory(this,
+                                                                                   testWD,
+                                                                                   trajectoryRootDir,
+                                                                                   logsDir,
+                                                                                   runKey,
+                                                                                   startFrom, -1);
+                        }
+                        else
+                        {
+                            Distillery::getInstance().distillTrajectory(this,
+                                                                        testWD,
+                                                                        trajectoryRootDir,
+                                                                        logsDir,
+                                                                        runKey,
+                                                                        startFrom, -1);
+                        }
                     }
                 }
                 else
@@ -2393,6 +2433,16 @@ namespace hen {
             {
                 m_runTrainingDataSynthesis = args["synthetic-data"].as<bool>();
             }
+
+            if(args.count("synthetic-validation-data"))
+            {
+                m_runValidationDataSynthesis = args["synthetic-validation-data"].as<bool>();
+            }
+
+            if(args.count("synthetic-rare-actions-data"))
+            {
+                m_runRareActionDataSynthesis = args["synthetic-rare-actions-data"].as<bool>();
+            }
         }
 
         return Project::executeCommand(command, cli, args);
@@ -2418,7 +2468,17 @@ namespace hen {
         if(m_runTrainingDataSynthesis)
         {
             Client::getInstance().agentToServer("\n\nSYNTHESIZING TRAINING DATA...\n\n");
-            synthetizeTrainingData();
+            synthetizeTrainingData(false);
+        }
+        else if(m_runValidationDataSynthesis)
+        {
+            Client::getInstance().agentToServer("\n\nSYNTHESIZING VALIDATION TRAINING DATA...\n\n");
+            synthetizeTrainingData(true);
+        }
+        else if(m_runRareActionDataSynthesis)
+        {
+            Client::getInstance().agentToServer("\n\nSYNTHESIZING RARE-ACTION TRAINING DATA...\n\n");
+            synthetizeTrainingData(false, true);
         }
         
         generateSingleSourceFile();

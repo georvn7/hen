@@ -54,6 +54,8 @@ From first run_test to last fix_functin sequence, identify only the necessary st
 ROLLOUT TARGET:
 [[ideal_target_guidance]]
 
+[[rare_action_guidance]]
+
 CRITICAL: The optimized sequence must show LOGICAL, STEP-BY-STEP progression where each action is a natural consequence of the information available up to that point.
 
 Think of it as: "An expert debugger works through the problem efficiently, where each step makes sense given only what they know so far."
