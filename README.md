@@ -135,7 +135,8 @@ This loads the already generated project and preserved trajectories, runs the no
 `hen`-generated debugging and distillation artifacts are also published on Hugging Face:
 
 - [georvn7/super-debug-v1](https://huggingface.co/datasets/georvn7/super-debug-v1)
+- [georvn7/super-debug-v2](https://huggingface.co/datasets/georvn7/super-debug-v2)
 
-This dataset contains debugger-oriented training artifacts distilled from successful `hen` trajectories. It is meant as a concrete example of the synthetic-data pipeline described in this repository, not as a separate product from `hen` itself.
+These datasets contain debugger-oriented training artifacts distilled from successful `hen` trajectories. They are meant as concrete examples of the synthetic-data pipeline described in this repository, not as separate products from `hen` itself.
 
 Notice, due to the nature of LLMs, hen is non-deterministic. The output folders and their content, from the very same prompt, will vary with each run
