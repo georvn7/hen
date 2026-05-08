@@ -1,0 +1,27 @@
+{
+  "name": "S1_parse_dofs",
+  "description": "Parse equality constraints.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^dofs=2 constraints=1 objectives=0\\n?$\"]]--check basic.sgps",
+    "input_files": [
+      "basic.sgps"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Count constraints separately from DOF declarations.",
+  "timeout": 5
+}

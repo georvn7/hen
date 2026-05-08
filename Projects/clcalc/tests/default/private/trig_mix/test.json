@@ -1,0 +1,25 @@
+{
+  "name": "C_clcalc_mixed",
+  "description": "Integrated trig and division expression.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^clclc: 2\\n?$\"]]\"cos(0) + sin(3.14159265/2)\"",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Evaluate all functions through the normal parser/evaluator; avoid matching exact expression strings.",
+  "timeout": 5
+}

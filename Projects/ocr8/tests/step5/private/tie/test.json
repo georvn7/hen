@@ -1,0 +1,27 @@
+{
+  "name": "S5_noisy_hamming",
+  "description": "Noisy classification should remain deterministic.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^id=also8 label=8 distance=1\\n?$\"]]--classify noisy.glyph",
+    "input_files": [
+      "noisy.glyph"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Compute Hamming distance against every template and choose the lowest distance with lower-label tie break.",
+  "timeout": 5
+}

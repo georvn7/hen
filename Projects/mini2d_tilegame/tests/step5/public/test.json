@@ -1,0 +1,27 @@
+{
+  "name": "S5_sprite_key",
+  "description": "Copy sprite with key-color transparency.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^AAAAAA\\nAAAXAA\\nAAXXXA\\nAAAAAA\\n?$\"]]--ascii sprite.scene",
+    "input_files": [
+      "sprite.scene"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

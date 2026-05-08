@@ -1,0 +1,40 @@
+{
+  "name": "S5_expressions_pack",
+  "description": "Standalone runner for five expression tests: arithmetic, relational, logical, bitwise, assignments. Params are comma‑separated ints. Returns bitmap of failing tests; 255 no args; 254 unknown name.",
+  "pretest": {
+    "commands": [
+      "clang -E -P ./s5.c -o ./s5_pre.c"
+    ],
+    "input_files": [
+      "s5.c"
+    ],
+    "output_files": [
+      "s5_pre.c"
+    ]
+  },
+  "test": {
+    "input_files": [
+      "s5_pre.c"
+    ],
+    "output_files": [
+      "s5.s"
+    ],
+    "command": "[[result=0]]-v -o ./s5.s ./s5_pre.c"
+  },
+  "posttest": {
+    "commands": [
+      "test -f ./s5.s || (echo '_DEBUG_COMMAND_RESULT=65535' && exit 1)",
+      "clang --target=aarch64-apple-darwin -c ./s5.s -o ./s5.o",
+      "clang --target=aarch64-apple-darwin ./s5.o -o ./s5",
+      "[[debug,result=0]]./s5 arithmetic:5,2 relational:5,2 logical:1,0 bitwise:6,3 assignments:10"
+    ],
+    "input_files": [
+      "s5.s"
+    ],
+    "output_files": [
+      "s5.o",
+      "s5"
+    ]
+  },
+  "io_hint": "none"
+}

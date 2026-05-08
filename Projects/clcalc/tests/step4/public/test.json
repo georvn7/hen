@@ -1,0 +1,25 @@
+{
+  "name": "S4_float_division",
+  "description": "Division promotes integers to float32.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^clclc: 3.5\\n?$\"]]\"7/2\"",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

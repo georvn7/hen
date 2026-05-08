@@ -1,0 +1,27 @@
+{
+  "name": "S2_lines",
+  "description": "Render horizontal and vertical lines.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^...V...\\n.HHVHH.\\n...V...\\n...V...\\n?$\"]]--ascii line.scene",
+    "input_files": [
+      "line.scene"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

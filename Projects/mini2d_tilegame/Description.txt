@@ -1,0 +1,45 @@
+
+PROJECT DESCRIPTION
+
+mini2d_tilegame - ASCII renderer and deterministic tile simulation
+
+CLI
+
+mini2d_tilegame [--dump] <mode> <scene_file>
+
+Modes
+- --check: parse commands and print counts.
+- --ascii: render a scene as ASCII grid.
+- --simulate: run deterministic tilegame ticks, then print events and final ASCII grid.
+
+Canvas
+- Step tests use small ASCII canvases, usually 8x6 or 10x6.
+- Pixel/color values are single ASCII symbols.
+- Layers are composited by higher layer number overwriting lower non-empty cells.
+
+Commands
+- GRID <width> <height> <clear_char>
+- FILL <layer> <char>
+- RECT <layer> <char> <x> <y> <w> <h>
+- LINEH <layer> <char> <x> <y> <w>
+- LINEV <layer> <char> <x> <y> <h>
+- TILE <id> <w> <h> followed by h rows and END_TILE
+- TILEMAP <layer> <x> <y> <grid_w> <grid_h> followed by rows of tile ids and END_TILEMAP
+- SPRITE <layer> <key_char> <x> <y> <w> <h> followed by h rows and END_SPRITE
+- MAP <w> <h> followed by h rows and END_MAP
+- MOVES <chars> where UDLR are movement commands
+
+Tilegame rules
+- '@' is player, '#' is wall, '$' is coin, '.' is floor.
+- Player attempts each move in order.
+- Wall collision leaves position unchanged and records blocked=1 for that tick.
+- Moving onto '$' collects it and turns that cell into '.'.
+
+Output
+- --check: commands=<N> grid=<W>x<H>
+- --ascii: ASCII grid only, with newline after each row.
+- --simulate: one line per move in the form tick=<n> player=<x>,<y> coin=<0|1> blocked=<0|1>, then score=<n>, then final ASCII grid.
+- In simulation event lines, coin=1 means a coin was collected on that tick.
+
+Debug evidence
+When --dump is present, print parsed command list, layer summaries, tilemap expansion, sampled pixels, and simulation events. Use PRINT_TEST for command parsing and per-cell writes.

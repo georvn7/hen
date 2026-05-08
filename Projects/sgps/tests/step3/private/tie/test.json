@@ -1,0 +1,27 @@
+{
+  "name": "S3_equality",
+  "description": "Grid search chooses nearest lower tie by deterministic rule.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^status=success\\nobjective=0.250\\nx=0.000\\n?$\"]]--solve eq.sgps",
+    "input_files": [
+      "eq.sgps"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Use deterministic ascending grid search and lower-value tie break.",
+  "timeout": 5
+}

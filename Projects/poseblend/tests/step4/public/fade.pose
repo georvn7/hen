@@ -1,0 +1,23 @@
+skeleton
+joint root - 0 0 0
+joint spine root 0 1 0
+joint hand spine 1 0 0
+end
+pose bind
+root 0 0 0
+spine 0 0 0
+hand 0 0 0
+end
+
+pose A
+root 0 0 0
+spine 0 0 0
+hand 0 0 0
+end
+pose B
+root 0 0 0
+spine 0 1 0
+hand 2 0 0
+end
+
+fade 0.25 0.75

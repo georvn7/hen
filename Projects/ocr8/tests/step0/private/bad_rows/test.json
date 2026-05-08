@@ -1,0 +1,27 @@
+{
+  "name": "S0_count",
+  "description": "Malformed glyph with too few rows is rejected.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=1,stdout=\"^ERROR: Glyph bad has 2 rows\\n?$\"]]--count bad.glyph",
+    "input_files": [
+      "bad.glyph"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Validate row count and row width from the file; do not silently pad malformed glyphs.",
+  "timeout": 5
+}

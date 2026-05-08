@@ -1,0 +1,27 @@
+{
+  "name": "S2_clamp",
+  "description": "Clamp current values to limits.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^x=1.000\\ny=0.000\\n?$\"]]--clamp clamp.sgps",
+    "input_files": [
+      "clamp.sgps"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

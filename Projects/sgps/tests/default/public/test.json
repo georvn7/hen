@@ -1,0 +1,27 @@
+{
+  "name": "C_sgps_arm2",
+  "description": "Solve a tiny two-link arm target with deterministic grid.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^status=success\\nobjective=0.000\\nshoulder=0.000\\nelbow=90.000\\n?$\"]]--solve arm.sgps",
+    "input_files": [
+      "arm.sgps"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

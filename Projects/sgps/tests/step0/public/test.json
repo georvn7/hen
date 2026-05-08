@@ -1,0 +1,25 @@
+{
+  "name": "S0_cli_errors",
+  "description": "Missing project file is rejected.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=1,stdout=\"^ERROR: Missing project file\\n?$\"]]--check",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

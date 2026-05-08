@@ -1,0 +1,27 @@
+{
+  "name": "C_sgps_arm2",
+  "description": "Dump mode exposes ARM2 candidate evaluation.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^[\\s\\S]*ARM2 target=1.000,1.000[\\s\\S]*SELECTED shoulder=0.000 elbow=90.000[\\s\\S]*status=success[\\s\\S]*$\"]]--dump --solve arm.sgps",
+    "input_files": [
+      "arm.sgps"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Evaluate the two-link kinematics from candidate angles; do not hardcode final angles.",
+  "timeout": 5
+}

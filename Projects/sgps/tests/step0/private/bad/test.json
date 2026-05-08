@@ -1,0 +1,27 @@
+{
+  "name": "S0_cli_errors",
+  "description": "Malformed DOF line reports line number.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=1,stdout=\"^ERROR: DOF expects 4 arguments at line 1\\n?$\"]]--check bad.sgps",
+    "input_files": [
+      "bad.sgps"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Validate line-oriented syntax and report exact line numbers.",
+  "timeout": 5
+}

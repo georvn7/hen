@@ -1,0 +1,27 @@
+{
+  "name": "C_math3d_script",
+  "description": "Run an integrated 3D math script with vector ops, quaternion rotation, transform composition, and scalar dot output.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^vec3 5.000 7.000 9.000\\nvec3 0.000 0.000 1.000\\nvec3 -2.000 1.000 3.000\\nvec3 6.000 0.000 11.000\\nscalar 97.000\\n?$\"]]--script scene.m3d",
+    "input_files": [
+      "scene.m3d"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

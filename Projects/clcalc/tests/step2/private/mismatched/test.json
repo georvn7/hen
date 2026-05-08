@@ -1,0 +1,25 @@
+{
+  "name": "S2_precedence",
+  "description": "Mismatched parentheses must be reported as a syntax error.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=1,stdout=\"^ERROR: Mismatched parentheses\\n?$\"]]\"(2 + 3\"",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Detect unmatched opening parentheses through parser state; do not evaluate partial expressions.",
+  "timeout": 5
+}

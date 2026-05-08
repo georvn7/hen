@@ -1,0 +1,25 @@
+{
+  "name": "S2_precedence",
+  "description": "Parentheses override precedence.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^clclc: 20\\n?$\"]]\"(2 + 3) * 4\"",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Build a real precedence parser; parentheses must alter grouping.",
+  "timeout": 5
+}

@@ -1,0 +1,27 @@
+{
+  "name": "S6_tilegame",
+  "description": "Wall collision leaves player in place.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^tick=1 player=1,1 coin=0 blocked=1\\nscore=0\\n#####\\n#@#.#\\n#####\\n?$\"]]--simulate game.scene",
+    "input_files": [
+      "game.scene"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Apply movement rules against the current map before updating player position.",
+  "timeout": 5
+}

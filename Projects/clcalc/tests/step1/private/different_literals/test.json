@@ -1,0 +1,25 @@
+{
+  "name": "S1_int_add",
+  "description": "Evaluate a different addition to prevent hardcoded 5.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^clclc: 13\\n?$\"]]\"12 + 1\"",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Compute from parsed integer literals; do not special-case the public expression.",
+  "timeout": 5
+}

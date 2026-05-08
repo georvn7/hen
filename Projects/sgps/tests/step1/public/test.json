@@ -1,0 +1,27 @@
+{
+  "name": "S1_parse_dofs",
+  "description": "Parse DoF definitions.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^dofs=2 constraints=0 objectives=0\\n?$\"]]--check basic.sgps",
+    "input_files": [
+      "basic.sgps"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

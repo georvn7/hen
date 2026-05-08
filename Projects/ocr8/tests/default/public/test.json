@@ -1,0 +1,27 @@
+{
+  "name": "C_ocr8_batch",
+  "description": "Batch classify canonical and noisy glyphs.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^id=one label=1 distance=0\\nid=noisy8 label=8 distance=1\\nid=four label=4 distance=0\\n?$\"]]--classify batch.glyphs",
+    "input_files": [
+      "batch.glyphs"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

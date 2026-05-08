@@ -1,0 +1,27 @@
+{
+  "name": "S5_memory",
+  "description": "Execute load/store memory operations.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^exit=42\\n?$\"]]--run mem.asm",
+    "input_files": [
+      "mem.asm"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

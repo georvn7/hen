@@ -1,0 +1,27 @@
+{
+  "name": "S0_parse_scene",
+  "description": "Malformed GRID command is rejected.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=1,stdout=\"^ERROR: GRID expects 3 arguments at line 1\\n?$\"]]--check scene.txt",
+    "input_files": [
+      "scene.txt"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Validate command arity and report source line numbers.",
+  "timeout": 5
+}

@@ -1,0 +1,27 @@
+{
+  "name": "S0_parse_counts",
+  "description": "Unknown parent is rejected.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=1,stdout=\"^ERROR: Unknown parent missing for joint hand\\n?$\"]]--count bad.pose",
+    "input_files": [
+      "bad.pose"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Validate parent names while building the skeleton hierarchy.",
+  "timeout": 5
+}

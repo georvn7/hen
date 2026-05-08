@@ -1,0 +1,27 @@
+{
+  "name": "S3_jumps",
+  "description": "jz must branch when register is zero.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^exit=0\\n?$\"]]--run zero.asm",
+    "input_files": [
+      "zero.asm"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Resolve labels and update PC rather than falling through unconditionally.",
+  "timeout": 5
+}

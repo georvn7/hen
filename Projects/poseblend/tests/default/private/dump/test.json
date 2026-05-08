@@ -1,0 +1,27 @@
+{
+  "name": "C_poseblend_full",
+  "description": "Dump mode exposes skeleton and local/world poses.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^[\\s\\S]*SKELETON root=- spine=root hand=spine[\\s\\S]*LOCAL hand[\\s\\S]*WORLD hand[\\s\\S]*time 0.500[\\s\\S]*$\"]]--dump --fade full.pose all",
+    "input_files": [
+      "full.pose"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Dump real parsed hierarchy and sampled pose data; do not replace animation with fixed output.",
+  "timeout": 5
+}

@@ -1,0 +1,27 @@
+{
+  "name": "S0_parse_scene",
+  "description": "Parse grid and command count.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^commands=2 grid=4x3\\n?$\"]]--check scene.txt",
+    "input_files": [
+      "scene.txt"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

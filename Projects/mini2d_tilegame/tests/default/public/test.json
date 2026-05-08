@@ -1,0 +1,27 @@
+{
+  "name": "C_mini2d_tilegame",
+  "description": "Integrated deterministic tilegame event log and final state.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^tick=1 player=2,1 coin=1 blocked=0\\ntick=2 player=3,1 coin=0 blocked=0\\ntick=3 player=3,2 coin=0 blocked=0\\nscore=1\\n#####\\n#...#\\n#..@#\\n#####\\n?$\"]]--simulate full.scene",
+    "input_files": [
+      "full.scene"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

@@ -1,0 +1,27 @@
+{
+  "name": "S5_sample_set",
+  "description": "Requested sample order should be preserved in output.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^time 1.000\\nweight=1.000\\njoint root 0.000 0.000 0.000\\njoint spine 0.000 2.000 0.000\\njoint hand 3.000 2.000 0.000\\ntime 0.000\\nweight=0.000\\njoint root 0.000 0.000 0.000\\njoint spine 0.000 1.000 0.000\\njoint hand 1.000 1.000 0.000\\n?$\"]]--fade full.pose all",
+    "input_files": [
+      "full.pose"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Preserve the order of requested sample times; do not sort or assume a fixed default sequence.",
+  "timeout": 5
+}

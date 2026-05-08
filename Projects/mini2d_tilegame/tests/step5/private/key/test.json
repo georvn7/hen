@@ -1,0 +1,27 @@
+{
+  "name": "S5_sprite_key",
+  "description": "Different key color changes transparency.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^AAAAAA\\nAA.A.A\\nAAAAAA\\nAAAAAA\\n?$\"]]--ascii sprite.scene",
+    "input_files": [
+      "sprite.scene"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Honor the key char argument and the scene clear character; copied non-key sprite pixels should composite over lower layers.",
+  "timeout": 5
+}

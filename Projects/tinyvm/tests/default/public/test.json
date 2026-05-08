@@ -1,0 +1,27 @@
+{
+  "name": "C_tinyvm_suite",
+  "description": "Integrated assemble and run program.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^exit=6\\n?$\"]]--run suite.asm",
+    "input_files": [
+      "suite.asm"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

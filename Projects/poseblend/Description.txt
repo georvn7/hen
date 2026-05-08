@@ -1,0 +1,30 @@
+
+PROJECT DESCRIPTION
+
+poseblend - deterministic tiny skeleton animation evaluator
+
+CLI
+
+poseblend [--dump] <mode> <file> [arguments]
+
+Modes
+- --count <file>: parse skeleton/clip file and print counts.
+- --pose <file>: evaluate a static local pose into world-space joint positions.
+- --sample <file> <time>: sample keyframes linearly.
+- --blend <file> <weight>: blend pose A and pose B.
+- --fade <file> <time>: evaluate fade-in/fade-out layer weights and blended pose.
+
+Data model
+- Skeleton is a tree of named joints.
+- Each joint has parent name or '-' for root and a bind offset tx ty tz.
+- Local pose channels are translation offsets tx ty tz from bind position.
+- World position = parent world position + bind offset + local pose translation.
+- Interpolation and blending are linear per channel.
+
+Output
+- For a single pose or sample, print one deterministic line per sampled joint in skeleton order: joint <name> <x> <y> <z>
+- For fade/sample-set modes, print time <t> and weight=<w> before the joint lines for that sample.
+- Use three decimal digits and clamp -0.000 to 0.000.
+
+Debug evidence
+When --dump is present, print parsed skeleton, local pose values, blend weights, and world pose values before final output. Use PRINT_TEST for parent indices, keyframe selection, and per-joint local/world values.

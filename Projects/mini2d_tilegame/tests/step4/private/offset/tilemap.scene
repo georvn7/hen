@@ -1,0 +1,13 @@
+GRID 8 4 .
+FILL 0 .
+TILE 0 2 2
+ab
+cd
+END_TILE
+TILE 1 2 2
+xy
+zw
+END_TILE
+TILEMAP 0 2 0 2 1
+0 1
+END_TILEMAP

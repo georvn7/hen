@@ -1,0 +1,25 @@
+{
+  "name": "S2_vec3_ops",
+  "description": "Compute dot product.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^scalar 32.000\\n?$\"]]vec3.dot 1 2 3 4 5 6",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Use the command name to dispatch to the correct vector operation.",
+  "timeout": 5
+}

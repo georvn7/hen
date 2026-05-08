@@ -1,0 +1,27 @@
+{
+  "name": "C_math3d_script",
+  "description": "Dump mode exposes quaternion and transform-stack intermediate state for the integrated script.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^[\\s\\S]*COMMAND: quat.rotate_axis_angle[\\s\\S]*QUAT:[\\s\\S]*vec3 -2.000 1.000 3.000[\\s\\S]*COMMAND: transform.compose_apply[\\s\\S]*MATRIX:[\\s\\S]*vec3 6.000 0.000 11.000[\\s\\S]*scalar 97.000[\\s\\S]*$\"]]--dump --script scene.m3d",
+    "input_files": [
+      "scene.m3d"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Dump parsed commands plus real quaternion/matrix intermediate values; the final vectors and scalar must still be computed from the script.",
+  "timeout": 5
+}

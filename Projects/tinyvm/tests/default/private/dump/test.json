@@ -1,0 +1,27 @@
+{
+  "name": "C_tinyvm_suite",
+  "description": "Dump mode exposes PC and registers during execution.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^[\\s\\S]*PC=0 r0=0 r1=0 r2=0 r3=0[\\s\\S]*PC=7[\\s\\S]*exit=6[\\s\\S]*$\"]]--dump --run suite.asm",
+    "input_files": [
+      "suite.asm"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Dump actual VM state per executed instruction without changing semantics.",
+  "timeout": 5
+}

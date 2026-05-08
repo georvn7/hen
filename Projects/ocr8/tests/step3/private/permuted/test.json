@@ -1,0 +1,27 @@
+{
+  "name": "S3_classify_0_3",
+  "description": "Classification should not depend on file order.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^id=three label=3 distance=0\\nid=one label=1 distance=0\\n?$\"]]--classify digits03.glyphs",
+    "input_files": [
+      "digits03.glyphs"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Classify each glyph independently; preserve input order in output but do not use position as label.",
+  "timeout": 5
+}

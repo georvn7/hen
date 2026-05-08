@@ -1,0 +1,27 @@
+{
+  "name": "S4_inequality",
+  "description": "LE constraint is handled symmetrically.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^status=success\\nobjective=0.000\\nx=-1.500\\n?$\"]]--solve ineq.sgps",
+    "input_files": [
+      "ineq.sgps"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Evaluate GE and LE constraints explicitly, not by assuming positive targets.",
+  "timeout": 5
+}

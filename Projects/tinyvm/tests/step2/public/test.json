@@ -1,0 +1,27 @@
+{
+  "name": "S2_arithmetic",
+  "description": "Execute register arithmetic.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^exit=11\\n?$\"]]--run arith.asm",
+    "input_files": [
+      "arith.asm"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

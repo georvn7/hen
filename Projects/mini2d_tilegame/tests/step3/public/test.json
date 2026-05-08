@@ -1,0 +1,27 @@
+{
+  "name": "S3_layers",
+  "description": "Composite higher layers over lower layers.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^AAAAA\\nABBBA\\nAAAAA\\n?$\"]]--ascii layers.scene",
+    "input_files": [
+      "layers.scene"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

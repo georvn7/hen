@@ -1,0 +1,27 @@
+{
+  "name": "S1_parse",
+  "description": "Parse labels separately from instructions.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^instructions=2 labels=1\\n?$\"]]--check label.asm",
+    "input_files": [
+      "label.asm"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Count labels and executable instructions separately.",
+  "timeout": 5
+}

@@ -1,0 +1,27 @@
+{
+  "name": "S0_count",
+  "description": "Validate one glyph and report count.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^glyphs=1 rows=8 cols=8\\n?$\"]]--count one.glyph",
+    "input_files": [
+      "one.glyph"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

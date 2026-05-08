@@ -1,0 +1,27 @@
+{
+  "name": "S2_features",
+  "description": "Feature extractor handles wider glyphs.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^id=zero on=28 rows=4,4,4,4,4,4,4,0 cols=5,7,2,2,7,5,0,0\\n?$\"]]--features zero.glyph",
+    "input_files": [
+      "zero.glyph"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Derive row and column features from all eight rows.",
+  "timeout": 5
+}

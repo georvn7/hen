@@ -1,0 +1,27 @@
+{
+  "name": "S0_parse_counts",
+  "description": "Parse skeleton and pose counts.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^joints=3 poses=1 keys=0\\n?$\"]]--count bind.pose",
+    "input_files": [
+      "bind.pose"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

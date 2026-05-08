@@ -1,0 +1,27 @@
+{
+  "name": "S1_grid_rect",
+  "description": "Render a filled rectangle.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^......\\n.AAA..\\n.AAA..\\n......\\n?$\"]]--ascii rect.scene",
+    "input_files": [
+      "rect.scene"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

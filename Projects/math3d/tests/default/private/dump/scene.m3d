@@ -1,0 +1,5 @@
+vec3.add 1 2 3 4 5 6
+vec3.cross 1 0 0 0 1 0
+quat.rotate_axis_angle 0 0 1 90 1 2 3
+transform.compose_apply 10 -2 5 2 90 1 2 3
+vec3.dot 6 0 11 -4 0 11

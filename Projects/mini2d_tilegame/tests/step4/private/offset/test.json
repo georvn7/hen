@@ -1,0 +1,27 @@
+{
+  "name": "S4_tilemap",
+  "description": "Tilemap placement honors destination offset.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^..abxy..\\n..cdzw..\\n........\\n........\\n?$\"]]--ascii tilemap.scene",
+    "input_files": [
+      "tilemap.scene"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Use tilemap destination x/y and tile dimensions when expanding cells.",
+  "timeout": 5
+}

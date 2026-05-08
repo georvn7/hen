@@ -1,0 +1,27 @@
+{
+  "name": "S0_count",
+  "description": "Malformed glyph with a short row is rejected.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=1,stdout=\"^ERROR: Glyph bad row 1 has width 7\\n?$\"]]--count bad.glyph",
+    "input_files": [
+      "bad.glyph"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Validate every row width exactly; do not pad, truncate, or infer missing pixels.",
+  "timeout": 5
+}

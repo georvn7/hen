@@ -1,0 +1,27 @@
+{
+  "name": "S3_pose_blend",
+  "description": "Blend with a non-public weight.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^joint root 0.000 0.000 0.000\\njoint spine 0.000 1.250 0.000\\njoint hand 1.500 1.250 0.000\\n?$\"]]--blend blend.pose 0.25",
+    "input_files": [
+      "blend.pose"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Use weight as a numeric blend factor for every local channel.",
+  "timeout": 5
+}

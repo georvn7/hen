@@ -1,0 +1,27 @@
+{
+  "name": "S5_noisy_hamming",
+  "description": "Classify a one-pixel noisy glyph by Hamming distance.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^id=noisy8 label=8 distance=1\\n?$\"]]--classify noisy.glyph",
+    "input_files": [
+      "noisy.glyph"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

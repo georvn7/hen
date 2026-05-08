@@ -1,0 +1,27 @@
+{
+  "name": "S4_fade_layer",
+  "description": "Fade layer computes blend weight from time.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^time 0.500\\nweight=0.500\\njoint root 0.000 0.000 0.000\\njoint spine 0.000 1.500 0.000\\njoint hand 2.000 1.500 0.000\\n?$\"]]--fade fade.pose 0.5",
+    "input_files": [
+      "fade.pose"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

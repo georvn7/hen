@@ -1,0 +1,27 @@
+{
+  "name": "S0_cli_errors",
+  "description": "Unknown opcode is rejected during check.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=1,stdout=\"^ERROR: Unknown opcode bogus at line 1\\n?$\"]]--check bad.asm",
+    "input_files": [
+      "bad.asm"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Validate opcode names while preserving line numbers.",
+  "timeout": 5
+}

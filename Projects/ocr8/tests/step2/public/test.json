@@ -1,0 +1,27 @@
+{
+  "name": "S2_features",
+  "description": "Print deterministic row and column count features.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^id=one on=17 rows=2,3,2,2,2,2,4,0 cols=0,0,2,7,7,1,0,0\\n?$\"]]--features one.glyph",
+    "input_files": [
+      "one.glyph"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

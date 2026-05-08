@@ -1,0 +1,44 @@
+
+PROJECT DESCRIPTION
+
+tinyvm - small assembler and bytecode virtual machine
+
+CLI
+
+tinyvm [--dump] <mode> <program.asm>
+
+Modes
+- --check: parse and validate a program, then print instruction and label counts.
+- --run: assemble and execute the program.
+
+Assembly syntax
+- One instruction per line.
+- Comments begin with ';'.
+- Labels are written as name: at the start of a line.
+- Registers: r0, r1, r2, r3.
+
+Instructions
+- mov rX imm
+- add rX rY
+- sub rX rY
+- mul rX rY
+- jmp label
+- jz rX label
+- push rX
+- pop rX
+- call label
+- ret
+- load rX addr
+- store addr rX
+- halt rX
+
+Execution rules
+- Registers and memory are signed int32.
+- Memory has 256 cells initialized to zero.
+- The VM stops on halt, prints exit=<halted value modulo 256>, and the host process returns 0.
+- Runtime errors print ERROR: <message> and the host process returns 1.
+
+Output
+- --check: instructions=<N> labels=<M>
+- --run: exit=<value>
+- --dump --run also prints PC, registers, stack depth, and selected memory samples for each step.

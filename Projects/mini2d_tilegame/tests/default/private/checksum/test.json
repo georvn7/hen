@@ -1,0 +1,27 @@
+{
+  "name": "C_mini2d_tilegame",
+  "description": "Dump mode includes checksum for final ASCII grid.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^[\\s\\S]*EVENT tick=1[\\s\\S]*ASCII_CHECKSUM=[0-9]+[\\s\\S]*score=1[\\s\\S]*$\"]]--dump --simulate full.scene",
+    "input_files": [
+      "full.scene"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Emit event log and checksum from the actual simulated final grid.",
+  "timeout": 5
+}

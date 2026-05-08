@@ -1,0 +1,4 @@
+DOF x 0 -2 2
+DOF y 0 -2 2
+EQ x 1
+EQ y -0.5

@@ -1,0 +1,25 @@
+{
+  "name": "S5_transform_compose",
+  "description": "Identity transform leaves point unchanged.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^vec3 4.000 5.000 6.000\\n?$\"]]transform.compose_apply 0 0 0 1 0 4 5 6",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Compose transforms generally; identity should fall out naturally.",
+  "timeout": 5
+}

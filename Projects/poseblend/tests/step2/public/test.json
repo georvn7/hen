@@ -1,0 +1,27 @@
+{
+  "name": "S2_key_interp",
+  "description": "Sample linear keyframe interpolation.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^joint root 0.000 0.000 0.000\\njoint spine 0.000 1.250 0.000\\njoint hand 1.500 1.250 0.000\\n?$\"]]--sample wave.clip 0.5",
+    "input_files": [
+      "wave.clip"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

@@ -1,0 +1,27 @@
+{
+  "name": "S5_multi_dof",
+  "description": "Solve two independent DoFs.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^status=success\\nobjective=0.000\\nx=1.000\\ny=-0.500\\n?$\"]]--solve two.sgps",
+    "input_files": [
+      "two.sgps"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

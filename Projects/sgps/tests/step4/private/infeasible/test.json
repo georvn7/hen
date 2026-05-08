@@ -1,0 +1,27 @@
+{
+  "name": "S4_inequality",
+  "description": "Infeasible inequality reports failure with the best bounded candidate.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^status=failure\\nobjective=1.000\\nx=1.000\\n?$\"]]--solve ineq.sgps",
+    "input_files": [
+      "ineq.sgps"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "If no candidate satisfies hard constraints within limits, report failure instead of pretending success.",
+  "timeout": 5
+}

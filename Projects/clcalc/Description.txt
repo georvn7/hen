@@ -1,0 +1,49 @@
+
+PROJECT DESCRIPTION
+
+Command line calculator (clcalc)
+
+CLI
+
+clcalc [--dump] "<expression>"
+
+The program evaluates exactly one expression and prints exactly one result line to stdout.
+There is no REPL and no implicit file input.
+
+Syntax
+- Literals: int32 and float32 decimal literals, including scientific notation for floats.
+- Operators: + - * / % ^
+- Functions: log(x[, base]), sqrt(x), rcp(x), sin(x), cos(x)
+- Parentheses group expressions.
+- Whitespace is ignored.
+
+Precedence and associativity, high to low
+1. function calls and parentheses
+2. ^, right associative
+3. unary + and unary -, right associative
+4. * / %, left associative
+5. + -, left associative
+
+Important rule: exponentiation outranks unary minus. Therefore -2^2 is -(2^2), which is -4.
+
+Type and evaluation rules
+- If both operands are int32, + - * and % use int32 arithmetic.
+- / always promotes operands to float32 and produces a float32 result.
+- % is allowed only for int32 operands and follows C/C++ remainder semantics: integer division truncates toward zero and the remainder has the sign of the left operand.
+- Integer ^ requires a non-negative integer exponent and checks overflow.
+- In float mode, ^ uses powf-style float32 exponentiation.
+- If any operand is float32 or a function is used, compute in float32.
+- rcp(0), division by zero, sqrt(x < 0), log(x <= 0), log(x, base <= 0 or base == 1), 0^0, and int32 overflow are errors.
+
+Output
+- Success: clclc: <value>
+- Error: ERROR: <one line explanation>
+- Always terminate output with a single newline.
+- Float output uses fixed decimal normalization: no scientific notation, up to 7 decimals, trim trailing zeros, keep at least one fractional digit for non-integers, and print -0 as 0.
+
+Debug evidence
+When --dump is present, print stable diagnostic lines before the final result:
+- TOKENS: ...
+- AST: ...
+- EVAL: ...
+Use PRINT_TEST for additional internal diagnostics. These diagnostics are for debugging and must remain deterministic.

@@ -1,0 +1,3 @@
+DOF shoulder 0 0 90
+DOF elbow 0 0 180
+ARM2 shoulder elbow 1.0 1.0 90

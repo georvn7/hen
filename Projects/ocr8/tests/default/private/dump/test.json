@@ -1,0 +1,27 @@
+{
+  "name": "C_ocr8_batch",
+  "description": "Dump mode exposes features and distances while preserving labels.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^[\\s\\S]*BITMAP one[\\s\\S]*DISTANCES noisy8[\\s\\S]*id=noisy8 label=8 distance=1[\\s\\S]*$\"]]--dump --classify batch.glyphs",
+    "input_files": [
+      "batch.glyphs"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Dump real parsed bitmaps/features/distances; labels must still come from the classifier.",
+  "timeout": 5
+}

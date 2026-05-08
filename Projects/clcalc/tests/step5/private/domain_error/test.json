@@ -1,0 +1,25 @@
+{
+  "name": "S5_functions",
+  "description": "Domain errors must be reported.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=1,stdout=\"^ERROR: Division by zero\\n?$\"]]\"rcp(0)\"",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Take explicit domain-error paths; do not return numeric placeholders for invalid functions.",
+  "timeout": 5
+}

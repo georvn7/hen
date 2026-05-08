@@ -1,0 +1,25 @@
+{
+  "name": "S0_cli_errors",
+  "description": "Invalid numeric argument is rejected.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=1,stdout=\"^ERROR: Invalid number at argument 2\\n?$\"]]vec3.add 1 nope 3 4 5 6",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Validate every numeric argument and report the first invalid argument index.",
+  "timeout": 5
+}

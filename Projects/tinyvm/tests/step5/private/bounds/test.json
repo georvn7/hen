@@ -1,0 +1,27 @@
+{
+  "name": "S5_memory",
+  "description": "Out-of-range memory access is rejected.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=1,stdout=\"^ERROR: Memory address out of range 300\\n?$\"]]--run bounds.asm",
+    "input_files": [
+      "bounds.asm"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Validate memory addresses before load/store.",
+  "timeout": 5
+}

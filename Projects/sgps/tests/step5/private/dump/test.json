@@ -1,0 +1,27 @@
+{
+  "name": "S5_multi_dof",
+  "description": "Dump mode exposes candidate objective search.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^[\\s\\S]*CANDIDATE x=-2.000 y=-2.000[\\s\\S]*SELECTED x=1.000 y=-0.500[\\s\\S]*objective=0.000[\\s\\S]*$\"]]--dump --solve two.sgps",
+    "input_files": [
+      "two.sgps"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Dump actual grid-search candidates and selected objective.",
+  "timeout": 5
+}

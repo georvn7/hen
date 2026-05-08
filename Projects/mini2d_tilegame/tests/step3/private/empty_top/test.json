@@ -1,0 +1,27 @@
+{
+  "name": "S3_layers",
+  "description": "Empty cells on higher layers do not erase lower layers.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^AAAA\\nAAAA\\n?$\"]]--ascii layers.scene",
+    "input_files": [
+      "layers.scene"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Treat clear char as transparent during layer compositing except on base fill.",
+  "timeout": 5
+}

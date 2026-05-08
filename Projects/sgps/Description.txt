@@ -1,0 +1,47 @@
+
+PROJECT DESCRIPTION
+
+sgps - simple deterministic general-purpose solver
+
+CLI
+
+sgps [--dump] <mode> <project_file>
+
+Modes
+- --check: parse and validate a project file.
+- --clamp: apply DoF min/max limits to current values.
+- --solve: run a deterministic grid-search solver.
+
+Input format
+Use a small line-oriented format instead of full JSON for this project:
+
+DOF <name> <current> <min> <max>
+EQ <name> <target>
+GE <name> <target>
+LE <name> <target>
+OBJ_MIN <name> <target>
+ARM2 <shoulder_name> <elbow_name> <target_x> <target_y> <step_degrees>
+
+Rules
+- DOF values are float32.
+- --check prints dofs=<N> constraints=<M> objectives=<K>.
+- --clamp prints each clamped value as name=<value>.
+- --solve uses deterministic exhaustive grid search over each DOF in ascending order.
+- For simple EQ/GE/LE/OBJ_MIN constraints, search step is 0.5 unless ARM2 specifies its own degree step.
+- Objective is absolute error sum plus constraint violations.
+- Ties are broken lexicographically by DOF order and lower value.
+
+ARM2 model
+- Two unit-length links in the XY plane.
+- shoulder angle and elbow angle are degrees.
+- End effector x = cos(shoulder) + cos(shoulder + elbow)
+- End effector y = sin(shoulder) + sin(shoulder + elbow)
+
+Output
+- status=success or status=failure
+- status=failure means the best candidate still violates at least one hard constraint after deterministic search.
+- objective=<fixed 3 decimals>
+- one line per DOF: <name>=<fixed 3 decimals>
+
+Debug evidence
+When --dump is present, print parsed constraints, candidate values, per-candidate objective summaries, and selected solution. Use PRINT_TEST for parser state and solver iteration diagnostics.

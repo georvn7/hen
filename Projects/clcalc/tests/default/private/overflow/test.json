@@ -1,0 +1,25 @@
+{
+  "name": "C_clcalc_mixed",
+  "description": "Int32 addition overflow must be reported instead of wrapping silently.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=1,stdout=\"^ERROR: Integer overflow\\n?$\"]]\"2147483647 + 1\"",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Apply int32 overflow checks on integer arithmetic; do not rely on wider host integer wraparound.",
+  "timeout": 5
+}

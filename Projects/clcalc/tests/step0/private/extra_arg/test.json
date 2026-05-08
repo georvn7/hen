@@ -1,0 +1,25 @@
+{
+  "name": "S0_cli_errors",
+  "description": "Multiple expressions should be rejected.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=1,stdout=\"^ERROR: Expected one expression\\n?$\"]]\"1+2\" \"3+4\"",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Reject invalid argument counts using argc only; do not evaluate partial inputs.",
+  "timeout": 5
+}

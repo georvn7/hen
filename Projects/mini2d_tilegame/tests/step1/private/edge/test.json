@@ -1,0 +1,27 @@
+{
+  "name": "S1_grid_rect",
+  "description": "Rectangle at canvas edge is clipped/rendered correctly.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^BB...\\nBB...\\nBB...\\n?$\"]]--ascii rect.scene",
+    "input_files": [
+      "rect.scene"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Draw using coordinates and dimensions; do not assume center-only rectangles.",
+  "timeout": 5
+}

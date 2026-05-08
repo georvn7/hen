@@ -1,0 +1,25 @@
+{
+  "name": "S2_vec3_ops",
+  "description": "Normalize a non-unit vector with deterministic formatting.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^vec3 0.600 0.800 0.000\\n?$\"]]vec3.normalize 3 4 0",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Implement real vector normalization using vector length; do not only support dot/cross dispatch.",
+  "timeout": 5
+}

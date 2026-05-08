@@ -1,0 +1,43 @@
+
+PROJECT DESCRIPTION
+
+math3d - deterministic 3D math command tool
+
+CLI
+
+math3d [--dump] <command> [arguments...]
+math3d [--dump] --script <file>
+
+The tool evaluates vector, matrix, quaternion, and transform commands. It prints deterministic fixed-decimal text with three digits after the decimal point.
+
+Core commands
+- vec3.add ax ay az bx by bz
+- vec3.dot ax ay az bx by bz
+- vec3.cross ax ay az bx by bz
+- vec3.normalize x y z
+- mat4.translate_point tx ty tz x y z
+- quat.rotate_axis_angle ax ay az degrees x y z
+- transform.compose_apply tx ty tz scale yaw_degrees x y z
+
+Transform semantics
+- transform.compose_apply first scales the point uniformly, then applies yaw_degrees as a rotation around the +Z axis, then applies translation tx ty tz.
+- --script executes commands in file order and prints one result line per command.
+
+Output examples
+- vec3 5.000 7.000 9.000
+- scalar 32.000
+- ERROR: <message>
+
+Rules
+- Use float32 math where practical.
+- Normalize quaternions and axes before rotation.
+- Avoid scientific notation.
+- Clamp very small absolute values below 0.0005 to 0.000 before formatting.
+
+Debug evidence
+When --dump is present, print stable diagnostic lines before the final result:
+- COMMAND: <name>
+- INPUTS: ...
+- MATRIX: ... or QUAT: ... when applicable
+- RESULT: ...
+Use PRINT_TEST for parsed arguments and intermediate vector/matrix/quaternion values.

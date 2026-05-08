@@ -1,0 +1,25 @@
+{
+  "name": "S3_mat4_transform",
+  "description": "Apply a translation transform to a point.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^vec3 5.000 7.000 9.000\\n?$\"]]mat4.translate_point 1 2 3 4 5 6",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

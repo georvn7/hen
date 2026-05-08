@@ -1,0 +1,43 @@
+
+PROJECT DESCRIPTION
+
+ocr8 - tiny 8x8 ASCII glyph recognizer
+
+CLI
+
+ocr8 [--dump] <mode> <glyph_file>
+
+Modes
+- --count: validate glyph file shape and print glyph count.
+- --features: parse each glyph and print deterministic feature summaries.
+- --classify: classify each glyph and print one label per glyph.
+
+Glyph file format
+Each glyph begins with a header line:
+
+glyph <id>
+
+Then exactly 8 rows follow. Each row has exactly 8 characters. '#' means an active pixel and '.' means an inactive pixel. A glyph ends with:
+
+end
+
+Blank lines and comment lines starting with ';' may be ignored.
+
+Recognition rules
+- Steps 1 and 2 only parse and summarize glyphs.
+- Step 3 recognizes canonical digits 0, 1, 2, 3.
+- Step 4 recognizes canonical digits 0 through 9.
+- Step 5 and later classify noisy glyphs using Hamming distance against canonical templates.
+- Ties are broken by the lower digit label.
+
+Output
+- --count prints: glyphs=<N> rows=8 cols=8
+- --features prints one line per glyph: id=<id> on=<count> rows=<comma counts> cols=<comma counts>
+- --classify prints one line per glyph: id=<id> label=<digit> distance=<hamming distance>
+
+Debug evidence
+When --dump is present, include stable lines for each glyph:
+- BITMAP <id> <64-bit string>
+- FEATURES <id> ...
+- DISTANCES <id> d0=<n> d1=<n> ...
+Use PRINT_TEST for parser state, row/column counts, and selected template distance.

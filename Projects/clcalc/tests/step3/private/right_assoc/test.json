@@ -1,0 +1,25 @@
+{
+  "name": "S3_unary_power",
+  "description": "Power is right associative.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^clclc: 512\\n?$\"]]\"2^3^2\"",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Parse ^ as right associative, not as a left-associative loop.",
+  "timeout": 5
+}

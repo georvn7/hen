@@ -1,0 +1,25 @@
+{
+  "name": "S4_quat_rotate",
+  "description": "Rotate X axis around Z by 90 degrees.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^vec3 0.000 1.000 0.000\\n?$\"]]quat.rotate_axis_angle 0 0 1 90 1 0 0",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

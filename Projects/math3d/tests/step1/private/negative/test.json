@@ -1,0 +1,25 @@
+{
+  "name": "S1_vec3_add",
+  "description": "Add signed vec3 values.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^vec3 -3.000 7.000 3.000\\n?$\"]]vec3.add -1 5 10 -2 2 -7",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Compute component-wise addition from all six numeric inputs.",
+  "timeout": 5
+}

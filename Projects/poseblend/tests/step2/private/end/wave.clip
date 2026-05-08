@@ -1,0 +1,23 @@
+skeleton
+joint root - 0 0 0
+joint spine root 0 1 0
+joint hand spine 1 0 0
+end
+pose bind
+root 0 0 0
+spine 0 0 0
+hand 0 0 0
+end
+
+clip wave
+key 0.0
+root 0 0 0
+spine 0 0 0
+hand 0 0 0
+end
+key 1.0
+root 0 0 0
+spine 0 0.5 0
+hand 1 0 0
+end
+endclip

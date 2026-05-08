@@ -1,0 +1,27 @@
+{
+  "name": "S4_classify_0_9",
+  "description": "Digit seven must be recognized outside the public batch.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^id=seven label=7 distance=0\\n?$\"]]--classify seven.glyph",
+    "input_files": [
+      "seven.glyph"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Use the full template table, not a public-output memorization.",
+  "timeout": 5
+}

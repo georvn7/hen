@@ -1,0 +1,39 @@
+{
+  "description": "Standalone program: returns 255 if no args; else returns (first byte of argv[1]) + (count of '1' digits in all args) modulo 256.",
+  "io_hint": "Derive the result from a general mapping of the first provided token (e.g., transform its first byte/feature), then combine it with an aggregation over all inputs. With only one token, the aggregation should reduce to its neutral element, yielding the base mapping—no special-casing literal values.",
+  "name": "S2_count_ones",
+  "posttest": {
+    "commands": [
+      "clang --target=aarch64-apple-darwin -c ./s2.s -o ./s2.o",
+      "clang --target=aarch64-apple-darwin ./s2.o -o ./s2",
+      "[[debug,result=70]]./s2 F"
+    ],
+    "input_files": [
+      "s2.s"
+    ],
+    "output_files": [
+      "s2.o",
+      "s2"
+    ]
+  },
+  "pretest": {
+    "commands": [
+      "clang -E -P ./s2.c -o ./s2_pre.c"
+    ],
+    "input_files": [
+      "s2.c"
+    ],
+    "output_files": [
+      "s2_pre.c"
+    ]
+  },
+  "test": {
+    "command": "[[result=0]]-v -o ./s2.s ./s2_pre.c",
+    "input_files": [
+      "s2_pre.c"
+    ],
+    "output_files": [
+      "s2.s"
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "S1_world_pose",
+  "description": "Local translations affect descendants through hierarchy.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^joint root 0.000 0.000 0.000\\njoint spine 0.000 1.500 0.000\\njoint hand 1.500 1.500 0.000\\n?$\"]]--pose reach.pose",
+    "input_files": [
+      "reach.pose"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Accumulate bind offsets and local translations through parent-child hierarchy.",
+  "timeout": 5
+}

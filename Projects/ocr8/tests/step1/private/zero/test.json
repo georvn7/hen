@@ -1,0 +1,27 @@
+{
+  "name": "S1_parse_bitmap",
+  "description": "Parse a different glyph with a different active count.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^[\\s\\S]*id=zero on=28[\\s\\S]*$\"]]--features zero.glyph",
+    "input_files": [
+      "zero.glyph"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Count active pixels from the bitmap rows; do not hardcode the public glyph.",
+  "timeout": 5
+}

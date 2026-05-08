@@ -1,0 +1,25 @@
+{
+  "name": "C_clcalc_mixed",
+  "description": "Integrated calculator stress expression covering nested precedence, right-associative power, unary-minus precedence, functions, modulo, float promotion, and formatting.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^clclc: -0\\.928571[0-9]\\n?$\"]]\"((((sin(0)^2 + cos(0)^2) * rcp(0.5) + log(1,10))^2 / sqrt(49) + ((-15 % 4) * (7 - 5) + 7/2) - 7/2.0) - ((2 + 3*4)^2 % 5) + ((2^3^2) % 100) + (-2^2) + rcp(sqrt(4)) - log(1000,10))\"",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

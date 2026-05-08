@@ -1,0 +1,27 @@
+{
+  "name": "S1_parse",
+  "description": "Parse a minimal program.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^instructions=2 labels=0\\n?$\"]]--check const.asm",
+    "input_files": [
+      "const.asm"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

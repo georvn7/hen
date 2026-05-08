@@ -1,0 +1,27 @@
+{
+  "name": "S4_call_stack",
+  "description": "Execute push and pop stack operations.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^exit=13\\n?$\"]]--run stack.asm",
+    "input_files": [
+      "stack.asm"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Maintain a real stack separate from registers.",
+  "timeout": 5
+}

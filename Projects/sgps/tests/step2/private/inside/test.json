@@ -1,0 +1,27 @@
+{
+  "name": "S2_clamp",
+  "description": "Values already inside limits are unchanged.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^x=0.500\\n?$\"]]--clamp inside.sgps",
+    "input_files": [
+      "inside.sgps"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Apply min/max bounds only when needed.",
+  "timeout": 5
+}
