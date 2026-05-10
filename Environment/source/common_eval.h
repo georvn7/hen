@@ -1,7 +1,7 @@
 #ifdef COMPILE_TEST
 
 #include <cstdio>
-#define PRINT_TEST(format, ...) std::printf(format, ##__VA_ARGS__)
+#define PRINT_TEST(format, ...) std::fprintf(stderr, format, ##__VA_ARGS__)
 
 #else
 

@@ -607,6 +607,7 @@ template <typename T,
               !is_iterable_v<T> &&
               !std::is_same<T, std::string>::value &&
               !std::is_pointer<T>::value &&
+              !std::is_array<T>::value &&
               is_streamable_v<T>,
               int
           >::type = 0>
@@ -679,6 +680,25 @@ inline void printValue(std::ostream& os,
     os << '"';
 }
 
+// T[N]
+template <typename T, std::size_t N,
+          typename = std::enable_if_t<!std::is_same_v<std::remove_cv_t<T>, char>>>
+inline void printValue(std::ostream& os,
+                       const T (&arr)[N],
+                       std::size_t depth,
+                       const PrintConfig& cfg)
+{
+    if (depth > cfg.maxDepth) { os << "[...]"; return; }
+    os << "[";
+    const std::size_t count = std::min<std::size_t>(N, cfg.maxElements);
+    for (std::size_t i = 0; i < count; ++i) {
+        if (i > 0) os << ", ";
+        printValue(os, arr[i], depth + 1, cfg);
+    }
+    if (N > count) os << ", ...";
+    os << "]";
+}
+
 template <typename T,
           typename = std::enable_if_t<
               std::is_pointer_v<T> &&
@@ -706,6 +726,7 @@ template <typename T,
               !is_iterable_v<T> &&
               !std::is_same<T, std::string>::value &&
               !std::is_pointer<T>::value &&
+              !std::is_array<T>::value &&
               is_streamable_v<T>,
               int
           >::type>
