@@ -201,6 +201,52 @@ bool normalizeMessageContent(web::json::value& message)
     return true;
 }
 
+void applyOpenRouterModelSettings(web::json::value& requestFromClientBody,
+                                  const std::shared_ptr<LLMConfig>& llm)
+{
+    utility::string_t reasoningEffort;
+    bool hasReasoningEffort = false;
+
+    // OpenRouter uses a provider-neutral reasoning object. Do not leak the
+    // OpenAI-compatible top-level reasoning_effort field to proxy requests.
+    if(requestFromClientBody.has_field(U("reasoning_effort")) &&
+       requestFromClientBody[U("reasoning_effort")].is_string())
+    {
+        reasoningEffort = requestFromClientBody[U("reasoning_effort")].as_string();
+        requestFromClientBody.erase(U("reasoning_effort"));
+        hasReasoningEffort = reasoningEffort != U("na");
+    }
+    else if(llm->reasoning_effort != "na")
+    {
+        reasoningEffort = utility::conversions::to_string_t(llm->reasoning_effort);
+        hasReasoningEffort = true;
+    }
+
+    if(hasReasoningEffort)
+    {
+        requestFromClientBody[U("reasoning")] = json::value::object();
+        requestFromClientBody[U("reasoning")][U("effort")] = json::value::string(reasoningEffort);
+    }
+
+    if(llm->model == "deepseek/deepseek-v4-pro")
+    {
+        requestFromClientBody[U("temperature")] = json::value::number(0.0);
+    }
+    else if(llm->model == "qwen/qwen3.6-35b-a3b")
+    {
+        requestFromClientBody[U("temperature")] = json::value::number(0.6);
+        requestFromClientBody[U("top_p")] = json::value::number(0.95);
+        requestFromClientBody[U("top_k")] = json::value::number(20);
+        requestFromClientBody[U("presence_penalty")] = json::value::number(0.0);
+    }
+    else if(llm->model == "minimax/minimax-m2.7")
+    {
+        requestFromClientBody[U("temperature")] = json::value::number(0.8);
+        requestFromClientBody[U("top_p")] = json::value::number(0.95);
+        requestFromClientBody[U("top_k")] = json::value::number(40);
+    }
+}
+
 bool isOpenAICompatibleUsageProvider(const std::string& provider)
 {
     return provider == "groq" ||
@@ -1791,8 +1837,10 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
             requestFromClientBody[U("frequency_penalty")] = json::value::number(0.2);
             requestFromClientBody[U("repetition_penalty")] = json::value::number(1.05);
         }
-        else if(llm->provider == "openrouter" && !llm->upstream_providers.empty())
+        else if(llm->provider == "openrouter")
         {
+            applyOpenRouterModelSettings(requestFromClientBody, llm);
+
             std::vector<std::string> providerOrder;
             for(const auto& provider : llm->upstream_providers)
             {
@@ -2153,9 +2201,11 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
     {
         requestFromClientBody[U("stream")] = json::value::boolean(false);
         requestFromClientBody[U("max_tokens")] = json::value::number(4096);
-        requestFromClientBody[U("temperature")] = json::value::number(0.15);
-        requestFromClientBody[U("repetition_penalty")] = json::value::number(1.08);
-        requestFromClientBody[U("top_p")] = json::value::number(0.9);
+        requestFromClientBody[U("temperature")] = json::value::number(0.6);
+        requestFromClientBody[U("top_p")] = json::value::number(0.95);
+        requestFromClientBody[U("top_k")] = json::value::number(20);
+        requestFromClientBody[U("presence_penalty")] = json::value::number(0.0);
+        requestFromClientBody[U("repetition_penalty")] = json::value::number(1.0);
     }
     else
     {

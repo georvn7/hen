@@ -913,7 +913,7 @@
       "url": "https://openrouter.ai/api/v1/chat/completions",
       "model": "deepseek/deepseek-v4-pro",
       "upstream_providers": ["Together", "DeepSeek"],
-      "reasoning_effort": "na",
+      "reasoning_effort": "xhigh",
       "verbosity": "low",
       "context_size": 512,
       "rate_limit": -1,
