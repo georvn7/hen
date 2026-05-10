@@ -1,0 +1,27 @@
+{
+  "name": "S6_xform_apply",
+  "description": "Apply a row-major affine transform to both a point and a vector.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^vec3 6.000 23.000 42.000\\nvec3 -4.000 3.000 12.000\\n?$\"]]--script transform.m3d",
+    "input_files": [
+      "transform.m3d"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

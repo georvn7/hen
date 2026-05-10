@@ -1,0 +1,27 @@
+{
+  "name": "S7_xform_mul",
+  "description": "Compose two affine transforms and apply the result to a point.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^xform 0.000 -2.000 0.000 1.000 2.000 0.000 0.000 2.000 0.000 0.000 2.000 3.000 0.000 0.000 0.000 1.000\\nvec3 -3.000 4.000 9.000\\n?$\"]]--script compose.m3d",
+    "input_files": [
+      "compose.m3d"
+    ],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

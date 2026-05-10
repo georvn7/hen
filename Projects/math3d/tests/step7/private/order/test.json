@@ -1,0 +1,25 @@
+{
+  "name": "S7_xform_mul",
+  "description": "Composition order is A * B, meaning B applies first and A applies second.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^xform 1.000 0.000 0.000 7.000 0.000 1.000 0.000 0.000 0.000 0.000 1.000 0.000 0.000 0.000 0.000 1.000\\n?$\"]]xform.mul 2 0 0 1 0 2 0 0 0 0 2 0 0 0 0 1 0.5 0 0 3 0 0.5 0 0 0 0 0.5 0 0 0 0 1",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "xform.mul A B must compute A*B, so B is applied first and then A; do not reverse the composition order.",
+  "timeout": 5
+}

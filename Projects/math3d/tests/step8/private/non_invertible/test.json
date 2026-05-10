@@ -1,0 +1,25 @@
+{
+  "name": "S8_xform_inverse",
+  "description": "Singular affine transforms are rejected deterministically.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=1,stdout=\"^ERROR: Non-invertible transform\\n?$\"]]xform.inverse 1 0 0 1 0 0 0 2 0 0 1 3 0 0 0 1",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Reject affine transforms with singular 3x3 linear part; do not divide by zero or emit partial inverse values.",
+  "timeout": 5
+}

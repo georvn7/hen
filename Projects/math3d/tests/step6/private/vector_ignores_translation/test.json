@@ -1,0 +1,25 @@
+{
+  "name": "S6_xform_apply",
+  "description": "Vector transformation ignores translation terms.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^vec3 4.000 5.000 6.000\\n?$\"]]xform.apply_vector 1 0 0 100 0 1 0 200 0 0 1 300 0 0 0 1 4 5 6",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Use affine vector semantics: apply only the 3x3 linear part, so m03, m13, and m23 translation terms must not affect the vector result.",
+  "timeout": 5
+}

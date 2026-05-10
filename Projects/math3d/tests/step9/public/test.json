@@ -1,0 +1,25 @@
+{
+  "name": "S9_projection_apply",
+  "description": "Apply a projection matrix to a point with perspective divide.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^vec3 0.500 1.000 1.500\\n?$\"]]proj.apply_point 1 0 0 0 0 1 0 0 0 0 1 0 0 1 0 0 1 2 3",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "none",
+  "timeout": 5
+}

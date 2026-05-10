@@ -1,0 +1,25 @@
+{
+  "name": "S6_xform_apply",
+  "description": "Affine point transformation applies linear transform plus translation.",
+  "pretest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "test": {
+    "command": "[[result=0,stdout=\"^vec3 12.000 17.000 24.000\\n?$\"]]xform.apply_point 2 0 0 10 0 3 0 20 0 0 4 30 0 0 0 1 1 -1 -1.5",
+    "input_files": [],
+    "output_files": []
+  },
+  "posttest": {
+    "commands": [],
+    "input_files": [],
+    "output_files": []
+  },
+  "regression_files": [],
+  "io_files": [
+    "console.log"
+  ],
+  "io_hint": "Use affine point semantics: apply the 3x3 linear part and add translation terms m03, m13, and m23.",
+  "timeout": 5
+}
