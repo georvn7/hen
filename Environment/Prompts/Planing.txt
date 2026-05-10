@@ -7,7 +7,9 @@ PROJECT TEST:
 
 PLANNING PROJECT SOFTWARE ARCHITECTURE
 
-Prepare a concise plan about the project architecture just enough to pass the final test as provided. 
+You must prepare a plan to implement the project described in the 'PROJECT DESCRIPTION' section.
+
+Prepare a concise plan about the project architecture just enough to pass the final test as provided.
 
 - The main goal is to implement the features with less code and complexity. To be easy to debug
 - Use this hierarchy only (no deeper levels): Application -> Sub-systems -> Components -> Modules -> Functions
