@@ -4922,7 +4922,8 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
         feedback += "The 'action_type' field is empty or whitespace-only. ";
         feedback += "Return corrected JSON with one valid next action from the debugging workflow.\n";
     }
-    else if(m_nextStep.isInformationRequest())
+
+    if(m_nextStep.isInformationRequest())
     {
         //For now I will disable this as it doen't leave traces in the trajectory
         //for wrong info request and the model will keep asking
