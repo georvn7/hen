@@ -21,9 +21,10 @@ namespace hen {
     {
     public:
         DECLARE_TYPE(LLMConfig, "description")
-        DECLARE_ENUM_FIELD(provider, "\"openai\",\"anthropic\",\"google\",\"groq\",\"xAI\",\"cerebras\",\"zai\",\"minimax\",\"mistral\",\"ollama\",\"vllm\"", "description")
+        DECLARE_ENUM_FIELD(provider, "\"openai\",\"anthropic\",\"google\",\"groq\",\"xAI\",\"cerebras\",\"zai\",\"minimax\",\"mistral\",\"ollama\",\"vllm\",\"openrouter\"", "description")
         DECLARE_FIELD(std::string, url, "description")
         DECLARE_FIELD(std::string, model, "description")
+        DECLARE_ARRAY_FIELD(std::string, upstream_providers, "Optional ordered upstream provider routing hints for proxy providers such as OpenRouter.")
         DECLARE_ENUM_FIELD(reasoning_effort, "\"na\",\"low\",\"medium\",\"high\"", "description")
         DECLARE_ENUM_FIELD(verbosity, "\"na\",\"low\",\"medium\",\"high\"", "description")
         DECLARE_FIELD(int, rate_limit, "Rate limits provided by the vendor for a given model. "\

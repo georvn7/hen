@@ -7,6 +7,7 @@ namespace hen {
     DEFINE_FIELD(LLMConfig, provider)
     DEFINE_FIELD(LLMConfig, url)
     DEFINE_FIELD(LLMConfig, model)
+    DEFINE_ARRAY_FIELD(LLMConfig, upstream_providers)
     DEFINE_FIELD(LLMConfig, reasoning_effort)
     DEFINE_FIELD(LLMConfig, verbosity)
     DEFINE_FIELD(LLMConfig, rate_limit)

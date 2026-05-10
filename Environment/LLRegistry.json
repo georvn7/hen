@@ -727,15 +727,15 @@
     {
       "provider": "cerebras",
       "url": "https://api.cerebras.ai/v1/chat/completions",
-      "model": "zai-glm-4.6",
+      "model": "gpt-oss-120b",
       "reasoning_effort": "na",
       "verbosity": "na",
       "context_size": 128,
       "rate_limit": 4096,
       "rate_limit_rpm": -1,
       "roles": "director,expert,developer",
-      "input_tokens_price": 1.10,
-      "output_tokens_price": 1.50
+      "input_tokens_price": 0.35,
+      "output_tokens_price": 0.75
     },
     {
       "provider": "cerebras",
@@ -892,6 +892,51 @@
       "roles": "director,expert,developer",
       "input_tokens_price": 0.25,
       "output_tokens_price": 2.00
+    },
+    {
+      "provider": "openrouter",
+      "url": "https://openrouter.ai/api/v1/chat/completions",
+      "model": "qwen/qwen3.6-35b-a3b",
+      "upstream_providers": ["AtlasCloud", "Parasail", "AkashML"],
+      "reasoning_effort": "na",
+      "verbosity": "low",
+      "context_size": 256,
+      "rate_limit": -1,
+      "rate_limit_rpm": -1,
+      "roles": "director,expert,developer",
+      "input_tokens_price": 0.23,
+      "cache_read_tokens_price": 0.23,
+      "output_tokens_price": 1.80
+    },
+    {
+      "provider": "openrouter",
+      "url": "https://openrouter.ai/api/v1/chat/completions",
+      "model": "deepseek/deepseek-v4-pro",
+      "upstream_providers": ["Together", "DeepSeek"],
+      "reasoning_effort": "na",
+      "verbosity": "low",
+      "context_size": 512,
+      "rate_limit": -1,
+      "rate_limit_rpm": -1,
+      "roles": "director,expert,developer",
+      "input_tokens_price": 2.10,
+      "cache_read_tokens_price": 0.20,
+      "output_tokens_price": 4.40
+    },
+    {
+      "provider": "openrouter",
+      "url": "https://openrouter.ai/api/v1/chat/completions",
+      "model": "minimax/minimax-m2.7",
+      "upstream_providers": ["Fireworks", "Minimax", "Morph"],
+      "reasoning_effort": "na",
+      "verbosity": "low",
+      "context_size": 512,
+      "rate_limit": -1,
+      "rate_limit_rpm": -1,
+      "roles": "director,expert,developer",
+      "input_tokens_price": 0.60,
+      "cache_read_tokens_price": 0.06,
+      "output_tokens_price": 2.40
     }
   ]
 }

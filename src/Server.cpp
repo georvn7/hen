@@ -147,6 +147,60 @@ size_t sanitizeJsonStringsForProvider(web::json::value& value)
     return replaced;
 }
 
+void appendMessageContentText(const web::json::value& value, std::string& content)
+{
+    if (value.is_string()) {
+        content += utility::conversions::to_utf8string(value.as_string());
+        return;
+    }
+
+    if (!value.is_object()) {
+        return;
+    }
+
+    if (value.has_field(U("type")) && value.at(U("type")).is_string()) {
+        const utility::string_t type = value.at(U("type")).as_string();
+        if (type == U("reasoning") ||
+            type == U("reasoning_details") ||
+            type == U("thinking") ||
+            type == U("redacted_reasoning")) {
+            return;
+        }
+    }
+
+    if (value.has_field(U("text")) && value.at(U("text")).is_string()) {
+        content += utility::conversions::to_utf8string(value.at(U("text")).as_string());
+    }
+    else if (value.has_field(U("content")) && value.at(U("content")).is_string()) {
+        content += utility::conversions::to_utf8string(value.at(U("content")).as_string());
+    }
+}
+
+bool normalizeMessageContent(web::json::value& message)
+{
+    if (!message.is_object() || !message.has_field(U("content"))) {
+        return false;
+    }
+
+    web::json::value& contentValue = message[U("content")];
+    if (contentValue.is_string()) {
+        return true;
+    }
+
+    std::string content;
+    if (contentValue.is_array()) {
+        for (const auto& item : contentValue.as_array()) {
+            appendMessageContentText(item, content);
+        }
+    }
+    else {
+        appendMessageContentText(contentValue, content);
+    }
+
+    contentValue = web::json::value::string(utility::conversions::to_string_t(content));
+    return true;
+}
+
 bool isOpenAICompatibleUsageProvider(const std::string& provider)
 {
     return provider == "groq" ||
@@ -158,7 +212,8 @@ bool isOpenAICompatibleUsageProvider(const std::string& provider)
            provider == "zai" ||
            provider == "minimax" ||
            provider == "mistral" ||
-           provider == "alibaba";
+           provider == "alibaba" ||
+           provider == "openrouter";
 }
 
 uint32_t readUIntField(const web::json::value& object, const utility::string_t& field)
@@ -173,6 +228,22 @@ uint32_t readUIntField(const web::json::value& object, const utility::string_t& 
     }
 
     return static_cast<uint32_t>(value.as_number().to_uint64());
+}
+
+double readDoubleField(const web::json::value& object,
+                       const utility::string_t& field,
+                       double fallback = 0.0)
+{
+    if (!object.is_object() || !object.has_field(field)) {
+        return fallback;
+    }
+
+    const web::json::value& value = object.at(field);
+    if (!value.is_number()) {
+        return fallback;
+    }
+
+    return value.as_number().to_double();
 }
 
 uint32_t readNestedUIntField(const web::json::value& object,
@@ -1211,9 +1282,13 @@ boost_bst::http::request<boost_bst::http::string_body> Server::prepareBeastReque
     if (llm->provider == "openai" ||
         llm->provider == "deepinfra" ||
         llm->provider == "deepseek" ||
-        llm->provider == "xAI")
+        llm->provider == "xAI" ||
+        llm->provider == "openrouter")
     {
         req.set(boost_bst::http::field::authorization, "Bearer " + llm->api_key);
+        if (llm->provider == "openrouter") {
+            req.set("X-OpenRouter-Title", PRODUCT_NAME);
+        }
     }
     else if (llm->provider == "anthropic") {
         req.set("x-api-key", llm->api_key);
@@ -1601,7 +1676,8 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
        llm->provider == "zai" ||
        llm->provider == "minimax" ||
        llm->provider == "mistral" ||
-       llm->provider == "alibaba")
+       llm->provider == "alibaba" ||
+       llm->provider == "openrouter")
     {
         bool openai_reasoning = startsWith(llm->model, "o1") ||
                               startsWith(llm->model, "o3") ||
@@ -1714,6 +1790,30 @@ std::string Server::prepareBody(json::value& requestFromClientBody, std::shared_
             requestFromClientBody[U("max_tokens")] = json::value::number(1536);
             requestFromClientBody[U("frequency_penalty")] = json::value::number(0.2);
             requestFromClientBody[U("repetition_penalty")] = json::value::number(1.05);
+        }
+        else if(llm->provider == "openrouter" && !llm->upstream_providers.empty())
+        {
+            std::vector<std::string> providerOrder;
+            for(const auto& provider : llm->upstream_providers)
+            {
+                if(provider && !provider->empty())
+                {
+                    providerOrder.push_back(*provider);
+                }
+            }
+
+            if(!providerOrder.empty())
+            {
+                auto upstreamProviders = json::value::array(providerOrder.size());
+                for(size_t i = 0; i < providerOrder.size(); ++i)
+                {
+                    upstreamProviders[i] = json::value::string(utility::conversions::to_string_t(providerOrder[i]));
+                }
+
+                requestFromClientBody[U("provider")] = json::value::object();
+                requestFromClientBody[U("provider")][U("order")] = upstreamProviders;
+                requestFromClientBody[U("provider")][U("allow_fallbacks")] = json::value::boolean(true);
+            }
         }
     }
     else if(llm->provider == "anthropic")
@@ -2129,7 +2229,19 @@ web::json::value Server::updateUsage(web::json::value& usageField,
             cache_read_tokens = readNestedUIntField(usageField, U("prompt_tokens_details"), U("cached_tokens"));
         }
 
-        splitCachedPromptTokens(input_tokens, cache_read_tokens, input_tokens, cache_read_tokens);
+        cache_write_tokens = readNestedUIntField(usageField, U("prompt_tokens_details"), U("cache_write_tokens"));
+
+        const uint32_t specialPromptTokens = cache_read_tokens + cache_write_tokens;
+        if(specialPromptTokens <= input_tokens)
+        {
+            input_tokens -= specialPromptTokens;
+        }
+        else
+        {
+            input_tokens = 0;
+            cache_read_tokens = 0;
+            cache_write_tokens = 0;
+        }
     }
     else if (llm->provider == "anthropic")
     {
@@ -2178,11 +2290,23 @@ web::json::value Server::updateUsage(web::json::value& usageField,
     if (cache_write_credits < 0.0f) {
         cache_write_credits = (cache_write_tokens / 1000000.0f) * cacheWritePrice;
     }
-    float credits =
+    float estimatedCredits =
         (input_tokens / 1000000.0f) * llm->input_tokens_price +
         cache_write_credits +
         (cache_read_tokens / 1000000.0f) * cacheReadPrice +
         (output_tokens / 1000000.0f) * llm->output_tokens_price;
+    float credits = estimatedCredits;
+
+    if(llm->provider == "openrouter")
+    {
+        const double openRouterCost = readDoubleField(usageField, U("cost"), -1.0);
+        if(openRouterCost >= 0.0)
+        {
+            credits = static_cast<float>(openRouterCost);
+            usage[U("provider_reported_credits")] = json::value::number(openRouterCost);
+            usage[U("estimated_credits")] = json::value::number(estimatedCredits);
+        }
+    }
     
     float creditsConsumed = 0;
     uint32_t creditsLimit = 0;
@@ -2279,6 +2403,9 @@ json::value Server::handleResponse(json::value& json_response, std::shared_ptr<L
         //OpenAI format
         auto choicesArray = json_response[U("choices")].as_array();
         reply = choicesArray[0];
+        if (reply.has_field(U("message"))) {
+            normalizeMessageContent(reply[U("message")]);
+        }
     }
     else if (json_response.has_field(U("candidates")) && json_response[U("candidates")].is_array() && json_response[U("candidates")].as_array().size() > 0)
     {
