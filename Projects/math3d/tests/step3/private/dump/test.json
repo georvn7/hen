@@ -1,13 +1,13 @@
 {
   "name": "S3_mat4_transform",
-  "description": "Dump matrix rows for debugging.",
+  "description": "Dump matrix construction for debugging.",
   "pretest": {
     "commands": [],
     "input_files": [],
     "output_files": []
   },
   "test": {
-    "command": "[[result=0,stdout=\"^[\\s\\S]*MATRIX row0=1.000,0.000,0.000,1.000[\\s\\S]*vec3 5.000 7.000 9.000[\\s\\S]*$\"]]--dump mat4.translate_point 1 2 3 4 5 6",
+    "command": "[[result=0,stdout=\"^[\\s\\S]*MATRIX[\\s\\S]*vec3 5.000 7.000 9.000[\\s\\S]*$\"]]--dump mat4.translate_point 1 2 3 4 5 6",
     "input_files": [],
     "output_files": []
   },
@@ -20,6 +20,6 @@
   "io_files": [
     "console.log"
   ],
-  "io_hint": "Dump actual matrix construction and then the same transformed point result.",
+  "io_hint": "Dump actual matrix construction and then the same transformed point result. The private check does not require a particular matrix storage convention.",
   "timeout": 5
 }

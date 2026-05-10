@@ -3,3 +3,7 @@ vec3.cross 1 0 0 0 1 0
 quat.rotate_axis_angle 0 0 1 90 1 2 3
 transform.compose_apply 10 -2 5 2 90 1 2 3
 vec3.dot 6 0 11 -4 0 11
+xform.apply_point 0 -2 0 10 3 0 0 20 0 0 4 30 0 0 0 1 1 2 3
+xform.apply_vector 0 -2 0 10 3 0 0 20 0 0 4 30 0 0 0 1 1 2 3
+xform.mul 0 -1 0 1 1 0 0 2 0 0 1 3 0 0 0 1 2 0 0 0 0 2 0 0 0 0 2 0 0 0 0 1
+xform.inverse 0 -2 0 1 2 0 0 2 0 0 2 3 0 0 0 1

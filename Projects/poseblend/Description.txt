@@ -24,7 +24,13 @@ Data model
 Output
 - For a single pose or sample, print one deterministic line per sampled joint in skeleton order: joint <name> <x> <y> <z>
 - For fade/sample-set modes, print time <t> and weight=<w> before the joint lines for that sample.
+- When the time argument is all, output samples in the order declared in the file. Do not sort sample times.
 - Use three decimal digits and clamp -0.000 to 0.000.
+- Unknown parent reference: ERROR: Unknown parent <parent> for joint <joint>
 
 Debug evidence
-When --dump is present, print parsed skeleton, local pose values, blend weights, and world pose values before final output. Use PRINT_TEST for parent indices, keyframe selection, and per-joint local/world values.
+When --dump is present, print parsed skeleton, local pose values, blend weights, and world pose values before final output.
+- Skeleton summary line: SKELETON <joint>=<parent> ... using - for root parent.
+- Local pose lines include LOCAL <joint> ...
+- World pose lines include WORLD <joint> ...
+Use PRINT_TEST for parent indices, keyframe selection, and per-joint local/world values.

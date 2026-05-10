@@ -40,6 +40,8 @@ Output
 - --ascii: ASCII grid only, with newline after each row.
 - --simulate: one line per move in the form tick=<n> player=<x>,<y> coin=<0|1> blocked=<0|1>, then score=<n>, then final ASCII grid.
 - In simulation event lines, coin=1 means a coin was collected on that tick.
+- Malformed command arity: ERROR: <COMMAND> expects <N> arguments at line <line>
+- <N> counts arguments after the command name. For example GRID requires 3 arguments: width, height, clear_char.
 
 Debug evidence
-When --dump is present, print parsed command list, layer summaries, tilemap expansion, sampled pixels, and simulation events. Use PRINT_TEST for command parsing and per-cell writes.
+When --dump is present, print parsed command list, layer summaries, tilemap expansion, sampled pixels, and simulation events. Simulation dump event lines begin with EVENT tick=<n>. Also print ASCII_CHECKSUM=<unsigned decimal> for the final ASCII grid. Use PRINT_TEST for command parsing and per-cell writes.

@@ -16,6 +16,30 @@ The curriculum intentionally spans different debugging domains and scales from a
 
 `simplec` mirrors the SimpleC benchmark shape as a self-contained project seed under `Projects/`. The working/generated SimpleC state still lives separately in `/Users/georvn/projects/hen/SimpleC` and should not be confused with this seed curriculum entry.
 
+## Estimated Solution Size
+
+The complexity estimates below are rough final-solution SLOC bands, not hard limits. They estimate the C++ implementation Hen is expected to generate after all public ramp steps pass.
+
+SLOC means implementation source lines only:
+
+- count non-empty, non-comment C++ lines in the generated project sources
+- exclude tests, `common.h`, instrumentation, debug logs, cached state, and generated trajectory artifacts
+- include ordinary helper functions, data types, parsing/formatting code, and command dispatch
+- treat the band as a complexity signal, not a grading rule
+
+The estimate is based on feature surface, number of subsystems, data-model size, parsing/dispatch complexity, algorithmic branching, and how much intermediate state must be printable for debugging.
+
+| Project | Estimated SLOC | Complexity Drivers |
+| --- | ---: | --- |
+| `clcalc` | 600-1,000 | expression lexer/parser, numeric evaluation, precedence, functions, CLI errors |
+| `ocr8` | 700-1,100 | 8x8 glyph parsing, feature extraction, template scoring, diagnostics |
+| `math3d` | 900-1,400 | vector math, affine transforms, quaternions, projection, script mode, fixed formatting |
+| `tinyvm` | 1,100-1,800 | assembler, bytecode representation, VM execution, jumps, stack, calls, memory |
+| `poseblend` | 1,100-1,700 | skeleton hierarchy, keyframe sampling, interpolation, pose blending, fade windows |
+| `mini2d_tilegame` | 1,200-1,900 | tile maps, sprites, layers, deterministic simulation, ASCII rendering |
+| `sgps` | 1,500-2,400 | constraint model, search, pruning, diagnostics, stable solution formatting |
+| `simplec` | 3,500-6,000 | lexer, parser, AST, semantic checks, symbol/layout logic, ARM64 code generation |
+
 Each project follows the same test-ramp principle:
 
 1. Start with CLI and validation behavior.

@@ -41,6 +41,13 @@ Output
 - Always terminate output with a single newline.
 - Float output uses fixed decimal normalization: no scientific notation, up to 7 decimals, trim trailing zeros, keep at least one fractional digit for non-integers, and print -0 as 0.
 
+Deterministic error messages
+- No expression argument: ERROR: Missing expression
+- More than one expression argument after optional --dump: ERROR: Expected one expression
+- Unmatched or mismatched parentheses: ERROR: Mismatched parentheses
+- Division by zero, including rcp(0): ERROR: Division by zero
+- Checked int32 arithmetic overflow: ERROR: Integer overflow
+
 Debug evidence
 When --dump is present, print stable diagnostic lines before the final result:
 - TOKENS: ...

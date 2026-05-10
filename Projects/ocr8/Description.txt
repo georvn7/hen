@@ -35,6 +35,11 @@ Output
 - --features prints one line per glyph: id=<id> on=<count> rows=<comma counts> cols=<comma counts>
 - --classify prints one line per glyph: id=<id> label=<digit> distance=<hamming distance>
 
+Deterministic error messages
+- Wrong row count: ERROR: Glyph <id> has <N> rows
+- Wrong row width: ERROR: Glyph <id> row <R> has width <N>
+- <R> is the 1-based row index within the glyph bitmap.
+
 Debug evidence
 When --dump is present, include stable lines for each glyph:
 - BITMAP <id> <64-bit string>

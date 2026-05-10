@@ -1,13 +1,13 @@
 {
   "name": "C_math3d_script",
-  "description": "Run an integrated 3D math script with vector ops, quaternion rotation, transform composition, and scalar dot output.",
+  "description": "Run an integrated 3D math script with vector ops, quaternion rotation, affine transforms, projection, and scalar output.",
   "pretest": {
     "commands": [],
     "input_files": [],
     "output_files": []
   },
   "test": {
-    "command": "[[result=0,stdout=\"^vec3 5.000 7.000 9.000\\nvec3 0.000 0.000 1.000\\nvec3 -2.000 1.000 3.000\\nvec3 6.000 0.000 11.000\\nscalar 97.000\\n?$\"]]--script scene.m3d",
+    "command": "[[result=0,stdout=\"^vec3 5.000 7.000 9.000\\nvec3 0.000 0.000 1.000\\nvec3 -2.000 1.000 3.000\\nvec3 6.000 0.000 11.000\\nscalar 97.000\\nvec3 6.000 23.000 42.000\\nvec3 -4.000 3.000 12.000\\nxform 0.000 -2.000 0.000 1.000 2.000 0.000 0.000 2.000 0.000 0.000 2.000 3.000 0.000 0.000 0.000 1.000\\nxform 0.000 0.500 0.000 -1.000 -0.500 0.000 0.000 0.500 0.000 0.000 0.500 -1.500 0.000 0.000 0.000 1.000\\nvec3 0.500 1.000 1.500\\n?$\"]]--script scene.m3d",
     "input_files": [
       "scene.m3d"
     ],

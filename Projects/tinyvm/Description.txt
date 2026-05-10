@@ -42,3 +42,6 @@ Output
 - --check: instructions=<N> labels=<M>
 - --run: exit=<value>
 - --dump --run also prints PC, registers, stack depth, and selected memory samples for each step.
+- Unknown opcode during check: ERROR: Unknown opcode <opcode> at line <line>
+- Out-of-range load/store address: ERROR: Memory address out of range <addr>
+- Dump execution lines begin with PC=<pc> r0=<v> r1=<v> r2=<v> r3=<v>

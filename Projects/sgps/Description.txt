@@ -42,6 +42,12 @@ Output
 - status=failure means the best candidate still violates at least one hard constraint after deterministic search.
 - objective=<fixed 3 decimals>
 - one line per DOF: <name>=<fixed 3 decimals>
+- Malformed command arity: ERROR: <COMMAND> expects <N> arguments at line <line>
+- <N> counts arguments after the command name. For example DOF requires 4 arguments: name, current, min, max.
 
 Debug evidence
-When --dump is present, print parsed constraints, candidate values, per-candidate objective summaries, and selected solution. Use PRINT_TEST for parser state and solver iteration diagnostics.
+When --dump is present, print parsed constraints, candidate values, per-candidate objective summaries, and selected solution.
+- ARM2 lines include ARM2 target=<x>,<y>
+- Candidate lines begin with CANDIDATE and list DOF values.
+- Selected solution lines begin with SELECTED and list chosen DOF values.
+Use PRINT_TEST for parser state and solver iteration diagnostics.
