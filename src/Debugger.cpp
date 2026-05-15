@@ -19,6 +19,7 @@
 #define MAX_NEXT_STEP_TRANSPORT_RETRY_ATTEMPTS 10
 #define MAX_REPEATED_INVALID_NEXT_STEP_ATTEMPTS 2
 #define MAX_REPEATED_INVALID_BREAKPOINT_STEP_ATTEMPTS 3
+#define DEBUG_FUNCTION_REPEAT_STUCK_WINDOW 6
 
 #define TRACE_MAX_MEMBERS 16
 #define TRACE_MIN_MEMBERS 4
@@ -31,6 +32,9 @@
 #define TRACE_SYS_MEMBERS 32
 #define TRACE_SYS_ELEMENTS 8
 #define TRACE_SYS_DEPTH 4
+
+//In characters
+#define COMPACT_CONTEXT_TRESHOULD (1024*45*4)
 
 #define RETRY_INVALID_STEP_WITH_DIRECTOR
 
@@ -4854,6 +4858,35 @@ std::string Debugger::validateStep(CCodeProject* project, const TestDef& test, i
                 feedback = ensureFunctionIsVisible(project, m_nextStep.action_subject, true) + feedback;
             }
         }
+#if DEBUG_FUNCTION_REPEAT_STUCK_WINDOW > 0
+        uint32_t sameFunctionDebugSteps = 0;
+        for(std::size_t i = m_trajectory.size(); i-- > 0; )
+        {
+            const DebugStep& step = m_trajectory[i];
+            if(step.m_action != "debug_function" || step.m_subject != m_nextStep.action_subject)
+            {
+                break;
+            }
+
+            sameFunctionDebugSteps++;
+            if(sameFunctionDebugSteps >= DEBUG_FUNCTION_REPEAT_STUCK_WINDOW)
+            {
+                break;
+            }
+        }
+
+        if(sameFunctionDebugSteps >= DEBUG_FUNCTION_REPEAT_STUCK_WINDOW)
+        {
+            feedback += "The proposed next step repeats action 'debug_function' for function '";
+            feedback += m_nextStep.action_subject;
+            feedback += "' after ";
+            feedback += std::to_string(sameFunctionDebugSteps);
+            feedback += " consecutive previous debug_function step";
+            feedback += sameFunctionDebugSteps == 1 ? "" : "s";
+            feedback += " for the same function. This usually means the debugger is stuck collecting the same kind of runtime evidence.\n";
+            feedback += "Choose a different next step: inspect another likely caller/callee, request existing information with function_info/log_info/step_info/search_source, use fix_function if there is enough evidence. Do not request debug_function for the same function again without a new source edit (via fix_function).\n\n";
+        }
+#endif
     }
     else if(m_nextStep.action_type == "run_test")
     {
@@ -6761,11 +6794,12 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
     }
     m_rawTrajectory.push_back(std::make_pair(rawStepInfo, "user"));
 
+    uint32_t compiledInfoLength = 0;
     std::string info;
     {
         if(!infoForCurrentStep.empty())
         {
-            uint32_t compiledInfoLength = uint32_t(m_compiledInfo.length() + infoForCurrentStep.length());
+            compiledInfoLength = uint32_t(m_compiledInfo.length() + infoForCurrentStep.length());
             auto llmConfig = Client::getInstance().currentLLMConfig();
             uint32_t maxInfoSize = (llmConfig->context_size * 1024) * CHARACTERS_PER_TOKEN * 0.7f;
 
@@ -6810,6 +6844,13 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         m_nextStep.motivation += "' and find what else needs fixes to successfully pass the test.";
         //Leave the action subject to be the fixed function!
     }
+#if COMPACT_CONTEXT_TRESHOULD
+    else if(compiledInfoLength > COMPACT_CONTEXT_TRESHOULD)
+    {
+        m_nextStep.action_type = "run_test";
+        m_nextStep.motivation = "Run the test and summarize the debugging progress";
+    }
+#endif
     else
     {
         m_commitMessage.clear();
