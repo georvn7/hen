@@ -1,5 +1,6 @@
 Current progress:
 [[trajectory]]
+[[progress_report]]
 
 [[call_graph]]
 

@@ -30,6 +30,12 @@
 
 #define DEBUGGER_INTERLEAVED_TRAJECTORY
 
+// Enables deterministic run_test progress reports persisted with trajectory steps.
+// Define DISABLE_DEBUGGER_PROGRESS_REPORT to compile this out while tuning.
+#ifndef DISABLE_DEBUGGER_PROGRESS_REPORT
+#define DEBUGGER_PROGRESS_REPORT
+#endif
+
 #include "TraceAnalyzer.h"
 #include "LogAnalyzer.h"
 
@@ -248,6 +254,14 @@ namespace hen {
         std::string             m_lastRunInfo;
         std::string             m_rewardHackingReview;
         std::string             m_lastRunTestLog;
+#ifdef DEBUGGER_PROGRESS_REPORT
+        std::string             m_lastRunProgressReport;
+        std::string             m_lastRunProgressReportVerbose;
+        std::string             m_pendingProgressReportText;
+        std::string             m_pendingProgressReportVerboseText;
+        std::string             m_pendingProgressReportJsonText;
+        std::vector<std::string> m_progressReportHistory;
+#endif
         std::string             m_testFunctionalityDelta;
         std::string             m_unitTestSource;
         std::string             m_commitMessage;

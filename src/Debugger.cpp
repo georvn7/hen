@@ -4,6 +4,8 @@
 #include <mutex>
 #include <cctype>
 #include <string_view>
+#include <sstream>
+#include <algorithm>
 
 #include "Debugger.h"
 #include "Utils.h"
@@ -45,6 +47,18 @@
 #define RUN_TEST_LLDB_TIMEOUT 10
 //This MUST be above the  HIGH_WATER_MARK (currently 25 MB) of PRINT_TEST in Environment/Prompts/CommonSource.h
 #define MAX_LLDB_STDOUT_SIZE (30*1024*1024)
+
+#ifndef DEBUGGER_PROGRESS_REPORT_HISTORY_LIMIT
+#define DEBUGGER_PROGRESS_REPORT_HISTORY_LIMIT 8
+#endif
+
+#ifndef DEBUGGER_PROGRESS_REPORT_GIT_HISTORY_COMMITS
+#define DEBUGGER_PROGRESS_REPORT_GIT_HISTORY_COMMITS 1
+#endif
+
+#ifndef DEBUGGER_PROGRESS_REPORT_GIT_HISTORY_MAX_CHARS
+#define DEBUGGER_PROGRESS_REPORT_GIT_HISTORY_MAX_CHARS 500
+#endif
 
 //#define LLDB_PRINT_BREAKPOINT_HITS
 //#define LLDB_VERBOSE_BATCH_MODE
@@ -152,6 +166,717 @@ bool Breakpoint::isValid() const
     return source_line > 0 && (hasCondition() || hasExpression());
 }
 
+namespace {
+
+std::string removeCppLiteralsAndComments(const std::string& code)
+{
+    std::string out = code;
+    bool inString = false;
+    bool inChar = false;
+    bool inLineComment = false;
+    bool inBlockComment = false;
+    bool escaped = false;
+
+    for(size_t i = 0; i < out.size(); ++i)
+    {
+        char c = out[i];
+        char n = (i + 1 < out.size()) ? out[i + 1] : '\0';
+
+        if(inLineComment)
+        {
+            if(c == '\n')
+            {
+                inLineComment = false;
+            }
+            else
+            {
+                out[i] = ' ';
+            }
+            continue;
+        }
+
+        if(inBlockComment)
+        {
+            if(c == '*' && n == '/')
+            {
+                out[i] = ' ';
+                out[i + 1] = ' ';
+                ++i;
+                inBlockComment = false;
+            }
+            else if(c != '\n')
+            {
+                out[i] = ' ';
+            }
+            continue;
+        }
+
+        if(inString || inChar)
+        {
+            if(escaped)
+            {
+                escaped = false;
+            }
+            else if(c == '\\')
+            {
+                escaped = true;
+            }
+            else if((inString && c == '"') || (inChar && c == '\''))
+            {
+                inString = false;
+                inChar = false;
+            }
+
+            if(c != '\n')
+            {
+                out[i] = ' ';
+            }
+            continue;
+        }
+
+        if(c == '/' && n == '/')
+        {
+            out[i] = ' ';
+            out[i + 1] = ' ';
+            ++i;
+            inLineComment = true;
+        }
+        else if(c == '/' && n == '*')
+        {
+            out[i] = ' ';
+            out[i + 1] = ' ';
+            ++i;
+            inBlockComment = true;
+        }
+        else if(c == '"')
+        {
+            out[i] = ' ';
+            inString = true;
+        }
+        else if(c == '\'')
+        {
+            out[i] = ' ';
+            inChar = true;
+        }
+    }
+
+    return out;
+}
+
+bool containsFunctionCall(const std::string& code, const std::string& functionName)
+{
+    std::regex pattern("\\b" + escapeRegex(functionName) + "\\b\\s*\\(");
+    return std::regex_search(code, pattern);
+}
+
+std::vector<std::string> disallowedBreakpointConditionSideEffects(const std::string& condition)
+{
+    std::vector<std::string> hits;
+    std::string code = removeCppLiteralsAndComments(condition);
+
+    static const std::vector<std::string> disallowedCalls = {
+        "printf", "fprintf", "sprintf", "snprintf", "puts", "putchar"
+    };
+
+    for(const auto& call : disallowedCalls)
+    {
+        if(containsFunctionCall(code, call))
+        {
+            hits.push_back(call);
+        }
+    }
+
+    static const std::vector<std::string> disallowedStreams = {
+        "std::cout", "std::cerr", "std::clog", "trace::log", "trace::hitBP"
+    };
+
+    for(const auto& stream : disallowedStreams)
+    {
+        if(code.find(stream) != std::string::npos)
+        {
+            hits.push_back(stream);
+        }
+    }
+
+    return hits;
+}
+
+std::string joinStrings(const std::vector<std::string>& values, const std::string& separator)
+{
+    std::string out;
+    for(size_t i = 0; i < values.size(); ++i)
+    {
+        if(i > 0)
+        {
+            out += separator;
+        }
+        out += values[i];
+    }
+    return out;
+}
+
+#ifdef DEBUGGER_PROGRESS_REPORT
+struct ProgressFixInfo
+{
+    uint32_t step = 0;
+    std::string subject;
+};
+
+struct DebuggingProgressReport
+{
+    uint32_t runStep = 0;
+    uint32_t previousRunStep = 0;
+    bool previousRunKnown = false;
+    bool previousRunPassed = false;
+    bool currentRunPassed = false;
+    bool currentBuildOk = false;
+    bool previousHadValidBuild = false;
+    bool currentHasValidBuild = false;
+    std::string label;
+    std::string labelExplanation;
+    std::string regressionReason;
+    std::string currentFailureSignature;
+    std::string previousFailureSignature;
+    std::vector<std::string> missingDebugArtifacts;
+    std::vector<ProgressFixInfo> fixesSincePreviousRun;
+    std::vector<std::string> currentFixRunHistory;
+    std::vector<std::string> recentFixRunHistory;
+    std::string regressedFixGitHistory;
+    std::string conciseText;
+    std::string verboseText;
+    std::string jsonText;
+};
+
+std::string compactOneLine(std::string text, size_t maxChars)
+{
+    for(char& c : text)
+    {
+        if(c == '\n' || c == '\r' || c == '\t')
+        {
+            c = ' ';
+        }
+    }
+
+    boost::algorithm::trim(text);
+    while(text.find("  ") != std::string::npos)
+    {
+        text = replaceAll(text, "  ", " ");
+    }
+
+    if(text.size() > maxChars)
+    {
+        text = text.substr(0, maxChars);
+        text += "...";
+    }
+
+    return text;
+}
+
+std::string firstRelevantLine(const std::string& text, size_t maxChars)
+{
+    std::istringstream input(text);
+    std::string line;
+    while(std::getline(input, line))
+    {
+        std::string compact = compactOneLine(line, maxChars);
+        if(!compact.empty())
+        {
+            return compact;
+        }
+    }
+    return std::string();
+}
+
+std::string extractFailureSignature(const std::string& log, const std::string& notes)
+{
+    static const std::vector<std::string> markers = {
+        "doesn't match",
+        "does not match",
+        "not expected",
+        "expected result",
+        "stdout doesn't",
+        "stderr doesn't",
+        "exit code",
+        "missing files",
+        "doesn't exist",
+        "does not exist",
+        "failed to open",
+        "unable to open",
+        "error:",
+        "undefined symbol",
+        "addresssanitizer",
+        "runtime error",
+        "segmentation fault",
+        "timed out",
+        "timeout",
+        "failed",
+        "failure",
+        "couldn't",
+        "could not",
+        "private test"
+    };
+
+    std::vector<std::string> hits;
+    std::istringstream input(log);
+    std::string line;
+    while(std::getline(input, line) && hits.size() < 4)
+    {
+        std::string compact = compactOneLine(line, 260);
+        if(compact.empty())
+        {
+            continue;
+        }
+
+        std::string lower = toLower(compact);
+        for(const auto& marker : markers)
+        {
+            if(lower.find(marker) != std::string::npos)
+            {
+                hits.push_back(compact);
+                break;
+            }
+        }
+    }
+
+    if(!hits.empty())
+    {
+        return joinStrings(hits, " | ");
+    }
+
+    return firstRelevantLine(notes, 320);
+}
+
+bool runInfoIndicatesPass(const std::string& runInfo)
+{
+    std::string lower = toLower(runInfo);
+    if(lower.find("feedback from the agent's algorithm") != std::string::npos)
+    {
+        return false;
+    }
+
+    return lower.find("debug notes: pass") != std::string::npos ||
+           lower.find("\ndebug notes:\npass") != std::string::npos;
+}
+
+void findPreviousRunState(const std::vector<DebugStep>& trajectory,
+                          const std::string& lastRunInfo,
+                          bool& known,
+                          bool& passed)
+{
+    known = false;
+    passed = false;
+
+    for(auto it = trajectory.rbegin(); it != trajectory.rend(); ++it)
+    {
+        if(it->m_action == "run_test")
+        {
+            known = true;
+            passed = boost::algorithm::trim_copy(it->m_debugNotes) == "PASS";
+            return;
+        }
+    }
+
+    if(!lastRunInfo.empty())
+    {
+        known = true;
+        passed = runInfoIndicatesPass(lastRunInfo);
+    }
+}
+
+std::vector<ProgressFixInfo> collectFixesSincePreviousRun(const std::vector<DebugStep>& trajectory,
+                                                          uint32_t previousSteps)
+{
+    std::vector<ProgressFixInfo> fixes;
+    for(size_t i = trajectory.size(); i > 0; --i)
+    {
+        const size_t index = i - 1;
+        const DebugStep& step = trajectory[index];
+        if(step.m_action == "run_test")
+        {
+            break;
+        }
+
+        if(step.m_action == "fix_function")
+        {
+            ProgressFixInfo fix;
+            fix.step = previousSteps + uint32_t(index) + 1;
+            fix.subject = step.m_subject.empty() ? "none" : step.m_subject;
+            fixes.push_back(fix);
+        }
+    }
+
+    std::reverse(fixes.begin(), fixes.end());
+    return fixes;
+}
+
+std::string formatFixes(const std::vector<ProgressFixInfo>& fixes)
+{
+    if(fixes.empty())
+    {
+        return "none";
+    }
+
+    std::vector<std::string> parts;
+    for(const auto& fix : fixes)
+    {
+        parts.push_back("step " + std::to_string(fix.step) + " " + fix.subject);
+    }
+    return joinStrings(parts, ", ");
+}
+
+std::string progressRegressionReason(const DebuggingProgressReport& report)
+{
+    if(!report.currentBuildOk)
+    {
+        return "instrumented build failed before test execution";
+    }
+
+    if(!report.currentHasValidBuild)
+    {
+        if(!report.missingDebugArtifacts.empty())
+        {
+            return "missing debug artifacts: " + joinStrings(report.missingDebugArtifacts, ", ");
+        }
+        return "expected debug artifacts are missing after the run";
+    }
+
+    if(!report.currentFailureSignature.empty())
+    {
+        return report.currentFailureSignature;
+    }
+
+    if(!report.currentRunPassed)
+    {
+        return "test still fails; inspect the test execution log for exact mismatch";
+    }
+
+    return std::string();
+}
+
+std::vector<std::string> buildCurrentFixRunHistory(const DebuggingProgressReport& report)
+{
+    std::vector<std::string> lines;
+    std::string reason = progressRegressionReason(report);
+
+    for(const auto& fix : report.fixesSincePreviousRun)
+    {
+        std::string line;
+        line += "fix_function " + fix.subject;
+        line += " (step " + std::to_string(fix.step) + ")";
+        line += " -> run_test step " + std::to_string(report.runStep);
+        line += " -> label: " + report.label;
+
+        if(!reason.empty() &&
+           (report.label == "regressed" || report.label == "instrumentation_failure"))
+        {
+            line += "; reason: " + compactOneLine(reason, 360);
+        }
+
+        lines.push_back(line);
+    }
+
+    return lines;
+}
+
+std::vector<std::string> mergeFixRunHistory(const std::vector<std::string>& previous,
+                                            const std::vector<std::string>& current)
+{
+    std::vector<std::string> merged = previous;
+    merged.insert(merged.end(), current.begin(), current.end());
+
+    if(merged.size() > DEBUGGER_PROGRESS_REPORT_HISTORY_LIMIT)
+    {
+        merged.erase(merged.begin(), merged.end() - DEBUGGER_PROGRESS_REPORT_HISTORY_LIMIT);
+    }
+
+    return merged;
+}
+
+std::vector<std::string> getMissingDebugArtifacts(const std::string& execPath,
+                                                  const std::string& stdoutLogPath,
+                                                  const std::string& traceLogPath)
+{
+    std::vector<std::string> missing;
+    if(!execPath.empty() && !boost_fs::exists(execPath))
+    {
+        missing.push_back("executable " + execPath);
+    }
+    if(!stdoutLogPath.empty() && !boost_fs::exists(stdoutLogPath))
+    {
+        missing.push_back("stdout log " + stdoutLogPath);
+    }
+    if(!traceLogPath.empty() && !boost_fs::exists(traceLogPath))
+    {
+        missing.push_back("trace log " + traceLogPath);
+    }
+    return missing;
+}
+
+void renderDebuggingProgressReport(DebuggingProgressReport& report)
+{
+    std::string currentResult = report.currentRunPassed ? "PASS" : "FAIL";
+    std::string previousResult = "unknown";
+    if(report.previousRunKnown)
+    {
+        previousResult = report.previousRunPassed ? "PASS" : "FAIL";
+    }
+
+    std::ostringstream concise;
+    concise << "\nDEBUGGING PROGRESS REPORT\n";
+    concise << "run_step: " << report.runStep << "\n";
+    concise << "label: " << report.label << " - " << report.labelExplanation << "\n";
+    concise << "current_result: " << currentResult << "\n";
+    concise << "previous_result: " << previousResult;
+    if(report.previousRunStep > 0)
+    {
+        concise << " (step " << report.previousRunStep << ")";
+    }
+    concise << "\n";
+    concise << "fixes_since_previous_run: " << formatFixes(report.fixesSincePreviousRun) << "\n";
+    if(!report.regressionReason.empty() &&
+       (report.label == "regressed" || report.label == "instrumentation_failure"))
+    {
+        concise << "regression_reason: " << report.regressionReason << "\n";
+    }
+    if(!report.currentFailureSignature.empty())
+    {
+        concise << "current_failure_signature: " << report.currentFailureSignature << "\n";
+    }
+    if(!report.missingDebugArtifacts.empty())
+    {
+        concise << "missing_debug_artifacts: " << joinStrings(report.missingDebugArtifacts, ", ") << "\n";
+    }
+    if(!report.recentFixRunHistory.empty())
+    {
+        concise << "recent_fix_run_history:\n";
+        for(const auto& line : report.recentFixRunHistory)
+        {
+            concise << "- " << line << "\n";
+        }
+    }
+    if(!report.regressedFixGitHistory.empty())
+    {
+        concise << "regressed_fix_git_history:\n";
+        concise << report.regressedFixGitHistory << "\n";
+    }
+    concise << "END DEBUGGING PROGRESS REPORT\n\n";
+    report.conciseText = concise.str();
+
+    std::ostringstream verbose;
+    verbose << report.conciseText;
+    verbose << "DEBUGGING PROGRESS REPORT DETAILS\n";
+    verbose << "current_build_ok: " << (report.currentBuildOk ? "true" : "false") << "\n";
+    verbose << "current_has_debug_artifacts: " << (report.currentHasValidBuild ? "true" : "false") << "\n";
+    verbose << "previous_had_debug_artifacts: " << (report.previousHadValidBuild ? "true" : "false") << "\n";
+    if(!report.previousFailureSignature.empty())
+    {
+        verbose << "previous_failure_signature: " << report.previousFailureSignature << "\n";
+    }
+    verbose << "END DEBUGGING PROGRESS REPORT DETAILS\n";
+    report.verboseText = verbose.str();
+
+    web::json::value json = web::json::value::object();
+    json[U("run_step")] = web::json::value::number(report.runStep);
+    json[U("previous_run_step")] = web::json::value::number(report.previousRunStep);
+    json[U("label")] = web::json::value::string(utility::conversions::to_string_t(report.label));
+    json[U("label_explanation")] = web::json::value::string(utility::conversions::to_string_t(report.labelExplanation));
+    json[U("regression_reason")] = web::json::value::string(utility::conversions::to_string_t(report.regressionReason));
+    json[U("previous_run_known")] = web::json::value::boolean(report.previousRunKnown);
+    json[U("previous_run_passed")] = web::json::value::boolean(report.previousRunPassed);
+    json[U("current_run_passed")] = web::json::value::boolean(report.currentRunPassed);
+    json[U("current_build_ok")] = web::json::value::boolean(report.currentBuildOk);
+    json[U("previous_had_debug_artifacts")] = web::json::value::boolean(report.previousHadValidBuild);
+    json[U("current_has_debug_artifacts")] = web::json::value::boolean(report.currentHasValidBuild);
+    json[U("current_failure_signature")] = web::json::value::string(utility::conversions::to_string_t(report.currentFailureSignature));
+    json[U("previous_failure_signature")] = web::json::value::string(utility::conversions::to_string_t(report.previousFailureSignature));
+    json[U("regressed_fix_git_history")] = web::json::value::string(utility::conversions::to_string_t(report.regressedFixGitHistory));
+
+    web::json::value missingArtifacts = web::json::value::array(report.missingDebugArtifacts.size());
+    for(size_t i = 0; i < report.missingDebugArtifacts.size(); ++i)
+    {
+        missingArtifacts[i] = web::json::value::string(utility::conversions::to_string_t(report.missingDebugArtifacts[i]));
+    }
+    json[U("missing_debug_artifacts")] = missingArtifacts;
+
+    web::json::value fixes = web::json::value::array(report.fixesSincePreviousRun.size());
+    for(size_t i = 0; i < report.fixesSincePreviousRun.size(); ++i)
+    {
+        web::json::value fix = web::json::value::object();
+        fix[U("step")] = web::json::value::number(report.fixesSincePreviousRun[i].step);
+        fix[U("subject")] = web::json::value::string(utility::conversions::to_string_t(report.fixesSincePreviousRun[i].subject));
+        fixes[i] = fix;
+    }
+    json[U("fixes_since_previous_run")] = fixes;
+
+    web::json::value currentHistory = web::json::value::array(report.currentFixRunHistory.size());
+    for(size_t i = 0; i < report.currentFixRunHistory.size(); ++i)
+    {
+        currentHistory[i] = web::json::value::string(utility::conversions::to_string_t(report.currentFixRunHistory[i]));
+    }
+    json[U("current_fix_run_history")] = currentHistory;
+
+    web::json::value recentHistory = web::json::value::array(report.recentFixRunHistory.size());
+    for(size_t i = 0; i < report.recentFixRunHistory.size(); ++i)
+    {
+        recentHistory[i] = web::json::value::string(utility::conversions::to_string_t(report.recentFixRunHistory[i]));
+    }
+    json[U("recent_fix_run_history")] = recentHistory;
+
+    report.jsonText = utility::conversions::to_utf8string(json.serialize());
+}
+
+std::string trimGitHistoryToCommitMessage(std::string history)
+{
+    std::size_t diffPos = history.find("\ndiff --git ");
+    if(diffPos != std::string::npos)
+    {
+        history = history.substr(0, diffPos);
+    }
+
+    boost::algorithm::trim(history);
+    if(history.size() > DEBUGGER_PROGRESS_REPORT_GIT_HISTORY_MAX_CHARS)
+    {
+        history = history.substr(0, DEBUGGER_PROGRESS_REPORT_GIT_HISTORY_MAX_CHARS);
+        history += "\n...[[truncated]]";
+    }
+
+    return history;
+}
+
+std::string getRegressedFixGitHistory(CCodeProject* project, const DebuggingProgressReport& report)
+{
+    if(!project || report.label != "regressed" || report.fixesSincePreviousRun.empty())
+    {
+        return std::string();
+    }
+
+    const ProgressFixInfo& fix = report.fixesSincePreviousRun.back();
+    auto nodeIt = project->nodeMap().find(fix.subject);
+    if(nodeIt == project->nodeMap().end() || !nodeIt->second)
+    {
+        return std::string();
+    }
+
+    CCodeNode* ccNode = (CCodeNode*)nodeIt->second;
+    std::string dagDir = project->getProjDir() + "/dag";
+    std::string sourcePath = ccNode->getNodeDirectory(project->getProjDir()) + "/" + fix.subject + ".cpp";
+
+    try
+    {
+        std::string history = project->getGitHistory(dagDir,
+                                                     sourcePath,
+                                                     DEBUGGER_PROGRESS_REPORT_GIT_HISTORY_COMMITS);
+        return trimGitHistoryToCommitMessage(history);
+    }
+    catch(...)
+    {
+        return std::string();
+    }
+}
+
+void attachRegressedFixGitHistory(CCodeProject* project, DebuggingProgressReport& report)
+{
+    report.regressedFixGitHistory = getRegressedFixGitHistory(project, report);
+    if(!report.regressedFixGitHistory.empty())
+    {
+        renderDebuggingProgressReport(report);
+    }
+}
+
+void classifyProgress(DebuggingProgressReport& report)
+{
+    if(!report.currentBuildOk ||
+       (report.previousHadValidBuild && !report.currentHasValidBuild))
+    {
+        report.label = "instrumentation_failure";
+        report.labelExplanation = "The instrumented build or expected debug artifacts are missing; treat this as a harness/instrumentation problem before blaming the last source fix.";
+        return;
+    }
+
+    if(!report.previousRunKnown)
+    {
+        report.label = "first_run";
+        report.labelExplanation = "No previous run_test is available for comparison.";
+        return;
+    }
+
+    if(!report.previousRunPassed && report.currentRunPassed)
+    {
+        report.label = "improved";
+        report.labelExplanation = "The previous run failed and the current run passes.";
+        return;
+    }
+
+    if(report.previousRunPassed && !report.currentRunPassed)
+    {
+        report.label = "regressed";
+        report.labelExplanation = "The previous run passed and the current run fails; inspect the latest fix before moving on.";
+        return;
+    }
+
+    if(report.previousRunPassed && report.currentRunPassed)
+    {
+        report.label = "unchanged_success";
+        report.labelExplanation = "The previous and current runs both pass.";
+        return;
+    }
+
+    if(!report.currentFailureSignature.empty() &&
+       report.currentFailureSignature == report.previousFailureSignature)
+    {
+        report.label = "unchanged_failure";
+        report.labelExplanation = "The test is still failing with the same high-level failure signature.";
+        return;
+    }
+
+    report.label = "mixed";
+    report.labelExplanation = "The test still fails, but the high-level failure signature changed.";
+}
+
+DebuggingProgressReport buildDebuggingProgressReport(uint32_t runStep,
+                                                     uint32_t previousRunStep,
+                                                     bool previousHadValidBuild,
+                                                     bool currentBuildOk,
+                                                     bool currentHasValidBuild,
+                                                     bool currentRunPassed,
+                                                     const std::string& currentRunLog,
+                                                     const std::string& currentDebugNotes,
+                                                     const std::string& previousRunLog,
+                                                     const std::string& previousRunInfo,
+                                                     const std::vector<DebugStep>& trajectory,
+                                                     uint32_t previousSteps,
+                                                     const std::vector<std::string>& previousFixRunHistory,
+                                                     const std::vector<std::string>& missingDebugArtifacts)
+{
+    DebuggingProgressReport report;
+    report.runStep = runStep;
+    report.previousRunStep = previousRunStep;
+    report.previousHadValidBuild = previousHadValidBuild;
+    report.currentBuildOk = currentBuildOk;
+    report.currentHasValidBuild = currentHasValidBuild;
+    report.currentRunPassed = currentRunPassed;
+    report.currentFailureSignature = currentRunPassed ? std::string() : extractFailureSignature(currentRunLog, currentDebugNotes);
+    report.previousFailureSignature = extractFailureSignature(previousRunLog, previousRunInfo);
+    report.missingDebugArtifacts = missingDebugArtifacts;
+    report.fixesSincePreviousRun = collectFixesSincePreviousRun(trajectory, previousSteps);
+
+    findPreviousRunState(trajectory, previousRunInfo, report.previousRunKnown, report.previousRunPassed);
+    if(!report.previousRunKnown || report.previousRunPassed)
+    {
+        report.previousFailureSignature.clear();
+    }
+    classifyProgress(report);
+    report.regressionReason = progressRegressionReason(report);
+    report.currentFixRunHistory = buildCurrentFixRunHistory(report);
+    report.recentFixRunHistory = mergeFixRunHistory(previousFixRunHistory, report.currentFixRunHistory);
+
+    renderDebuggingProgressReport(report);
+    return report;
+}
+#endif
+
+}
+
 // Helper function to escape regex metacharacters in a given string.
 std::string escapeRegexFromCode(const std::string& input) {
     static const std::string specials = R"(\^$.|?*+()[{)";
@@ -212,7 +937,9 @@ std::string Breakpoint::instrumentFunction(const std::string& snippet,
 
 void Breakpoint::instrumentCalls(const std::string& functionName, const std::map<std::string, std::string>& stdCalls)
 {
-    m_instrumentedCondition = instrumentCalls(getConditionCode(), functionName, stdCalls);
+    // Keep conditions expression-only. Rewriting printf-style calls expands
+    // into statements, which cannot be embedded safely inside if(...).
+    m_instrumentedCondition = getConditionCode();
 
     //Just in case if the expression is missing ;
     m_instrumentedExpression = instrumentCalls(getExpressionCode() + ";", functionName, stdCalls);
@@ -2767,6 +3494,14 @@ void Debugger::systemAnalysis(CCodeProject* project, const std::string& hint, Ru
 
     std::string trajectory = getTrajectory(0, -1, true, true, true);
 
+#ifdef DEBUGGER_PROGRESS_REPORT
+    std::string progressReport = !m_lastRunProgressReportVerbose.empty() ?
+                                 m_lastRunProgressReportVerbose :
+                                 m_lastRunProgressReport;
+#else
+    std::string progressReport;
+#endif
+
     std::string fixedFunctionInfo;
     std::string debugNote;
 
@@ -2859,6 +3594,7 @@ void Debugger::systemAnalysis(CCodeProject* project, const std::string& hint, Ru
     Prompt promptAnalysis("SystemAnalysis.txt",{
                         {"trace_desc", traceDescStr},
                         {"trajectory", trajectory},
+                        {"progress_report", progressReport},
                         {"call_graph", callTree},
                         {"application", application},
                         {"max_depth", maxDepth},
@@ -3887,6 +4623,35 @@ std::string Debugger::evaluateBreakpoints(CCodeProject* project,
         return debugNotes;
     }
 
+    std::string invalidConditions;
+    for(auto bp : customBreakpoints)
+    {
+        if(!bp || !bp->hasCondition())
+        {
+            continue;
+        }
+
+        std::vector<std::string> sideEffects = disallowedBreakpointConditionSideEffects(bp->getConditionCode());
+        if(sideEffects.empty())
+        {
+            continue;
+        }
+
+        invalidConditions += "Breakpoint line " + std::to_string(bp->source_line);
+        invalidConditions += " has an invalid condition: ";
+        invalidConditions += bp->getConditionCode() + "\n";
+        invalidConditions += "The condition contains side-effect/logging call(s): ";
+        invalidConditions += joinStrings(sideEffects, ", ") + "\n";
+    }
+
+    if(!invalidConditions.empty())
+    {
+        invalidConditions += "\nBreakpoint conditions must be boolean predicates only. ";
+        invalidConditions += "Do not use printf, logging, or other side-effect calls in a condition. ";
+        invalidConditions += "Move diagnostic printing to the breakpoint expression field and use condition 'true' or a real boolean predicate.\n";
+        return invalidConditions;
+    }
+
     std::set<int32_t> sourceLines;
     std::set<int32_t> reportBpLines;
     for(auto bp : customBreakpoints)
@@ -4356,6 +5121,12 @@ std::string Debugger::getTrajectory(int fromStep, int toStep, bool addCurrent, b
             trajectory += m_rewardHackingReview;
         }
 
+#ifdef DEBUGGER_PROGRESS_REPORT
+        if(!m_lastRunProgressReport.empty())
+        {
+            trajectory += m_lastRunProgressReport;
+        }
+#endif
         trajectory += m_lastRunTestLog;
         trajectory += "INFORMATION FOR THE LAST RUN STEP ENDS HERE\n";
     }
@@ -4406,6 +5177,14 @@ void Debugger::debugAnalysis(CCodeProject* project, const std::string& function,
 {
     std::string application = project->getProjectName();
     std::string trajectory = getTrajectory(0, -1, true, true);
+
+#ifdef DEBUGGER_PROGRESS_REPORT
+    std::string progressReport = !m_lastRunProgressReportVerbose.empty() ?
+                                 m_lastRunProgressReportVerbose :
+                                 m_lastRunProgressReport;
+#else
+    std::string progressReport;
+#endif
 
     std::string detailedInfo = getFunctionDetailedInfo(project, function);
 
@@ -4464,6 +5243,7 @@ void Debugger::debugAnalysis(CCodeProject* project, const std::string& function,
     Prompt promptDebugAnalysis("SystemDebugAnalysis.txt",{
         {"app_info", m_appInfo},
         {"trajectory", trajectory},
+        {"progress_report", progressReport},
         {"application", application},
         {"function", function},
         {"function_info", detailedInfo},
@@ -5269,6 +6049,15 @@ bool Debugger::saveTrajectory(CCodeProject* project, const TestDef& test)
         }
 
         lastDbgStep.save(dbgStepPath);
+
+#ifdef DEBUGGER_PROGRESS_REPORT
+        if(lastDbgStep.m_action == "run_test" && !m_pendingProgressReportText.empty())
+        {
+            hen::saveToFile(m_pendingProgressReportText, stepDir + "progress_report.txt");
+            hen::saveToFile(m_pendingProgressReportVerboseText, stepDir + "progress_report_verbose.txt");
+            hen::saveToFile(m_pendingProgressReportJsonText, stepDir + "progress_report.json");
+        }
+#endif
     }
 
     trajectoryCfg.as_object()[U("infoStepsStart")] = json::value::number(m_infoStepsStart);
@@ -5554,6 +6343,35 @@ bool Debugger::loadTrajectory(CCodeProject* project, const TestDef& test)
         }
     }
 
+#ifdef DEBUGGER_PROGRESS_REPORT
+    m_progressReportHistory.clear();
+    for(uint32_t s = 1; s <= allSteps; ++s)
+    {
+        std::string progressPath = trajectoryDir + "/step_" + std::to_string(s) + "/progress_report.json";
+        if(!boost_fs::exists(progressPath))
+        {
+            continue;
+        }
+
+        web::json::value progressJson;
+        if(!hen::loadJson(progressJson, progressPath) ||
+           !progressJson.has_field(U("recent_fix_run_history")) ||
+           !progressJson[U("recent_fix_run_history")].is_array())
+        {
+            continue;
+        }
+
+        m_progressReportHistory.clear();
+        for(const auto& item : progressJson[U("recent_fix_run_history")].as_array())
+        {
+            if(item.is_string())
+            {
+                m_progressReportHistory.push_back(utility::conversions::to_utf8string(item.as_string()));
+            }
+        }
+    }
+#endif
+
     //Try to load the last run step (the one before infoStepsStart)
     //and check if there is a reward hacking hint
     if(m_infoStepsStart > 1)
@@ -5625,6 +6443,26 @@ bool Debugger::loadTrajectory(CCodeProject* project, const TestDef& test)
         uint32_t stepIndex = m_lastRunStep;
         std::string lastRunStepStr = std::to_string(stepIndex);
         std::string stepDir = trajectoryDir + "/step_" + lastRunStepStr + "/";
+
+#ifdef DEBUGGER_PROGRESS_REPORT
+        m_lastRunProgressReport.clear();
+        m_lastRunProgressReportVerbose.clear();
+        std::string progressReportPath = stepDir + "progress_report.txt";
+        if(boost_fs::exists(progressReportPath))
+        {
+            m_lastRunProgressReport = hen::loadFile(progressReportPath);
+        }
+
+        std::string progressReportVerbosePath = stepDir + "progress_report_verbose.txt";
+        if(boost_fs::exists(progressReportVerbosePath))
+        {
+            m_lastRunProgressReportVerbose = hen::loadFile(progressReportVerbosePath);
+        }
+        else
+        {
+            m_lastRunProgressReportVerbose = m_lastRunProgressReport;
+        }
+#endif
 
         //Load the stdout log
         std::string logPath = stepDir + "wd/stdout.log";
@@ -6357,7 +7195,28 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
     {
         m_rawTrajectory.clear();
 
+#ifdef DEBUGGER_PROGRESS_REPORT
+        const std::string previousRunLog = m_lastRunTestLog;
+        const std::string previousRunInfo = m_lastRunInfo;
+        const uint32_t previousRunStep = m_lastRunStep;
+        const bool previousHadValidBuild = m_hasValidBuild;
+        m_pendingProgressReportText.clear();
+        m_pendingProgressReportVerboseText.clear();
+        m_pendingProgressReportJsonText.clear();
+        DebuggingProgressReport progress;
+#endif
+
         RunAnalysis analysis;
+        std::string expectedExecPath;
+        if(m_system == "main")
+        {
+            expectedExecPath = project->getProjDir() + "/build/" + getPlatform() + "_test/main";
+        }
+        else
+        {
+            expectedExecPath = project->getProjDir() + "/build_instrumented/source/" + m_system + "/test/main";
+        }
+
         //Need to rebuild to ensure all recent changes from the trajectory so far are applieds
         bool compiled = project->buildBinary(true);
         if(m_system != "main")
@@ -6367,9 +7226,39 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
 
         if(!compiled)
         {
+#ifdef DEBUGGER_PROGRESS_REPORT
+            std::string buildFailure = "Instrumented build failed before test execution.";
+            DebuggingProgressReport progress = buildDebuggingProgressReport(stepIndex,
+                                                                            previousRunStep,
+                                                                            previousHadValidBuild,
+                                                                            false,
+                                                                            false,
+                                                                            false,
+                                                                            buildFailure,
+                                                                            buildFailure,
+                                                                            previousRunLog,
+                                                                            previousRunInfo,
+                                                                            m_trajectory,
+                                                                            m_previousSteps,
+                                                                            m_progressReportHistory,
+                                                                            {"executable " + replaceAll(expectedExecPath, project->getProjDir(), ".")});
+            m_progressReportHistory = progress.recentFixRunHistory;
+            m_lastRunProgressReport = progress.conciseText;
+            m_lastRunProgressReportVerbose = progress.verboseText;
+            m_pendingProgressReportText = progress.conciseText;
+            m_pendingProgressReportVerboseText = progress.verboseText;
+            m_pendingProgressReportJsonText = progress.jsonText;
+            m_lastRunStep = stepIndex;
+#endif
             //We are unable continue debugging if the binary couldn't be compiled
             //TODO: Add a debug note to the trajectory that explains the problem
             criticalError("Could't build the executable from the latest source code!");
+#ifdef DEBUGGER_PROGRESS_REPORT
+            if(!m_trajectory.empty())
+            {
+                m_lastRunInfo = m_trajectory.back().fullInfo();
+            }
+#endif
             return false;
         }
 
@@ -6384,13 +7273,12 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
 
         if(m_system == "main")
         {
-            execPath = project->getProjDir() + "/build/" + getPlatform() + "_test/main";
+            execPath = expectedExecPath;
         }
         else
         {
             //Unit test
-            std::string testWD = project->getProjDir() + "/build_instrumented/source/" + m_system + "/test";
-            execPath = testWD + "/main";
+            execPath = expectedExecPath;
         }
 
         if(boost_fs::exists(execPath) &&
@@ -6399,6 +7287,34 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         {
             m_hasValidBuild = true;
         }
+
+#ifdef DEBUGGER_PROGRESS_REPORT
+        std::vector<std::string> missingDebugArtifacts = getMissingDebugArtifacts(execPath,
+                                                                                  stdoutLogPath,
+                                                                                  traceLogPath);
+        for(auto& artifact : missingDebugArtifacts)
+        {
+            artifact = replaceAll(artifact, project->getProjDir(), ".");
+        }
+
+        const bool currentHasValidBuild = boost_fs::exists(execPath) &&
+                                          boost_fs::exists(stdoutLogPath) &&
+                                          boost_fs::exists(traceLogPath);
+        progress = buildDebuggingProgressReport(stepIndex,
+                                                previousRunStep,
+                                                previousHadValidBuild,
+                                                compiled,
+                                                currentHasValidBuild,
+                                                analysis.debug_notes == "PASS",
+                                                analysis.m_testLog,
+                                                analysis.debug_notes,
+                                                previousRunLog,
+                                                previousRunInfo,
+                                                m_trajectory,
+                                                m_previousSteps,
+                                                m_progressReportHistory,
+                                                missingDebugArtifacts);
+#endif
 
         std::string commitHash;
         if(!m_commitMessage.empty())
@@ -6417,6 +7333,16 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         }
 
         m_commitMessage.clear();
+
+#ifdef DEBUGGER_PROGRESS_REPORT
+        attachRegressedFixGitHistory(project, progress);
+        m_progressReportHistory = progress.recentFixRunHistory;
+        m_lastRunProgressReport = progress.conciseText;
+        m_lastRunProgressReportVerbose = progress.verboseText;
+        m_pendingProgressReportText = progress.conciseText;
+        m_pendingProgressReportVerboseText = progress.verboseText;
+        m_pendingProgressReportJsonText = progress.jsonText;
+#endif
 
         bool done = analysis.debug_notes == "PASS";
         if(done)
@@ -9824,6 +10750,14 @@ void Debugger::resetTest()
     m_lastRunStep = 0;
     m_lastFixStep = 0;
     m_lastRunInfo.clear();
+#ifdef DEBUGGER_PROGRESS_REPORT
+    m_lastRunProgressReport.clear();
+    m_lastRunProgressReportVerbose.clear();
+    m_pendingProgressReportText.clear();
+    m_pendingProgressReportVerboseText.clear();
+    m_pendingProgressReportJsonText.clear();
+    m_progressReportHistory.clear();
+#endif
     m_commitMessage.clear();
 
     m_testFunctionalityDelta.clear();
