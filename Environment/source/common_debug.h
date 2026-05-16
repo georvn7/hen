@@ -647,7 +647,44 @@ inline std::size_t safe_strlen_cap(const char* s, std::size_t cap) {
     return n; // returns cap if not found, preventing overrun
 }
 
+inline void write_escaped_char_literal(std::ostream& os, unsigned char c, long long numeric) {
+    const char raw = static_cast<char>(c);
+    os << '\'';
+    write_escaped(os, &raw, 1);
+    os << "' (" << numeric << ")";
+}
+
 // --- Specific overloads: ALWAYS treat as text, but cap length ---
+
+inline void printValue(std::ostream& os,
+                       char value,
+                       std::size_t /*depth*/,
+                       const PrintConfig& /*cfg*/)
+{
+    write_escaped_char_literal(os,
+                               static_cast<unsigned char>(value),
+                               static_cast<int>(static_cast<unsigned char>(value)));
+}
+
+inline void printValue(std::ostream& os,
+                       signed char value,
+                       std::size_t /*depth*/,
+                       const PrintConfig& /*cfg*/)
+{
+    write_escaped_char_literal(os,
+                               static_cast<unsigned char>(value),
+                               static_cast<int>(value));
+}
+
+inline void printValue(std::ostream& os,
+                       unsigned char value,
+                       std::size_t /*depth*/,
+                       const PrintConfig& /*cfg*/)
+{
+    write_escaped_char_literal(os,
+                               value,
+                               static_cast<unsigned int>(value));
+}
 
 // const char*
 inline void printValue(std::ostream& os,
@@ -747,10 +784,15 @@ inline void printValue(std::ostream& os,
     {
         os << "[[empty string]]";
     }
-    else if (value.size() > cfg.maxStringSize) {
-        os << "\"" << value.substr(0, cfg.maxStringSize) << "...\"";
-    } else {
-        os << "\"" << value << "\"";
+    else {
+        const std::size_t cap = cfg.maxStringSize ? cfg.maxStringSize : 1024;
+        const std::size_t count = std::min<std::size_t>(value.size(), cap);
+        os << '"';
+        write_escaped(os, value.data(), count);
+        if (value.size() > cap) {
+            os << "...";
+        }
+        os << '"';
     }
 }
 

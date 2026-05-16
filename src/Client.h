@@ -102,6 +102,12 @@ namespace hen {
         uint16_t                            m_debugPort;
         
         void checkLLMContextSize(const json::value& messages, json::value& request);
+        bool repairJsonResponseWithDirector(const utility::string_t& badContent,
+                                            const utility::string_t& parseError,
+                                            const utility::string_t& extractedJson,
+                                            const web::json::value& schema,
+                                            web::json::value& response,
+                                            utility::string_t& repairedContent);
         void maybePrintDebugLoggingNotice(const std::string& logDir);
         void sendToServer(const json::value& request, json::value& response);
         

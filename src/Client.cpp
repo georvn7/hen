@@ -902,6 +902,174 @@ void Client::checkLLMContextSize(const json::value& messages, json::value& reque
     request[U("llm")] = json::value(uLLM);
 }
 
+bool Client::repairJsonResponseWithDirector(const utility::string_t& badContent,
+                                            const utility::string_t& parseError,
+                                            const utility::string_t& extractedJson,
+                                            const web::json::value& schema,
+                                            web::json::value& response,
+                                            utility::string_t& repairedContent)
+{
+    if(badContent.empty())
+    {
+        return false;
+    }
+
+    const std::string repairLLM = m_llmDirector.first + "/" + m_llmDirector.second;
+    const std::string logRoot = m_ctxLogDir.empty() ? "." : m_ctxLogDir;
+    const std::string logPrefix =
+        logRoot + "/response_" + std::to_string(m_requestId) + "_" +
+        m_ctxPrompt + "_json_repair";
+
+    saveToFile(utility::conversions::to_utf8string(badContent),
+               logPrefix + "_original.txt");
+
+    json::value repairRequest;
+    json::value repairMessages = json::value::array();
+
+    repairMessages[0][U("role")] = json::value::string(U("system"));
+    repairMessages[0][U("content")] = json::value::string(
+        U("You repair malformed JSON for an automated coding/debugging agent. "
+          "Return only one valid JSON object. Preserve the original semantic content and debugging decision. "
+          "Do not perform new debugging analysis, do not choose a different action, and do not add fields outside the schema."));
+
+    utility::string_t repairPrompt;
+    repairPrompt += U("The previous assistant response was supposed to be one top-level JSON object matching the schema below, but parsing failed.\n");
+    repairPrompt += U("Repair only JSON syntax, escaping, and required schema formatting. Preserve all original field meanings and values.\n\n");
+    repairPrompt += U("JSON SCHEMA:\n```json\n");
+    repairPrompt += schema.serialize();
+    repairPrompt += U("\n```\n\n");
+    repairPrompt += U("PARSER ERROR:\n");
+    repairPrompt += parseError;
+    repairPrompt += U("\n\n");
+    if(!extractedJson.empty())
+    {
+        repairPrompt += U("EXTRACTED INVALID JSON CANDIDATE:\n```text\n");
+        repairPrompt += extractedJson;
+        repairPrompt += U("\n```\n\n");
+    }
+    repairPrompt += U("ORIGINAL RESPONSE CONTENT:\n```text\n");
+    repairPrompt += badContent;
+    repairPrompt += U("\n```\n\nReturn only the repaired JSON object.");
+
+    repairMessages[1][U("role")] = json::value::string(U("user"));
+    repairMessages[1][U("content")] = json::value::string(repairPrompt);
+
+    repairRequest[U("messages")] = repairMessages;
+    repairRequest[U("llm")] = json::value::string(utility::conversions::to_string_t(repairLLM));
+    repairRequest[U("logical_request_id")] = json::value::string(utility::conversions::to_string_t(generateUUID()));
+    repairRequest[U("json_repair_for_prompt")] = json::value::string(utility::conversions::to_string_t(m_ctxPrompt));
+    repairRequest[U("json_repair_for_request_id")] = json::value::number(m_requestId);
+    if(!m_projectId.empty())
+    {
+        repairRequest[U("projectId")] = json::value::string(utility::conversions::to_string_t(m_projectId));
+    }
+    if(!m_clientInstanceId.empty())
+    {
+        repairRequest[U("client_instance_id")] = json::value::string(utility::conversions::to_string_t(m_clientInstanceId));
+    }
+
+    saveJson(repairRequest, logPrefix + "_request.json");
+
+    json::value repairResponse;
+    for(uint32_t attempt = 0; attempt < 2; ++attempt)
+    {
+        const uint32_t transportRequestId = nextTransportRequestId();
+        repairRequest[U("request_id")] = json::value::number(transportRequestId);
+        repairResponse = json::value();
+
+        Client::sendToServer(repairRequest, repairResponse);
+        saveJson(repairResponse, logPrefix + "_response_" + std::to_string(attempt + 1) + ".json");
+
+        std::string errorCode;
+        std::string errorMessage;
+        const bool hasServingError = getServingError(repairResponse, errorCode, errorMessage);
+        const bool missingResponse = !repairResponse.has_field(U("request_id"));
+        const uint32_t retryDelayMs = transientServingRetryDelayMs(errorCode,
+                                                                   errorMessage,
+                                                                   missingResponse,
+                                                                   attempt + 1);
+        if(retryDelayMs > 0)
+        {
+            std::cout << "JSON repair transient serving issue";
+            if(hasServingError)
+            {
+                std::cout << " " << errorCode << ": " << errorMessage;
+            }
+            std::cout << ". Waiting " << retryDelayMs << " ms before retry." << std::endl;
+            std::this_thread::sleep_for(std::chrono::milliseconds(retryDelayMs));
+            continue;
+        }
+        if(hasServingError)
+        {
+            std::cout << "JSON repair provider error";
+            if(!errorCode.empty())
+            {
+                std::cout << " " << errorCode;
+            }
+            if(!errorMessage.empty())
+            {
+                std::cout << ": " << errorMessage;
+            }
+            std::cout << std::endl;
+            return false;
+        }
+        if(missingResponse ||
+           !repairResponse.has_field(U("message")) ||
+           !repairResponse[U("message")].has_field(U("content")) ||
+           !repairResponse[U("message")][U("content")].is_string())
+        {
+            std::cout << "JSON repair response did not contain string message content" << std::endl;
+            continue;
+        }
+
+        const uint32_t responseRequestId = (uint32_t)repairResponse[U("request_id")].as_integer();
+        if(responseRequestId != transportRequestId)
+        {
+            std::cout << "Skipping JSON repair response with invalid request_id: "
+                      << responseRequestId << " expected: " << transportRequestId << std::endl;
+            continue;
+        }
+
+        utility::string_t repairContent =
+            removeThinkPart(repairResponse[U("message")][U("content")].as_string());
+        utility::string_t repairJsonText;
+        try
+        {
+            repairJsonText = findJson(repairContent, false);
+            web::json::value repairedObject = web::json::value::parse(repairJsonText);
+
+            std::string schemaLog;
+            if(!validateJson(repairedObject, schema, schemaLog))
+            {
+                std::cout << "JSON repair produced schema-invalid JSON: " << schemaLog << std::endl;
+                saveToFile(schemaLog, logPrefix + "_schema_invalid.txt");
+                continue;
+            }
+
+            repairedContent = repairedObject.serialize();
+            saveToFile(utility::conversions::to_utf8string(repairedContent),
+                       logPrefix + "_repaired.json");
+
+            if(repairResponse.has_field(U("usage")))
+            {
+                json::value repairUsage = json::value::object();
+                accumulateUsageObject(repairUsage, repairResponse.at(U("usage")));
+                mergeAccumulatedUsageIntoResponse(response, repairUsage);
+            }
+
+            std::cout << "Repaired malformed JSON response with Director model: "
+                      << repairLLM << std::endl;
+            return true;
+        }
+        catch(const std::exception& e)
+        {
+            std::cout << "JSON repair response was still invalid: " << e.what() << std::endl;
+        }
+    }
+
+    return false;
+}
+
 bool Client::sendRequest(const json::value& messages, json::value& response, const json::value* schemas)
 {
     std::lock_guard<std::mutex> llmRequestLock(m_llmRequestMutex);
@@ -1082,7 +1250,11 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
         }
         else
         {
-            const web::json::value& schema = schemas->as_array().at(0);
+            const web::json::value& functionSchema = schemas->as_array().at(0);
+            const web::json::value& responseSchema =
+                functionSchema.has_object_field(U("parameters")) ?
+                functionSchema.at(U("parameters")) :
+                functionSchema;
             web::json::value object;
             bool hasObject = m_project->handleResponse(response, &object, false);
             
@@ -1091,13 +1263,12 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
 
             if(hasObject)
             {
-                const web::json::value& parameters = schemas->as_array().at(0);
+                const web::json::value& parameters = functionSchema;
                 assert(parameters.has_object_field(U("parameters")));
                 if (parameters.has_object_field(U("parameters")))
                 {
-                    const web::json::value& schema = parameters.at(U("parameters"));
                     std::string jsonLog;
-                    bool validObject = validateJson(object, schema, jsonLog);
+                    bool validObject = validateJson(object, responseSchema, jsonLog);
                     if (validObject)
                     {
                         finished = true;
@@ -1179,6 +1350,23 @@ bool Client::sendRequest(const json::value& messages, json::value& response, con
                                     ucout << U("********** Message content start **********") << std::endl;
                                     ucout << ucontent << std::endl;
                                     ucout << U("********** Message content end **********") << std::endl;
+                                }
+
+                                if(i > 0)
+                                {
+                                    utility::string_t repairedContent;
+                                    if(repairJsonResponseWithDirector(ucontent,
+                                                                      utility::conversions::to_string_t(e.what()),
+                                                                      ujson,
+                                                                      responseSchema,
+                                                                      response,
+                                                                      repairedContent))
+                                    {
+                                        response[U("message")][U("content")] =
+                                            json::value::string(repairedContent);
+                                        finished = true;
+                                        break;
+                                    }
                                 }
                                 
                                 failMessage += U("*** Info about response with invalid JSON start here ***\n");
