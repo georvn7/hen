@@ -4,6 +4,7 @@
 #include "File.h"
 
 #include <set>
+#include <vector>
 
 namespace hen {
 
@@ -47,6 +48,15 @@ public:
     DECLARE_ARRAY_FIELD(CommandRegex, regex_patterns, "For all commands with regex match check.")
     
     std::string verify();
+};
+
+struct UnexpectedResultHint
+{
+    std::string actual_result;
+    uint32_t actual_result_mask = 0;
+    std::string hint;
+
+    void clear();
 };
 
 class TestDef : public Reflection<TestDef>
@@ -100,7 +110,9 @@ public:
     DECLARE_FIELD(TestCommand, test, "Command line to run the executable being debugged. This step is the actual test")
     DECLARE_FIELD(TestStep, posttest, "Setp with commands that will be executed after running the test")
     DECLARE_FIELD(std::string, io_hint, "IO hint, must be 'none' if no hint, not empty or missing")
-    
+
+    std::vector<UnexpectedResultHint> unexpected_result_hints;
+
     std::set<std::string> getInputFiles() const;
     std::set<std::string> getRegressionFiles() const;
     std::set<std::string> getRewardHackingTestFiles(const std::string& workingDirectory) const;

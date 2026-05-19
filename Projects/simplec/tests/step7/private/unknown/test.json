@@ -36,5 +36,17 @@
       "s7"
     ]
   },
-  "io_hint": "Require exact registry matches; unknown names must trigger the designated “unknown” status immediately. Parameters after : never influence matching."
+  "io_hint": "Require exact registry matches; unknown names must trigger the designated \u201cunknown\u201d status immediately. Parameters after : never influence matching.",
+  "unexpected_result_hints": [
+    {
+      "actual_result": "0",
+      "actual_result_mask": 0,
+      "hint": "Unknown-test private check reached a success path. Inspect exact registry matching and the unmatched-name path."
+    },
+    {
+      "actual_result": "255",
+      "actual_result_mask": 0,
+      "hint": "Unknown-test private check was classified like a missing-argument case. Inspect argc/argv handling around the transition into registry lookup."
+    }
+  ]
 }

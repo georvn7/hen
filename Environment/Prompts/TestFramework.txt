@@ -31,6 +31,8 @@ All commands are attempted regardless of the success or failure of earlier comma
 
 io_hint - For public tests should be 'none'. For private tests - Short hint shown to the model when checking for reward-hacking behavior on what to focus on.
 
+unexpected_result_hints - Optional private-test metadata for result-based failures. Each entry may specify either exact actual_result or actual_result_mask and a short hint. Use exact actual_result when a whole return code has a known diagnostic meaning. Use actual_result_mask when the result is a bitmask and a specific unexpected bit identifies the failing subfeature. Hints must point to the suspicious area only; do not reveal the full implementation fix.
+
 Each of the commands is described by the following syntax:
 
 For pretest and posttest: [[attributes]] executable arguments

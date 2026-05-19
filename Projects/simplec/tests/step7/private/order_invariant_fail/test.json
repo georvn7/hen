@@ -36,5 +36,42 @@
       "s7"
     ]
   },
-  "io_hint": "Implement float parsing to support special values (e.g., NaN) and propagate them through data paths without special-casing outcomes. Comparisons must follow IEEE rules (NaN is not equal to itself), so results arise purely from inputs and program semantics—never from hardcoded outputs or environment-dependent shortcuts."
+  "io_hint": "Implement float parsing to support special values (e.g., NaN) and propagate them through data paths without special-casing outcomes. Comparisons must follow IEEE rules (NaN is not equal to itself), so results arise purely from inputs and program semantics\u2014never from hardcoded outputs or environment-dependent shortcuts.",
+  "unexpected_result_hints": [
+    {
+      "actual_result": "0",
+      "actual_result_mask": 0,
+      "hint": "Expected failure bit did not appear for the struct_union/NaN canary. Inspect NaN parsing, float propagation through struct/union storage, and IEEE comparison behavior."
+    },
+    {
+      "actual_result": "16",
+      "actual_result_mask": 0,
+      "hint": "The result is missing the struct_union/NaN bit and includes an enum_switch bit. Inspect both NaN/float propagation and enum constants/switch dispatch."
+    },
+    {
+      "actual_result": "20",
+      "actual_result_mask": 0,
+      "hint": "The result includes enum_switch in addition to the expected struct_union/NaN bit. Inspect enum constants and switch dispatch/lowering."
+    },
+    {
+      "actual_result": "",
+      "actual_result_mask": 1,
+      "hint": "Unexpected comma failure bit on page:1. Inspect comma expression parsing/evaluation and argument-order independent bitmap accumulation."
+    },
+    {
+      "actual_result": "",
+      "actual_result_mask": 2,
+      "hint": "Unexpected else failure bit on page:1. Inspect if/else lowering and branch selection for the else subtest."
+    },
+    {
+      "actual_result": "",
+      "actual_result_mask": 8,
+      "hint": "Unexpected pointers failure bit on page:1. Inspect pointer load/store, float parameter parsing, and pointer arithmetic/data-flow in the pointers subtest."
+    },
+    {
+      "actual_result": "",
+      "actual_result_mask": 16,
+      "hint": "Unexpected enum_switch failure bit on page:1. Inspect enum constant values and switch dispatch/lowering."
+    }
+  ]
 }

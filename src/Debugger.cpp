@@ -69,6 +69,10 @@
 #define DEBUGGER_PROGRESS_REPORT_PENDING_FIX_DIFF_MAX_CHARS (12*1024)
 #endif
 
+#ifndef PRIVATE_TEST_LLDB_DIAGNOSTICS_MAX_CHARS
+#define PRIVATE_TEST_LLDB_DIAGNOSTICS_MAX_CHARS (12*1024)
+#endif
+
 //#define LLDB_PRINT_BREAKPOINT_HITS
 //#define LLDB_VERBOSE_BATCH_MODE
 
@@ -406,6 +410,174 @@ uint32_t rawTrajectorySize(const std::vector<std::pair<std::string, std::string>
     }
 
     return uint32_t(std::min<size_t>(size, std::numeric_limits<uint32_t>::max()));
+}
+
+struct PrivateResultMismatch
+{
+    bool found = false;
+    std::string actual;
+    std::string expected;
+    uint64_t actualValue = 0;
+    uint64_t expectedValue = 0;
+    bool actualNumeric = false;
+    bool expectedNumeric = false;
+};
+
+bool parseUnsignedResultValue(const std::string& value, uint64_t& out)
+{
+    try
+    {
+        size_t consumed = 0;
+        out = std::stoull(value, &consumed, 0);
+        return consumed == value.size();
+    }
+    catch(...)
+    {
+        return false;
+    }
+}
+
+PrivateResultMismatch findLastPrivateResultMismatch(const std::string& testLog)
+{
+    PrivateResultMismatch result;
+    const std::string actualPrefix = "Returned result '";
+    const std::string expectedPrefix = "' is not expected! Expected result is: '";
+
+    size_t pos = 0;
+    while((pos = testLog.find(actualPrefix, pos)) != std::string::npos)
+    {
+        const size_t actualStart = pos + actualPrefix.size();
+        const size_t actualEnd = testLog.find(expectedPrefix, actualStart);
+        if(actualEnd == std::string::npos)
+        {
+            pos = actualStart;
+            continue;
+        }
+
+        const size_t expectedStart = actualEnd + expectedPrefix.size();
+        const size_t expectedEnd = testLog.find("'", expectedStart);
+        if(expectedEnd == std::string::npos)
+        {
+            pos = expectedStart;
+            continue;
+        }
+
+        result.found = true;
+        result.actual = testLog.substr(actualStart, actualEnd - actualStart);
+        result.expected = testLog.substr(expectedStart, expectedEnd - expectedStart);
+        pos = expectedEnd + 1;
+    }
+
+    if(result.found)
+    {
+        result.actualNumeric = parseUnsignedResultValue(result.actual, result.actualValue);
+        result.expectedNumeric = parseUnsignedResultValue(result.expected, result.expectedValue);
+    }
+
+    return result;
+}
+
+std::string selectPrivateResultHint(const TestDef& test, const std::string& testLog)
+{
+    const PrivateResultMismatch mismatch = findLastPrivateResultMismatch(testLog);
+    if(!mismatch.found)
+    {
+        return test.io_hint;
+    }
+
+    for(const auto& hint : test.unexpected_result_hints)
+    {
+        if(hint.hint.empty() || hint.actual_result.empty())
+        {
+            continue;
+        }
+
+        if(hint.actual_result == mismatch.actual)
+        {
+            return hint.hint;
+        }
+    }
+
+    if(mismatch.actualNumeric)
+    {
+        uint64_t unexpectedBits = mismatch.actualValue;
+        if(mismatch.expectedNumeric)
+        {
+            unexpectedBits = mismatch.actualValue & ~mismatch.expectedValue;
+        }
+
+        std::vector<std::string> matchingHints;
+        for(const auto& hint : test.unexpected_result_hints)
+        {
+            if(hint.hint.empty() || hint.actual_result_mask == 0)
+            {
+                continue;
+            }
+
+            const uint64_t mask = hint.actual_result_mask;
+            if((unexpectedBits & mask) == mask)
+            {
+                matchingHints.push_back(hint.hint);
+            }
+        }
+
+        if(!matchingHints.empty())
+        {
+            std::string result;
+            for(size_t i = 0; i < matchingHints.size(); ++i)
+            {
+                if(i != 0)
+                {
+                    result += "\n";
+                }
+                result += matchingHints[i];
+            }
+            return result;
+        }
+    }
+
+    return test.io_hint;
+}
+
+bool lldbLogLooksLikeCrashOrTimeout(const std::string& lldbLog)
+{
+    if(lldbLog.empty())
+    {
+        return false;
+    }
+
+    const std::string lower = toLower(lldbLog);
+    return lower.find("_debug_command_result=timeout") != std::string::npos ||
+           lower.find("stop reason = signal") != std::string::npos ||
+           lower.find("exc_bad_access") != std::string::npos ||
+           lower.find("addresssanitizer:") != std::string::npos ||
+           lower.find("undefinedbehaviorsanitizer:") != std::string::npos ||
+           lower.find("[error] unable to obtain lldb exit code") != std::string::npos;
+}
+
+std::string extractPrivateLldbCrashCallstack(const std::string& lldbLog)
+{
+    if(!lldbLogLooksLikeCrashOrTimeout(lldbLog))
+    {
+        return std::string();
+    }
+
+    // The LLDB scripts already bound stack depth and frame output. Keep only the
+    // stopped-process tail so the prompt sees the crash callstack, not setup noise.
+    size_t start = lldbLog.rfind("(lldb) process continue");
+    if(start == std::string::npos)
+    {
+        start = lldbLog.find("_DEBUG_COMMAND_RESULT=");
+    }
+    if(start == std::string::npos)
+    {
+        start = 0;
+    }
+
+    std::string callstack = lldbLog.substr(start);
+    return truncateWithNoteUtf8(callstack,
+                                PRIVATE_TEST_LLDB_DIAGNOSTICS_MAX_CHARS,
+                                "\n...[[truncated lldb crash callstack]]");
 }
 
 std::string extractFailureSignature(const std::string& log, const std::string& notes)
@@ -2419,6 +2591,7 @@ bool Debugger::rewardHackingAnalysis(CCodeProject* project,
 
     std::string privateTestInfo;
     std::string privateTestHint;
+    std::string privateCrashCallstack;
     bool privateTestsPass = true;
     bool hasPrivateTests = false;
 
@@ -2447,7 +2620,8 @@ bool Debugger::rewardHackingAnalysis(CCodeProject* project,
             privateTestsPass = privateTestsPass && testResult;
             if(!privateTestsPass)
             {
-                privateTestHint = privateTest.io_hint;
+                privateTestHint = selectPrivateResultHint(privateTest, debugLogTest);
+                privateCrashCallstack = extractPrivateLldbCrashCallstack(m_lldbLog);
                 break;
             }
         }
@@ -2461,6 +2635,14 @@ bool Debugger::rewardHackingAnalysis(CCodeProject* project,
             {
                 privateTestInfo += "Here is a direct hint from the failed private test:\n";
                 privateTestInfo += privateTestHint;
+            }
+
+            if(!privateCrashCallstack.empty())
+            {
+                privateTestInfo += "\n\nHere is the bounded LLDB crash/timeout callstack from the failed private test:\n";
+                privateTestInfo += "```lldb\n";
+                privateTestInfo += privateCrashCallstack;
+                privateTestInfo += "\n```\n";
             }
             privateTestInfo += "\n\n";
         }
@@ -3323,7 +3505,7 @@ bool Debugger::execTestScript(CCodeProject* project,
 
     checkTestStepInput(debugLogTest, project, test.test.input_files, test.test.output_files, "test", true);
 
-    int returnCode;
+    int returnCode = 65535;
 
     std::string cmdArgsOnly = removeFirstWord(cmd, "main");
 

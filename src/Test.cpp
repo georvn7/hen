@@ -125,6 +125,13 @@ void TestCommand::clear()
     output_files.clear();
 }
 
+void UnexpectedResultHint::clear()
+{
+    actual_result.clear();
+    actual_result_mask = 0;
+    hint.clear();
+}
+
 std::string TestRegexContract::verify()
 {
     std::string feedback;
@@ -562,6 +569,19 @@ std::string TestDef::validate(bool isPrivate)
     
     feedback += validateIOFiles();
     feedback += validateCommands();
+
+    for(const auto& unexpectedHint : unexpected_result_hints)
+    {
+        if(unexpectedHint.hint.empty())
+        {
+            feedback += "Each unexpected_result_hints entry must provide a non-empty hint.\n";
+        }
+
+        if(unexpectedHint.actual_result.empty() && unexpectedHint.actual_result_mask == 0)
+        {
+            feedback += "Each unexpected_result_hints entry must provide actual_result or actual_result_mask.\n";
+        }
+    }
     
     return feedback;
 }
@@ -728,6 +748,7 @@ void TestDef::clear()
     test.clear();
     posttest.clear();
     io_hint.clear();
+    unexpected_result_hints.clear();
     m_lastResult.clear();
 }
 
@@ -772,6 +793,41 @@ bool TestDef::load(const std::string& jsonPath)
     auto uJsonStr = utility::conversions::to_string_t(jsonStr);
     auto json = web::json::value::parse(uJsonStr);
     from_json(json);
+
+    unexpected_result_hints.clear();
+    const auto hintsKey = utility::conversions::to_string_t("unexpected_result_hints");
+    if(json.has_field(hintsKey) && json.at(hintsKey).is_array())
+    {
+        for(const auto& hintJson : json.at(hintsKey).as_array())
+        {
+            if(!hintJson.is_object())
+            {
+                continue;
+            }
+
+            UnexpectedResultHint hint;
+            const auto actualResultKey = utility::conversions::to_string_t("actual_result");
+            const auto actualResultMaskKey = utility::conversions::to_string_t("actual_result_mask");
+            const auto hintKey = utility::conversions::to_string_t("hint");
+
+            if(hintJson.has_field(actualResultKey) && hintJson.at(actualResultKey).is_string())
+            {
+                hint.actual_result = utility::conversions::to_utf8string(hintJson.at(actualResultKey).as_string());
+            }
+
+            if(hintJson.has_field(actualResultMaskKey) && hintJson.at(actualResultMaskKey).is_number())
+            {
+                hint.actual_result_mask = hintJson.at(actualResultMaskKey).as_number().to_uint32();
+            }
+
+            if(hintJson.has_field(hintKey) && hintJson.at(hintKey).is_string())
+            {
+                hint.hint = utility::conversions::to_utf8string(hintJson.at(hintKey).as_string());
+            }
+
+            unexpected_result_hints.push_back(hint);
+        }
+    }
     
     return true;
 }

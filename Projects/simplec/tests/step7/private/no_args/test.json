@@ -36,5 +36,17 @@
       "s7"
     ]
   },
-  "io_hint": "Enforce an early usage/error branch when inputs are missing, decided only by input arity; any access to later args is unreachable. Keep this path deterministic and side-effect free."
+  "io_hint": "Enforce an early usage/error branch when inputs are missing, decided only by input arity; any access to later args is unreachable. Keep this path deterministic and side-effect free.",
+  "unexpected_result_hints": [
+    {
+      "actual_result": "0",
+      "actual_result_mask": 0,
+      "hint": "No-argument private check reached a success path. Inspect early argument-count handling and whether registry lookup or parameter parsing is being entered unexpectedly."
+    },
+    {
+      "actual_result": "254",
+      "actual_result_mask": 0,
+      "hint": "No-argument private check was classified like an unknown test name. Inspect the boundary between argument-count handling and registry lookup."
+    }
+  ]
 }
