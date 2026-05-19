@@ -325,14 +325,15 @@ namespace hen {
         void analysisTrace(CCodeProject* project,
                            const std::string& dbgTestLog,
                            const std::string& traceLog,
-                           RunAnalysis& analysis, const TestDef& test);
+                           RunAnalysis& analysis, const TestDef& test,
+                           bool includePendingFixDiff);
         
         void logAnalysis(CCodeProject* project,
                          const std::string& debugLogTestStr,
                          RunAnalysis& analysis);
         
         std::string getSubSystemsData(CCodeProject* project, std::set<std::string>& subSystems);
-        void systemAnalysis(CCodeProject* project, const std::string& hint, RunAnalysis& analysis);
+        void systemAnalysis(CCodeProject* project, const std::string& hint, RunAnalysis& analysis, bool includePendingFixDiff);
         
         bool rewardHackingAnalysis(CCodeProject* project,
                                    const TestDef& test,

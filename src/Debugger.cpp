@@ -6,6 +6,7 @@
 #include <string_view>
 #include <sstream>
 #include <algorithm>
+#include <limits>
 
 #include "Debugger.h"
 #include "Utils.h"
@@ -58,6 +59,14 @@
 
 #ifndef DEBUGGER_PROGRESS_REPORT_GIT_HISTORY_MAX_CHARS
 #define DEBUGGER_PROGRESS_REPORT_GIT_HISTORY_MAX_CHARS 500
+#endif
+
+#ifndef DEBUGGER_PROGRESS_REPORT_PENDING_FIX_MESSAGE_MAX_CHARS
+#define DEBUGGER_PROGRESS_REPORT_PENDING_FIX_MESSAGE_MAX_CHARS 3000
+#endif
+
+#ifndef DEBUGGER_PROGRESS_REPORT_PENDING_FIX_DIFF_MAX_CHARS
+#define DEBUGGER_PROGRESS_REPORT_PENDING_FIX_DIFF_MAX_CHARS (12*1024)
 #endif
 
 //#define LLDB_PRINT_BREAKPOINT_HITS
@@ -385,6 +394,18 @@ std::string firstRelevantLine(const std::string& text, size_t maxChars)
         }
     }
     return std::string();
+}
+
+uint32_t rawTrajectorySize(const std::vector<std::pair<std::string, std::string>>& rawTrajectory)
+{
+    size_t size = 0;
+    for(const auto& step : rawTrajectory)
+    {
+        size += step.first.size();
+        size += step.second.size();
+    }
+
+    return uint32_t(std::min<size_t>(size, std::numeric_limits<uint32_t>::max()));
 }
 
 std::string extractFailureSignature(const std::string& log, const std::string& notes)
@@ -781,6 +802,100 @@ void attachRegressedFixGitHistory(CCodeProject* project, DebuggingProgressReport
     {
         renderDebuggingProgressReport(report);
     }
+}
+
+std::string getPendingFixContext(CCodeProject* project,
+                                 const std::vector<DebugStep>& trajectory,
+                                 const std::string& pendingCommitMessage,
+                                 bool includeDiff)
+{
+    if(!project || pendingCommitMessage.empty())
+    {
+        return std::string();
+    }
+
+    std::vector<ProgressFixInfo> fixes = collectFixesSincePreviousRun(trajectory, 0);
+    std::string fixedFunction = fixes.empty() ? std::string() : fixes.back().subject;
+
+    std::string diff;
+    if(includeDiff && !fixedFunction.empty())
+    {
+        auto nodeIt = project->nodeMap().find(fixedFunction);
+        if(nodeIt != project->nodeMap().end() && nodeIt->second)
+        {
+            CCodeNode* ccNode = (CCodeNode*)nodeIt->second;
+            boost_fs::path repo = boost_fs::path(project->getProjDir()) / "dag";
+            boost_fs::path sourcePath = ccNode->getNodeDirectory(project->getProjDir()) + "/" + fixedFunction + ".cpp";
+
+            try
+            {
+                boost_fs::path absFile = boost_fs::absolute(sourcePath);
+                boost_fs::path relFile = boost_fs::relative(absFile, repo);
+                std::string cmd = "git -C " + shQuote(repo.string());
+                cmd += " -c core.quotepath=false diff --no-color HEAD -- ";
+                cmd += shQuote(relFile.generic_string());
+
+                diff = exec(cmd, repo.string(), "gitPendingFixDiff", true);
+            }
+            catch(...)
+            {
+                diff.clear();
+            }
+        }
+    }
+
+    if(includeDiff && diff.empty())
+    {
+        try
+        {
+            boost_fs::path repo = boost_fs::path(project->getProjDir()) / "dag";
+            std::string cmd = "git -C " + shQuote(repo.string());
+            cmd += " -c core.quotepath=false diff --no-color HEAD -- ";
+            cmd += shQuote(":(glob)**/*.cpp");
+            cmd += " ";
+            cmd += shQuote(":(glob)**/*.json");
+
+            diff = exec(cmd, repo.string(), "gitPendingFixDiffAll", true);
+        }
+        catch(...)
+        {
+            diff.clear();
+        }
+    }
+
+    std::stringstream ss;
+    ss << "\n\nPENDING FIX BEFORE CURRENT RUN ANALYSIS\n\n";
+    ss << "Draft commit message from the last fix_function. ";
+    ss << "The run_test analysis/debug notes have not been appended yet.\n\n";
+    ss << truncateWithNoteUtf8(pendingCommitMessage,
+                               DEBUGGER_PROGRESS_REPORT_PENDING_FIX_MESSAGE_MAX_CHARS,
+                               "\n...[[truncated]]");
+    ss << "\n\n";
+
+    if(!fixedFunction.empty())
+    {
+        ss << "Fixed function: " << fixedFunction << "\n\n";
+    }
+
+    if(!diff.empty())
+    {
+        ss << "Uncommitted diff visible before this run_test analysis:\n\n";
+        ss << "```diff\n";
+        ss << truncateWithNoteUtf8(diff,
+                                   DEBUGGER_PROGRESS_REPORT_PENDING_FIX_DIFF_MAX_CHARS,
+                                   "\n...[[truncated]]");
+        ss << "\n```\n\n";
+    }
+    else if(!includeDiff)
+    {
+        ss << "Uncommitted diff omitted because the current run is not classified as a regression before analysis.\n\n";
+    }
+    else
+    {
+        ss << "No uncommitted source diff was available for the pending fix.\n\n";
+    }
+
+    return ss.str();
 }
 
 void classifyProgress(DebuggingProgressReport& report)
@@ -2207,7 +2322,9 @@ std::string Debugger::analysisFrameTrace(CCodeProject* project, const std::strin
 void Debugger::analysisTrace(CCodeProject* project,
                              const std::string& dbgTestLog,
                              const std::string& traceLog,
-                             RunAnalysis& analysis, const TestDef& test)
+                             RunAnalysis& analysis,
+                             const TestDef& test,
+                             bool includePendingFixDiff)
 {
     m_tracer.loadFromString(traceLog);
 
@@ -2235,7 +2352,7 @@ void Debugger::analysisTrace(CCodeProject* project,
     RunAnalysis fullTraceAnalysis;
     std::string hitCount = std::to_string(MAX_BREKPOINT_HITCOUNT);
 
-    systemAnalysis(project, analysisHint, fullTraceAnalysis);
+    systemAnalysis(project, analysisHint, fullTraceAnalysis, includePendingFixDiff);
     analysis = fullTraceAnalysis;
 }
 
@@ -3427,7 +3544,12 @@ void Debugger::runAnalysis(CCodeProject* project, const TestDef& test, RunAnalys
 
     if(!lldbOnlyLog.empty())
     {
-        analysisTrace(project, debugLogTestStr, lldbOnlyLog, analysis, test);
+        bool previousRunKnown = false;
+        bool previousRunPassed = false;
+        findPreviousRunState(m_trajectory, m_lastRunInfo, previousRunKnown, previousRunPassed);
+
+        bool includePendingFixDiff = previousRunKnown && previousRunPassed && !testPasses;
+        analysisTrace(project, debugLogTestStr, lldbOnlyLog, analysis, test, includePendingFixDiff);
     }
 
     if(!m_runAnalysisSteps.empty())
@@ -3477,7 +3599,10 @@ std::string Debugger::getSubSystemsData(CCodeProject* project, std::set<std::str
     return ss.str();
 }
 
-void Debugger::systemAnalysis(CCodeProject* project, const std::string& hint, RunAnalysis& analysis)
+void Debugger::systemAnalysis(CCodeProject* project,
+                              const std::string& hint,
+                              RunAnalysis& analysis,
+                              bool includePendingFixDiff)
 {
     std::set<std::string> subSystems;
     std::string systemData = getSubSystemsData(project, subSystems);
@@ -3498,8 +3623,13 @@ void Debugger::systemAnalysis(CCodeProject* project, const std::string& hint, Ru
     std::string progressReport = !m_lastRunProgressReportVerbose.empty() ?
                                  m_lastRunProgressReportVerbose :
                                  m_lastRunProgressReport;
+    std::string pendingFixContext = getPendingFixContext(project,
+                                                         m_trajectory,
+                                                         m_commitMessage,
+                                                         includePendingFixDiff);
 #else
     std::string progressReport;
+    std::string pendingFixContext;
 #endif
 
     std::string fixedFunctionInfo;
@@ -3595,6 +3725,7 @@ void Debugger::systemAnalysis(CCodeProject* project, const std::string& hint, Ru
                         {"trace_desc", traceDescStr},
                         {"trajectory", trajectory},
                         {"progress_report", progressReport},
+                        {"pending_fix_context", pendingFixContext},
                         {"call_graph", callTree},
                         {"application", application},
                         {"max_depth", maxDepth},
@@ -7248,17 +7379,15 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             m_pendingProgressReportText = progress.conciseText;
             m_pendingProgressReportVerboseText = progress.verboseText;
             m_pendingProgressReportJsonText = progress.jsonText;
-            m_lastRunStep = stepIndex;
 #endif
             //We are unable continue debugging if the binary couldn't be compiled
             //TODO: Add a debug note to the trajectory that explains the problem
             criticalError("Could't build the executable from the latest source code!");
-#ifdef DEBUGGER_PROGRESS_REPORT
             if(!m_trajectory.empty())
             {
                 m_lastRunInfo = m_trajectory.back().fullInfo();
+                m_lastRunStep = stepIndex;
             }
-#endif
             return false;
         }
 
@@ -7762,6 +7891,13 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
 
     std::string trajectory = getTrajectory(0, -1, true, true, true);
 
+#if COMPACT_CONTEXT_TRESHOULD
+    uint32_t compactContextLength = compiledInfoLength;
+#ifdef DEBUGGER_INTERLEAVED_TRAJECTORY
+    compactContextLength = rawTrajectorySize(m_rawTrajectory);
+#endif
+#endif
+
     //Enforces run_test step immediately after fix_function
     if(m_nextStep.action_type == "fix_function")
     {
@@ -7771,7 +7907,7 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         //Leave the action subject to be the fixed function!
     }
 #if COMPACT_CONTEXT_TRESHOULD
-    else if(compiledInfoLength > COMPACT_CONTEXT_TRESHOULD)
+    else if(compactContextLength > COMPACT_CONTEXT_TRESHOULD)
     {
         m_nextStep.action_type = "run_test";
         m_nextStep.motivation = "Run the test and summarize the debugging progress";
