@@ -36,9 +36,6 @@
 #define TRACE_SYS_ELEMENTS 8
 #define TRACE_SYS_DEPTH 4
 
-//In characters
-#define COMPACT_CONTEXT_TRESHOULD (1024*45*4)
-
 #define RETRY_INVALID_STEP_WITH_DIRECTOR
 
 //#define EVALUATE_BREAKPOINTS_WITH_MIN_CPP_VER
@@ -8073,11 +8070,9 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
 
     std::string trajectory = getTrajectory(0, -1, true, true, true);
 
-#if COMPACT_CONTEXT_TRESHOULD
-    uint32_t compactContextLength = compiledInfoLength;
+    uint64_t compactContextLength = compiledInfoLength;
 #ifdef DEBUGGER_INTERLEAVED_TRAJECTORY
     compactContextLength = rawTrajectorySize(m_rawTrajectory);
-#endif
 #endif
 
     //Enforces run_test step immediately after fix_function
@@ -8088,13 +8083,12 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         m_nextStep.motivation += "' and find what else needs fixes to successfully pass the test.";
         //Leave the action subject to be the fixed function!
     }
-#if COMPACT_CONTEXT_TRESHOULD
-    else if(compactContextLength > COMPACT_CONTEXT_TRESHOULD)
+    else if(m_compactContextThresholdChars > 0 &&
+            compactContextLength > m_compactContextThresholdChars)
     {
         m_nextStep.action_type = "run_test";
         m_nextStep.motivation = "Run the test and summarize the debugging progress";
     }
-#endif
     else
     {
         m_commitMessage.clear();
@@ -10937,6 +10931,11 @@ void Debugger::restoreSource(CCodeProject* project)
     }
 }
 
+void Debugger::setCompactContextThresholdUnits(uint32_t thousandTokenUnits)
+{
+    m_compactContextThresholdChars = uint64_t(thousandTokenUnits) * 1000ULL * CHARACTERS_PER_TOKEN;
+}
+
 void Debugger::feedback(const std::string& message)
 {
 
@@ -11091,6 +11090,7 @@ m_previousSteps(0),
 m_infoStepsStart(-1),
 m_hasValidBuild(false),
 m_attemptsToFixUnitTestMain(0),
+m_compactContextThresholdChars(0),
 m_threadPool(std::thread::hardware_concurrency() ?: 2)
 {
     resetTest();

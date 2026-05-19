@@ -265,7 +265,8 @@ namespace hen {
         std::string             m_testFunctionalityDelta;
         std::string             m_unitTestSource;
         std::string             m_commitMessage;
-        
+        uint64_t                m_compactContextThresholdChars;
+
         std::string             m_sdkPath;
         
         mutable boost::asio::thread_pool m_threadPool;
@@ -538,7 +539,9 @@ namespace hen {
                           const std::string& system,
                           const std::string& testJsonPath,
                           std::string& log);
-        
+
+        void setCompactContextThresholdUnits(uint32_t thousandTokenUnits);
+
         void feedback(const std::string& message);
         Debugger();
 	};

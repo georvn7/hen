@@ -2429,6 +2429,13 @@ namespace hen {
                 m_runUnitTests = args["unit-tests"].as<bool>();
             }
 
+            uint32_t compactContextThresholdUnits = 0;
+            if(args.count("compact-context-threshold"))
+            {
+                compactContextThresholdUnits = args["compact-context-threshold"].as<uint32_t>();
+            }
+            Debugger::getInstance().setCompactContextThresholdUnits(compactContextThresholdUnits);
+
             if(args.count("synthetic-data"))
             {
                 m_runTrainingDataSynthesis = args["synthetic-data"].as<bool>();
