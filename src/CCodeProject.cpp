@@ -2429,12 +2429,12 @@ namespace hen {
                 m_runUnitTests = args["unit-tests"].as<bool>();
             }
 
-            uint32_t compactContextThresholdUnits = 0;
+            uint32_t directorContextThresholdUnits = 0;
             if(args.count("compact-context-threshold"))
             {
-                compactContextThresholdUnits = args["compact-context-threshold"].as<uint32_t>();
+                directorContextThresholdUnits = args["compact-context-threshold"].as<uint32_t>();
             }
-            Debugger::getInstance().setCompactContextThresholdUnits(compactContextThresholdUnits);
+            Debugger::getInstance().setDirectorContextThresholdUnits(directorContextThresholdUnits);
 
             if(args.count("synthetic-data"))
             {

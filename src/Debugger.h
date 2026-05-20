@@ -265,7 +265,7 @@ namespace hen {
         std::string             m_testFunctionalityDelta;
         std::string             m_unitTestSource;
         std::string             m_commitMessage;
-        uint64_t                m_compactContextThresholdChars;
+        uint64_t                m_directorContextThresholdChars;
 
         std::string             m_sdkPath;
         
@@ -540,7 +540,7 @@ namespace hen {
                           const std::string& testJsonPath,
                           std::string& log);
 
-        void setCompactContextThresholdUnits(uint32_t thousandTokenUnits);
+        void setDirectorContextThresholdUnits(uint32_t thousandTokenUnits);
 
         void feedback(const std::string& message);
         Debugger();

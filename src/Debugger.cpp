@@ -8070,10 +8070,12 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
 
     std::string trajectory = getTrajectory(0, -1, true, true, true);
 
-    uint64_t compactContextLength = compiledInfoLength;
+    uint64_t debuggerContextLength = compiledInfoLength;
 #ifdef DEBUGGER_INTERLEAVED_TRAJECTORY
-    compactContextLength = rawTrajectorySize(m_rawTrajectory);
+    debuggerContextLength = rawTrajectorySize(m_rawTrajectory);
 #endif
+    const bool useDirectorForLargeContext = m_directorContextThresholdChars > 0 &&
+                                            debuggerContextLength > m_directorContextThresholdChars;
 
     //Enforces run_test step immediately after fix_function
     if(m_nextStep.action_type == "fix_function")
@@ -8082,12 +8084,6 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         m_nextStep.motivation = "Run the test to verify the fix of '" + m_nextStep.action_subject;
         m_nextStep.motivation += "' and find what else needs fixes to successfully pass the test.";
         //Leave the action subject to be the fixed function!
-    }
-    else if(m_compactContextThresholdChars > 0 &&
-            compactContextLength > m_compactContextThresholdChars)
-    {
-        m_nextStep.action_type = "run_test";
-        m_nextStep.motivation = "Run the test and summarize the debugging progress";
     }
     else
     {
@@ -8143,6 +8139,25 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             return false;
         };
 
+        auto requestNextStepWithLLM = [&](const std::string& message,
+                                          const std::string& stage,
+                                          bool useDirector)
+        {
+            LLMRole previousLLM = Client::getInstance().getLLM();
+            if(useDirector)
+            {
+                Client::getInstance().setLLM(LLMRole::DIRECTOR);
+            }
+            else
+            {
+                Client::getInstance().selectLLM(InferenceIntent::DEBUG_ANALYSIS);
+            }
+
+            bool ok = requestNextStep(message, stage);
+            Client::getInstance().setLLM(previousLLM);
+            return ok;
+        };
+
         uint32_t sinceLastFix = stepIndex - m_lastFixStep;
         if(sinceLastFix >= DISCLOSE_STOP_STEPS_AFTER_FIX && m_system != "main")
         {
@@ -8156,7 +8171,7 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             promptNextStepMsg += "If you decide to do this, provide your justification in the motivation section.\n";
         }
 
-        if(!requestNextStep(promptNextStepMsg, "for the next step"))
+        if(!requestNextStepWithLLM(promptNextStepMsg, "for the next step", useDirectorForLargeContext))
         {
             project->popContext();
             project->popContext();
@@ -8212,9 +8227,11 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
             project->captureContext(std::string());
 
 #ifdef RETRY_INVALID_STEP_WITH_DIRECTOR
-            Client::getInstance().setLLM(LLMRole::DIRECTOR);
+            bool useDirectorForRetry = true;
+#else
+            bool useDirectorForRetry = false;
 #endif
-            if(!requestNextStep(feedback, "to repair the next step"))
+            if(!requestNextStepWithLLM(feedback, "to repair the next step", useDirectorForRetry))
             {
                 project->popContext();
                 project->popContext();
@@ -10931,9 +10948,9 @@ void Debugger::restoreSource(CCodeProject* project)
     }
 }
 
-void Debugger::setCompactContextThresholdUnits(uint32_t thousandTokenUnits)
+void Debugger::setDirectorContextThresholdUnits(uint32_t thousandTokenUnits)
 {
-    m_compactContextThresholdChars = uint64_t(thousandTokenUnits) * 1000ULL * CHARACTERS_PER_TOKEN;
+    m_directorContextThresholdChars = uint64_t(thousandTokenUnits) * 1000ULL * CHARACTERS_PER_TOKEN;
 }
 
 void Debugger::feedback(const std::string& message)
@@ -11090,7 +11107,7 @@ m_previousSteps(0),
 m_infoStepsStart(-1),
 m_hasValidBuild(false),
 m_attemptsToFixUnitTestMain(0),
-m_compactContextThresholdChars(0),
+m_directorContextThresholdChars(0),
 m_threadPool(std::thread::hardware_concurrency() ?: 2)
 {
     resetTest();

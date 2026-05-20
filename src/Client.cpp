@@ -388,7 +388,7 @@ int Client::init(int argc, char* argv[])
         ("save,s", boost_opt::value<bool>(), "Toggle save nodes after being fully defined, by default keeps the current value")
         ("debug,d", boost_opt::value<bool>(), "Toggle post-build test debugging, enabled by default")
         ("unit-tests", boost_opt::value<bool>(), "Toggle unit-test ramp-up during debugging, enabled by default")
-        ("compact-context-threshold", boost_opt::value<uint32_t>(), "Force debugger context compaction after N thousand tokens; 0 or omitted disables")
+        ("compact-context-threshold", boost_opt::value<uint32_t>(), "Use Director for debugger next-step selection after N thousand tokens; 0 or omitted disables")
         ("synthetic-data", boost_opt::value<bool>(), "Toggle synthetic training data generation after debugging, disabled by default")
         ("synthetic-validation-data", boost_opt::value<bool>(), "Toggle validation-repair training data generation from recorded debugger retries only, disabled by default")
         ("synthetic-rare-actions-data", boost_opt::value<bool>(), "Toggle rare-action-preserving debugger training data generation from recorded trajectories only, disabled by default");
