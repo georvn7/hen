@@ -7,6 +7,7 @@
 #include <sstream>
 #include <algorithm>
 #include <limits>
+#include <set>
 
 #include "Debugger.h"
 #include "Utils.h"
@@ -332,6 +333,18 @@ struct ProgressFixInfo
     std::string subject;
 };
 
+struct ProgressArtifactDelta
+{
+    std::string stepName;
+    std::string file;
+    std::string label;
+    bool previousKnown = false;
+    bool previousExists = false;
+    bool currentExists = false;
+    uint64_t previousSize = 0;
+    uint64_t currentSize = 0;
+};
+
 struct DebuggingProgressReport
 {
     uint32_t runStep = 0;
@@ -348,6 +361,7 @@ struct DebuggingProgressReport
     std::string currentFailureSignature;
     std::string previousFailureSignature;
     std::vector<std::string> missingDebugArtifacts;
+    std::vector<ProgressArtifactDelta> artifactDeltas;
     std::vector<ProgressFixInfo> fixesSincePreviousRun;
     std::vector<std::string> currentFixRunHistory;
     std::vector<std::string> recentFixRunHistory;
@@ -714,6 +728,245 @@ std::string formatFixes(const std::vector<ProgressFixInfo>& fixes)
     return joinStrings(parts, ", ");
 }
 
+std::string normalizeDeclaredOutputFile(const std::shared_ptr<std::string>& file)
+{
+    if(!file)
+    {
+        return std::string();
+    }
+
+    std::string value = *file;
+    boost::algorithm::trim(value);
+    while(startsWith(value, "./"))
+    {
+        value = value.substr(2);
+    }
+    return value;
+}
+
+boost_fs::path declaredOutputPath(const std::string& root, const std::string& file)
+{
+    boost_fs::path path(file);
+    if(path.is_absolute())
+    {
+        return path;
+    }
+    return boost_fs::path(root) / path;
+}
+
+bool pathExistsNoThrow(const boost_fs::path& path)
+{
+    boost::system::error_code ec;
+    const bool exists = boost_fs::exists(path, ec);
+    return !ec && exists;
+}
+
+uint64_t regularFileSizeNoThrow(const boost_fs::path& path)
+{
+    boost::system::error_code ec;
+    if(!boost_fs::exists(path, ec) || ec)
+    {
+        return 0;
+    }
+
+    if(!boost_fs::is_regular_file(path, ec) || ec)
+    {
+        return 0;
+    }
+
+    const uintmax_t size = boost_fs::file_size(path, ec);
+    if(ec)
+    {
+        return 0;
+    }
+
+    return static_cast<uint64_t>(std::min<uintmax_t>(size, std::numeric_limits<uint64_t>::max()));
+}
+
+std::string classifyArtifactDelta(bool previousKnown,
+                                  bool previousExists,
+                                  bool currentExists,
+                                  uint64_t previousSize,
+                                  uint64_t currentSize)
+{
+    if(!previousKnown)
+    {
+        return "unknown_previous";
+    }
+
+    if(!previousExists && currentExists)
+    {
+        return "artifact_progress";
+    }
+
+    if(previousExists && !currentExists)
+    {
+        return "potential_regression";
+    }
+
+    if(previousExists && currentExists && previousSize != currentSize)
+    {
+        return "size_changed";
+    }
+
+    if(previousExists && currentExists)
+    {
+        return "unchanged_present";
+    }
+
+    return "unchanged_missing";
+}
+
+void appendDeclaredOutputFileDeltas(std::vector<ProgressArtifactDelta>& deltas,
+                                    std::set<std::string>& seen,
+                                    const std::vector<std::shared_ptr<std::string>>& outputFiles,
+                                    const std::string& stepName,
+                                    const std::string& previousWorkingDirectory,
+                                    const std::string& currentWorkingDirectory,
+                                    bool previousKnown)
+{
+    for(const auto& outputFile : outputFiles)
+    {
+        const std::string file = normalizeDeclaredOutputFile(outputFile);
+        if(file.empty())
+        {
+            continue;
+        }
+
+        const std::string key = stepName + "\n" + file;
+        if(!seen.insert(key).second)
+        {
+            continue;
+        }
+
+        const boost_fs::path previousPath = declaredOutputPath(previousWorkingDirectory, file);
+        const boost_fs::path currentPath = declaredOutputPath(currentWorkingDirectory, file);
+
+        ProgressArtifactDelta delta;
+        delta.stepName = stepName;
+        delta.file = file;
+        delta.previousKnown = previousKnown;
+        delta.previousExists = previousKnown && pathExistsNoThrow(previousPath);
+        delta.currentExists = pathExistsNoThrow(currentPath);
+        delta.previousSize = delta.previousExists ? regularFileSizeNoThrow(previousPath) : 0;
+        delta.currentSize = delta.currentExists ? regularFileSizeNoThrow(currentPath) : 0;
+        delta.label = classifyArtifactDelta(delta.previousKnown,
+                                            delta.previousExists,
+                                            delta.currentExists,
+                                            delta.previousSize,
+                                            delta.currentSize);
+        deltas.push_back(delta);
+    }
+}
+
+std::vector<ProgressArtifactDelta> buildDeclaredOutputFileDeltas(const TestDef& test,
+                                                                 const std::string& previousWorkingDirectory,
+                                                                 const std::string& currentWorkingDirectory)
+{
+    std::vector<ProgressArtifactDelta> deltas;
+    std::set<std::string> seen;
+
+    const bool previousKnown = !previousWorkingDirectory.empty() &&
+                               pathExistsNoThrow(boost_fs::path(previousWorkingDirectory));
+
+    appendDeclaredOutputFileDeltas(deltas,
+                                   seen,
+                                   test.test.output_files,
+                                   "test",
+                                   previousWorkingDirectory,
+                                   currentWorkingDirectory,
+                                   previousKnown);
+    appendDeclaredOutputFileDeltas(deltas,
+                                   seen,
+                                   test.posttest.output_files,
+                                   "posttest",
+                                   previousWorkingDirectory,
+                                   currentWorkingDirectory,
+                                   previousKnown);
+
+    return deltas;
+}
+
+bool hasArtifactDeltaLabel(const DebuggingProgressReport& report, const std::string& label)
+{
+    for(const auto& delta : report.artifactDeltas)
+    {
+        if(delta.label == label)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool isMeaningfulArtifactDelta(const ProgressArtifactDelta& delta)
+{
+    return delta.label == "artifact_progress" ||
+           delta.label == "potential_regression" ||
+           delta.label == "size_changed";
+}
+
+std::string formatArtifactDelta(const ProgressArtifactDelta& delta)
+{
+    std::ostringstream ss;
+    ss << delta.stepName << " output " << delta.file << ": ";
+
+    if(delta.label == "artifact_progress")
+    {
+        ss << "missing -> present (" << delta.currentSize << " bytes)";
+    }
+    else if(delta.label == "potential_regression")
+    {
+        ss << "present -> missing (previous " << delta.previousSize << " bytes)";
+    }
+    else if(delta.label == "size_changed")
+    {
+        ss << "size changed " << delta.previousSize << " -> " << delta.currentSize << " bytes";
+    }
+    else if(delta.label == "unchanged_present")
+    {
+        ss << "present (" << delta.currentSize << " bytes)";
+    }
+    else if(delta.label == "unchanged_missing")
+    {
+        ss << "missing in both runs";
+    }
+    else
+    {
+        ss << "previous run output state unknown; current ";
+        ss << (delta.currentExists ? "present" : "missing");
+        if(delta.currentExists)
+        {
+            ss << " (" << delta.currentSize << " bytes)";
+        }
+    }
+
+    return ss.str();
+}
+
+std::string summarizeArtifactDeltas(const DebuggingProgressReport& report,
+                                    const std::set<std::string>& labels,
+                                    bool meaningfulOnly)
+{
+    std::vector<std::string> parts;
+    for(const auto& delta : report.artifactDeltas)
+    {
+        if(!labels.empty() && labels.find(delta.label) == labels.end())
+        {
+            continue;
+        }
+
+        if(meaningfulOnly && !isMeaningfulArtifactDelta(delta))
+        {
+            continue;
+        }
+
+        parts.push_back(formatArtifactDelta(delta));
+    }
+
+    return joinStrings(parts, "; ");
+}
+
 std::string progressRegressionReason(const DebuggingProgressReport& report)
 {
     if(!report.currentBuildOk)
@@ -728,6 +981,27 @@ std::string progressRegressionReason(const DebuggingProgressReport& report)
             return "missing debug artifacts: " + joinStrings(report.missingDebugArtifacts, ", ");
         }
         return "expected debug artifacts are missing after the run";
+    }
+
+    if(report.label == "potential_regression")
+    {
+        return summarizeArtifactDeltas(report, {"potential_regression"}, true);
+    }
+
+    if(report.label == "artifact_progress")
+    {
+        return summarizeArtifactDeltas(report, {"artifact_progress"}, true);
+    }
+
+    if(report.label == "mixed")
+    {
+        const std::string artifactSummary = summarizeArtifactDeltas(report,
+                                                                    {"artifact_progress", "potential_regression"},
+                                                                    true);
+        if(!artifactSummary.empty())
+        {
+            return artifactSummary;
+        }
     }
 
     if(!report.currentFailureSignature.empty())
@@ -757,7 +1031,11 @@ std::vector<std::string> buildCurrentFixRunHistory(const DebuggingProgressReport
         line += " -> label: " + report.label;
 
         if(!reason.empty() &&
-           (report.label == "regressed" || report.label == "instrumentation_failure"))
+           (report.label == "regressed" ||
+            report.label == "instrumentation_failure" ||
+            report.label == "potential_regression" ||
+            report.label == "artifact_progress" ||
+            report.label == "mixed"))
         {
             line += "; reason: " + compactOneLine(reason, 360);
         }
@@ -824,6 +1102,15 @@ void renderDebuggingProgressReport(DebuggingProgressReport& report)
     concise << "\n";
     concise << "fixes_since_previous_run: " << formatFixes(report.fixesSincePreviousRun) << "\n";
     if(!report.regressionReason.empty() &&
+       (report.label == "regressed" ||
+        report.label == "instrumentation_failure" ||
+        report.label == "potential_regression" ||
+        report.label == "artifact_progress" ||
+        report.label == "mixed"))
+    {
+        concise << "label_reason: " << report.regressionReason << "\n";
+    }
+    if(!report.regressionReason.empty() &&
        (report.label == "regressed" || report.label == "instrumentation_failure"))
     {
         concise << "regression_reason: " << report.regressionReason << "\n";
@@ -835,6 +1122,21 @@ void renderDebuggingProgressReport(DebuggingProgressReport& report)
     if(!report.missingDebugArtifacts.empty())
     {
         concise << "missing_debug_artifacts: " << joinStrings(report.missingDebugArtifacts, ", ") << "\n";
+    }
+    bool printedArtifactDeltas = false;
+    for(const auto& delta : report.artifactDeltas)
+    {
+        if(!isMeaningfulArtifactDelta(delta))
+        {
+            continue;
+        }
+
+        if(!printedArtifactDeltas)
+        {
+            concise << "declared_output_deltas:\n";
+            printedArtifactDeltas = true;
+        }
+        concise << "- " << formatArtifactDelta(delta) << "\n";
     }
     if(!report.recentFixRunHistory.empty())
     {
@@ -862,6 +1164,14 @@ void renderDebuggingProgressReport(DebuggingProgressReport& report)
     {
         verbose << "previous_failure_signature: " << report.previousFailureSignature << "\n";
     }
+    if(!report.artifactDeltas.empty())
+    {
+        verbose << "declared_output_files:\n";
+        for(const auto& delta : report.artifactDeltas)
+        {
+            verbose << "- " << delta.label << ": " << formatArtifactDelta(delta) << "\n";
+        }
+    }
     verbose << "END DEBUGGING PROGRESS REPORT DETAILS\n";
     report.verboseText = verbose.str();
 
@@ -870,6 +1180,7 @@ void renderDebuggingProgressReport(DebuggingProgressReport& report)
     json[U("previous_run_step")] = web::json::value::number(report.previousRunStep);
     json[U("label")] = web::json::value::string(utility::conversions::to_string_t(report.label));
     json[U("label_explanation")] = web::json::value::string(utility::conversions::to_string_t(report.labelExplanation));
+    json[U("label_reason")] = web::json::value::string(utility::conversions::to_string_t(report.regressionReason));
     json[U("regression_reason")] = web::json::value::string(utility::conversions::to_string_t(report.regressionReason));
     json[U("previous_run_known")] = web::json::value::boolean(report.previousRunKnown);
     json[U("previous_run_passed")] = web::json::value::boolean(report.previousRunPassed);
@@ -887,6 +1198,23 @@ void renderDebuggingProgressReport(DebuggingProgressReport& report)
         missingArtifacts[i] = web::json::value::string(utility::conversions::to_string_t(report.missingDebugArtifacts[i]));
     }
     json[U("missing_debug_artifacts")] = missingArtifacts;
+
+    web::json::value artifactDeltas = web::json::value::array(report.artifactDeltas.size());
+    for(size_t i = 0; i < report.artifactDeltas.size(); ++i)
+    {
+        const ProgressArtifactDelta& delta = report.artifactDeltas[i];
+        web::json::value item = web::json::value::object();
+        item[U("step_name")] = web::json::value::string(utility::conversions::to_string_t(delta.stepName));
+        item[U("file")] = web::json::value::string(utility::conversions::to_string_t(delta.file));
+        item[U("label")] = web::json::value::string(utility::conversions::to_string_t(delta.label));
+        item[U("previous_known")] = web::json::value::boolean(delta.previousKnown);
+        item[U("previous_exists")] = web::json::value::boolean(delta.previousExists);
+        item[U("current_exists")] = web::json::value::boolean(delta.currentExists);
+        item[U("previous_size")] = web::json::value::number(delta.previousSize);
+        item[U("current_size")] = web::json::value::number(delta.currentSize);
+        artifactDeltas[i] = item;
+    }
+    json[U("declared_output_deltas")] = artifactDeltas;
 
     web::json::value fixes = web::json::value::array(report.fixesSincePreviousRun.size());
     for(size_t i = 0; i < report.fixesSincePreviousRun.size(); ++i)
@@ -935,7 +1263,9 @@ std::string trimGitHistoryToCommitMessage(std::string history)
 
 std::string getRegressedFixGitHistory(CCodeProject* project, const DebuggingProgressReport& report)
 {
-    if(!project || report.label != "regressed" || report.fixesSincePreviousRun.empty())
+    if(!project ||
+       (report.label != "regressed" && report.label != "potential_regression") ||
+       report.fixesSincePreviousRun.empty())
     {
         return std::string();
     }
@@ -1105,6 +1435,29 @@ void classifyProgress(DebuggingProgressReport& report)
         return;
     }
 
+    const bool artifactProgress = hasArtifactDeltaLabel(report, "artifact_progress");
+    const bool artifactRegression = hasArtifactDeltaLabel(report, "potential_regression");
+    if(artifactProgress && artifactRegression)
+    {
+        report.label = "mixed";
+        report.labelExplanation = "The test still fails, and declared output files show both newly produced and newly missing artifacts.";
+        return;
+    }
+
+    if(artifactRegression)
+    {
+        report.label = "potential_regression";
+        report.labelExplanation = "The test still fails, and at least one declared output file that existed after the previous run is now missing.";
+        return;
+    }
+
+    if(artifactProgress)
+    {
+        report.label = "artifact_progress";
+        report.labelExplanation = "The test still fails, but at least one declared output file missing after the previous run is now produced.";
+        return;
+    }
+
     if(!report.currentFailureSignature.empty() &&
        report.currentFailureSignature == report.previousFailureSignature)
     {
@@ -1130,7 +1483,8 @@ DebuggingProgressReport buildDebuggingProgressReport(uint32_t runStep,
                                                      const std::vector<DebugStep>& trajectory,
                                                      uint32_t previousSteps,
                                                      const std::vector<std::string>& previousFixRunHistory,
-                                                     const std::vector<std::string>& missingDebugArtifacts)
+                                                     const std::vector<std::string>& missingDebugArtifacts,
+                                                     const std::vector<ProgressArtifactDelta>& artifactDeltas)
 {
     DebuggingProgressReport report;
     report.runStep = runStep;
@@ -1142,6 +1496,7 @@ DebuggingProgressReport buildDebuggingProgressReport(uint32_t runStep,
     report.currentFailureSignature = currentRunPassed ? std::string() : extractFailureSignature(currentRunLog, currentDebugNotes);
     report.previousFailureSignature = extractFailureSignature(previousRunLog, previousRunInfo);
     report.missingDebugArtifacts = missingDebugArtifacts;
+    report.artifactDeltas = artifactDeltas;
     report.fixesSincePreviousRun = collectFixesSincePreviousRun(trajectory, previousSteps);
 
     findPreviousRunState(trajectory, previousRunInfo, report.previousRunKnown, report.previousRunPassed);
@@ -7551,7 +7906,8 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
                                                                             m_trajectory,
                                                                             m_previousSteps,
                                                                             m_progressReportHistory,
-                                                                            {"executable " + replaceAll(expectedExecPath, project->getProjDir(), ".")});
+                                                                            {"executable " + replaceAll(expectedExecPath, project->getProjDir(), ".")},
+                                                                            {});
             m_progressReportHistory = progress.recentFixRunHistory;
             m_lastRunProgressReport = progress.conciseText;
             m_lastRunProgressReportVerbose = progress.verboseText;
@@ -7608,6 +7964,15 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
         const bool currentHasValidBuild = boost_fs::exists(execPath) &&
                                           boost_fs::exists(stdoutLogPath) &&
                                           boost_fs::exists(traceLogPath);
+        std::string previousWorkingDirectory;
+        if(previousRunStep > 0)
+        {
+            previousWorkingDirectory = project->getProjDir() + "/debug/" + test.name;
+            previousWorkingDirectory += "/trajectory/step_" + std::to_string(previousRunStep) + "/wd";
+        }
+        const std::vector<ProgressArtifactDelta> declaredOutputDeltas =
+            buildDeclaredOutputFileDeltas(test, previousWorkingDirectory, m_workingDirectory);
+
         progress = buildDebuggingProgressReport(stepIndex,
                                                 previousRunStep,
                                                 previousHadValidBuild,
@@ -7621,7 +7986,8 @@ bool Debugger::executeNextStep(CCodeProject* project, const TestDef& test)
                                                 m_trajectory,
                                                 m_previousSteps,
                                                 m_progressReportHistory,
-                                                missingDebugArtifacts);
+                                                missingDebugArtifacts,
+                                                declaredOutputDeltas);
 #endif
 
         std::string commitHash;
